@@ -25,7 +25,8 @@ export default function RootLayout({
   return (
     <html lang="en" suppressHydrationWarning className="hydrated">
       <body
-        className={`${geistSans.variable} ${geistMono.variable} antialiased max-w-screen h-screen`}
+        className={`${geistSans.variable} ${geistMono.variable} antialiased `}
+        cz-shortcut-listen="true"
       >
         {children}
       </body>
