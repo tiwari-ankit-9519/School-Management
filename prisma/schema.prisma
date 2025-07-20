@@ -1,9 +1,316 @@
 generator client {
   provider = "prisma-client-js"
-  output   = "../src/generated/prisma"
 }
 
 datasource db {
   provider = "mongodb"
   url      = env("DATABASE_URL")
+}
+
+model Student {
+  id               String   @id @default(auto()) @map("_id") @db.ObjectId
+  studentId        String   @unique
+  firstName        String
+  lastName         String
+  email            String   @unique
+  phone            String?
+  dateOfBirth      DateTime
+  address          String
+  guardianName     String
+  guardianPhone    String
+  guardianEmail    String
+  classId          String   @db.ObjectId
+  section          String
+  academicYearId   String   @db.ObjectId
+  enrollmentDate   DateTime @default(now())
+  isActive         Boolean  @default(true)
+  profileImage     String?
+  bloodGroup       String?
+  emergencyContact String?
+  medicalInfo      String?
+
+  class         Class          @relation(fields: [classId], references: [id])
+  academicYear  AcademicYear   @relation(fields: [academicYearId], references: [id])
+  feePayments   FeePayment[]
+  notifications Notification[]
+  auditLogs     AuditLog[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([classId, section])
+  @@index([isActive, academicYearId])
+  @@index([firstName, lastName])
+  @@map("students")
+}
+
+model Class {
+  id          String  @id @default(auto()) @map("_id") @db.ObjectId
+  name        String
+  description String?
+  capacity    Int
+  isActive    Boolean @default(true)
+
+  students      Student[]
+  feeStructures FeeStructure[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([name])
+  @@index([isActive])
+  @@map("classes")
+}
+
+model AcademicYear {
+  id        String   @id @default(auto()) @map("_id") @db.ObjectId
+  year      String   @unique
+  startDate DateTime
+  endDate   DateTime
+  isActive  Boolean  @default(false)
+  isCurrent Boolean  @default(false)
+
+  students      Student[]
+  feePayments   FeePayment[]
+  feeStructures FeeStructure[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([isActive])
+  @@index([isCurrent])
+  @@map("academic_years")
+}
+
+model FeeStructure {
+  id             String       @id @default(auto()) @map("_id") @db.ObjectId
+  classId        String       @db.ObjectId
+  academicYearId String       @db.ObjectId
+  amount         Float
+  dueDate        DateTime?
+  description    String?
+  isActive       Boolean      @default(true)
+  class          Class        @relation(fields: [classId], references: [id])
+  academicYear   AcademicYear @relation(fields: [academicYearId], references: [id])
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([classId, academicYearId])
+  @@index([isActive])
+  @@map("fee_structures")
+}
+
+model FeePayment {
+  id             String        @id @default(auto()) @map("_id") @db.ObjectId
+  studentId      String        @db.ObjectId
+  academicYearId String        @db.ObjectId
+  amount         Float
+  paymentMethod  PaymentMethod
+  transactionId  String?
+  paymentDate    DateTime      @default(now())
+  month          String?
+  status         PaymentStatus @default(PENDING)
+  remarks        String?
+  receiptNumber  String?
+  paidBy         String?
+
+  student      Student      @relation(fields: [studentId], references: [id])
+  academicYear AcademicYear @relation(fields: [academicYearId], references: [id])
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([studentId])
+  @@index([academicYearId])
+  @@index([paymentDate, status])
+  @@index([status])
+  @@index([receiptNumber])
+  @@map("fee_payments")
+}
+
+model Admin {
+  id                String         @id @default(auto()) @map("_id") @db.ObjectId
+  email             String         @unique
+  name              String
+  passwordHash      String
+  role              AdminRole      @default(ADMIN)
+  isActive          Boolean        @default(true)
+  lastLogin         DateTime?
+  preferredLanguage String         @default("en")
+  profileImage      String?
+  phone             String?
+  sessions          Session[]
+  auditLogs         AuditLog[]
+  notifications     Notification[]
+  createdAt         DateTime       @default(now())
+  updatedAt         DateTime       @updatedAt
+
+  @@index([isActive])
+  @@index([role])
+  @@map("admins")
+}
+
+model Session {
+  id           String   @id @default(auto()) @map("_id") @db.ObjectId
+  sessionToken String   @unique
+  adminId      String   @db.ObjectId
+  expires      DateTime
+  ipAddress    String?
+  userAgent    String?
+  loginTime    DateTime @default(now())
+
+  admin Admin @relation(fields: [adminId], references: [id], onDelete: Cascade)
+
+  @@index([adminId])
+  @@index([loginTime])
+  @@map("sessions")
+}
+
+model SystemSettings {
+  id          String  @id @default(auto()) @map("_id") @db.ObjectId
+  key         String  @unique
+  value       String
+  description String?
+  dataType    String  @default("string")
+  isEditable  Boolean @default(true)
+  category    String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([category])
+  @@map("system_settings")
+}
+
+model Translation {
+  id        String  @id @default(auto()) @map("_id") @db.ObjectId
+  key       String
+  locale    String
+  value     String
+  namespace String  @default("common")
+  isSystem  Boolean @default(false)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([key, locale, namespace])
+  @@index([locale])
+  @@index([namespace])
+  @@map("translations")
+}
+
+model AuditLog {
+  id        String   @id @default(auto()) @map("_id") @db.ObjectId
+  adminId   String?  @db.ObjectId
+  studentId String?  @db.ObjectId
+  action    String
+  entity    String
+  entityId  String?
+  oldData   Json?
+  newData   Json?
+  ipAddress String?
+  userAgent String?
+  timestamp DateTime @default(now())
+
+  admin   Admin?   @relation(fields: [adminId], references: [id])
+  student Student? @relation(fields: [studentId], references: [id])
+
+  @@index([adminId])
+  @@index([studentId])
+  @@index([action])
+  @@index([entity])
+  @@index([timestamp])
+  @@map("audit_logs")
+}
+
+model Notification {
+  id         String             @id @default(auto()) @map("_id") @db.ObjectId
+  title      String
+  message    String
+  type       NotificationType
+  targetType NotificationTarget
+  targetId   String?            @db.ObjectId
+  isRead     Boolean            @default(false)
+  isGlobal   Boolean            @default(false)
+  expiresAt  DateTime?
+
+  admin   Admin?   @relation(fields: [targetId], references: [id])
+  student Student? @relation(fields: [targetId], references: [id])
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([targetType, targetId])
+  @@index([isRead])
+  @@index([isGlobal])
+  @@index([type])
+  @@index([createdAt])
+  @@map("notifications")
+}
+
+model CacheMetrics {
+  id           String    @id @default(auto()) @map("_id") @db.ObjectId
+  key          String
+  hitCount     Int       @default(0)
+  missCount    Int       @default(0)
+  lastAccessed DateTime  @default(now())
+  expiresAt    DateTime?
+
+  @@index([key])
+  @@index([lastAccessed])
+  @@map("cache_metrics")
+}
+
+model QueryMetrics {
+  id           String   @id @default(auto()) @map("_id") @db.ObjectId
+  queryType    String
+  duration     Int
+  timestamp    DateTime @default(now())
+  isSuccessful Boolean  @default(true)
+  errorMessage String?
+
+  @@index([queryType])
+  @@index([timestamp])
+  @@index([duration])
+  @@map("query_metrics")
+}
+
+enum PaymentMethod {
+  CASH
+  CARD
+  UPI
+  BANK_TRANSFER
+  CHEQUE
+  ONLINE
+  DD
+}
+
+enum PaymentStatus {
+  PENDING
+  COMPLETED
+  FAILED
+  REFUNDED
+  PARTIAL
+  CANCELLED
+}
+
+enum AdminRole {
+  SUPER_ADMIN
+  ADMIN
+}
+
+enum NotificationType {
+  INFO
+  WARNING
+  ERROR
+  SUCCESS
+  REMINDER
+  ALERT
+}
+
+enum NotificationTarget {
+  ADMIN
+  STUDENT
+  GLOBAL
 }
