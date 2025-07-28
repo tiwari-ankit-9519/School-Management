@@ -13,86 +13,77 @@ import {
   FormMessage,
 } from "@/components/ui/form";
 import { Label } from "@/components/ui/label";
-import { Eye, EyeOff, Mail, Lock, ArrowRight } from "lucide-react";
+import { Eye, EyeOff, Mail, Lock, ArrowRight, User } from "lucide-react";
 import { useState } from "react";
-import { formSchema } from "@/types/authTypes";
-import { login } from "@/actions/login";
+import { register as registerAction } from "@/actions/register";
 import Link from "next/link";
-import { toast } from "sonner";
+import { registerFormSchema } from "@/types/authTypes";
 import { useRouter } from "next/navigation";
+import { toast } from "sonner";
 
-const Login = () => {
-  const form = useForm<z.infer<typeof formSchema>>({
-    resolver: zodResolver(formSchema),
+const Register = () => {
+  const form = useForm<z.infer<typeof registerFormSchema>>({
+    resolver: zodResolver(registerFormSchema),
     defaultValues: {
+      name: "",
       email: "",
       password: "",
     },
   });
 
-  const [showPassword, setShowPassword] = useState(false);
-  const [isLoading, setIsLoading] = useState(false);
   const router = useRouter();
 
-  const handleSubmit = async (values: z.infer<typeof formSchema>) => {
+  const [showPassword, setShowPassword] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
+
+  const handleSubmit = async (values: z.infer<typeof registerFormSchema>) => {
     setIsLoading(true);
-
-    try {
-      const result = await login(values);
-
-      if (result?.success) {
-        toast.success("Logged in successfully!");
-        router.push("/");
-      } else {
-        toast.error(result?.message || "Login failed. Please try again.");
-      }
-    } catch (error) {
-      toast.error(error as string);
-    } finally {
-      setIsLoading(false);
-    }
+    await registerAction(values);
+    toast.success("User created successfully. Navigate to login page");
+    setIsLoading(false);
+    router.push("/login");
   };
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-indigo-50 via-white to-cyan-50 dark:from-gray-900 dark:via-gray-800 dark:to-indigo-900">
       <div className="flex min-h-screen">
-        <div className="hidden lg:flex lg:w-1/2 xl:w-3/5 bg-gradient-to-br from-indigo-600 via-purple-600 to-blue-700 relative overflow-hidden">
+        <div className="hidden lg:flex lg:w-1/2 xl:w-3/5 bg-gradient-to-br from-emerald-600 via-teal-600 to-cyan-700 relative overflow-hidden">
           <div className="absolute inset-0 bg-black/20"></div>
           <div className="absolute inset-0 bg-gradient-to-t from-black/50 via-transparent to-transparent"></div>
           <div className="relative z-10 flex flex-col justify-end p-8 lg:p-12 xl:p-16 text-white">
             <div className="space-y-6">
               <h1 className="text-4xl xl:text-5xl font-bold leading-tight">
-                Welcome to the
-                <span className="block bg-gradient-to-r from-cyan-400 to-blue-400 bg-clip-text text-transparent">
-                  Future of Work
+                Join the
+                <span className="block bg-gradient-to-r from-emerald-400 to-cyan-400 bg-clip-text text-transparent">
+                  Revolution Today
                 </span>
               </h1>
-              <p className="text-lg xl:text-xl text-blue-100 max-w-md">
-                Join thousands of professionals who trust our platform for their
-                daily workflow.
+              <p className="text-lg xl:text-xl text-emerald-100 max-w-md">
+                Create your account and start your journey with thousands of
+                professionals worldwide.
               </p>
-              <div className="flex items-center space-x-2 text-sm text-blue-200">
-                <div className="w-2 h-2 bg-green-400 rounded-full animate-pulse"></div>
-                <span>Over 10,000+ active users</span>
+              <div className="flex items-center space-x-2 text-sm text-emerald-200">
+                <div className="w-2 h-2 bg-emerald-400 rounded-full animate-pulse"></div>
+                <span>Join 10,000+ users today</span>
               </div>
             </div>
           </div>
           <div className="absolute top-10 right-10 w-32 h-32 bg-white/10 rounded-full blur-xl"></div>
-          <div className="absolute bottom-20 left-10 w-24 h-24 bg-cyan-400/20 rounded-full blur-lg"></div>
-          <div className="absolute top-1/2 right-1/4 w-16 h-16 bg-purple-400/20 rounded-full blur-md"></div>
+          <div className="absolute bottom-20 left-10 w-24 h-24 bg-emerald-400/20 rounded-full blur-lg"></div>
+          <div className="absolute top-1/2 right-1/4 w-16 h-16 bg-teal-400/20 rounded-full blur-md"></div>
         </div>
 
         <div className="w-full lg:w-1/2 xl:w-2/5 flex items-center justify-center p-4 sm:p-6 lg:p-8">
           <div className="w-full max-w-md space-y-8">
             <div className="text-center space-y-4">
-              <div className="inline-flex items-center justify-center w-16 h-16 bg-gradient-to-r from-indigo-500 to-purple-600 rounded-2xl mb-4">
-                <Lock className="w-8 h-8 text-white" />
+              <div className="inline-flex items-center justify-center w-16 h-16 bg-gradient-to-r from-emerald-500 to-teal-600 rounded-2xl mb-4">
+                <User className="w-8 h-8 text-white" />
               </div>
               <h2 className="text-3xl sm:text-4xl font-bold text-gray-900 dark:text-white">
-                Welcome Back
+                Create Account
               </h2>
               <p className="text-gray-600 dark:text-gray-400 text-sm sm:text-base">
-                Sign in to your account to continue
+                Sign up to get started with your account
               </p>
             </div>
 
@@ -102,6 +93,30 @@ const Login = () => {
                   onSubmit={form.handleSubmit(handleSubmit)}
                   className="space-y-6"
                 >
+                  <FormField
+                    control={form.control}
+                    name="name"
+                    render={({ field }) => (
+                      <FormItem className="space-y-2">
+                        <Label className="text-sm font-medium text-gray-700 dark:text-gray-300">
+                          Full Name
+                        </Label>
+                        <div className="relative">
+                          <User className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
+                          <FormControl>
+                            <Input
+                              className="pl-10 h-12 bg-white/50 dark:bg-gray-700/50 border-gray-200 dark:border-gray-600 rounded-xl focus:ring-2 focus:ring-emerald-500 focus:border-transparent transition-all duration-200 text-sm sm:text-base"
+                              placeholder="Enter your full name"
+                              type="text"
+                              {...field}
+                            />
+                          </FormControl>
+                        </div>
+                        <FormMessage className="text-xs text-red-500" />
+                      </FormItem>
+                    )}
+                  />
+
                   <FormField
                     control={form.control}
                     name="email"
@@ -114,7 +129,7 @@ const Login = () => {
                           <Mail className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
                           <FormControl>
                             <Input
-                              className="pl-10 h-12 bg-white/50 dark:bg-gray-700/50 border-gray-200 dark:border-gray-600 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-all duration-200 text-sm sm:text-base"
+                              className="pl-10 h-12 bg-white/50 dark:bg-gray-700/50 border-gray-200 dark:border-gray-600 rounded-xl focus:ring-2 focus:ring-emerald-500 focus:border-transparent transition-all duration-200 text-sm sm:text-base"
                               placeholder="Enter your email"
                               type="email"
                               {...field}
@@ -138,8 +153,8 @@ const Login = () => {
                           <Lock className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
                           <FormControl>
                             <Input
-                              className="pl-10 pr-10 h-12 bg-white/50 dark:bg-gray-700/50 border-gray-200 dark:border-gray-600 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-all duration-200 text-sm sm:text-base"
-                              placeholder="Enter your password"
+                              className="pl-10 pr-10 h-12 bg-white/50 dark:bg-gray-700/50 border-gray-200 dark:border-gray-600 rounded-xl focus:ring-2 focus:ring-emerald-500 focus:border-transparent transition-all duration-200 text-sm sm:text-base"
+                              placeholder="Create a password"
                               type={showPassword ? "text" : "password"}
                               {...field}
                             />
@@ -161,25 +176,16 @@ const Login = () => {
                     )}
                   />
 
-                  <div className="flex items-center justify-between text-sm">
-                    <a
-                      href="#"
-                      className="text-indigo-600 hover:text-indigo-800 font-medium transition-colors"
-                    >
-                      Forgot password?
-                    </a>
-                  </div>
-
                   <Button
                     type="submit"
                     disabled={isLoading}
-                    className="w-full h-12 bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700 text-white font-medium rounded-xl shadow-lg hover:shadow-xl transform hover:-translate-y-0.5 transition-all duration-200 flex items-center justify-center space-x-2 text-sm sm:text-base"
+                    className="w-full h-12 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 text-white font-medium rounded-xl shadow-lg hover:shadow-xl transform hover:-translate-y-0.5 transition-all duration-200 flex items-center justify-center space-x-2 text-sm sm:text-base"
                   >
                     {isLoading ? (
                       <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
                     ) : (
                       <>
-                        <span>Sign In</span>
+                        <span>Create Account</span>
                         <ArrowRight className="w-4 h-4" />
                       </>
                     )}
@@ -190,23 +196,23 @@ const Login = () => {
               <div className="mt-8 pt-6 border-t border-gray-200 dark:border-gray-700">
                 <div className="text-center space-y-4">
                   <p className="text-sm text-gray-600 dark:text-gray-400">
-                    Don&apos;t have an account?{" "}
+                    Already have an account?{" "}
                     <Link
-                      href="/register"
-                      className="text-indigo-600 hover:text-indigo-800 font-semibold transition-colors"
+                      href="/login"
+                      className="text-emerald-600 hover:text-emerald-800 font-semibold transition-colors"
                     >
-                      Sign up for free
+                      Sign in here
                     </Link>
                   </p>
 
                   <div className="flex items-center justify-center space-x-4 pt-4">
                     <div className="flex items-center space-x-2 text-xs text-gray-500">
                       <div className="w-2 h-2 bg-green-500 rounded-full"></div>
-                      <span>Secure Login</span>
+                      <span>Secure Registration</span>
                     </div>
                     <div className="flex items-center space-x-2 text-xs text-gray-500">
                       <div className="w-2 h-2 bg-blue-500 rounded-full"></div>
-                      <span>SSL Protected</span>
+                      <span>Email Verified</span>
                     </div>
                   </div>
                 </div>
@@ -215,12 +221,12 @@ const Login = () => {
 
             <div className="text-center">
               <p className="text-xs text-gray-500 dark:text-gray-400">
-                By signing in, you agree to our{" "}
-                <a href="#" className="text-indigo-600 hover:underline">
+                By creating an account, you agree to our{" "}
+                <a href="#" className="text-emerald-600 hover:underline">
                   Terms of Service
                 </a>{" "}
                 and{" "}
-                <a href="#" className="text-indigo-600 hover:underline">
+                <a href="#" className="text-emerald-600 hover:underline">
                   Privacy Policy
                 </a>
               </p>
@@ -232,4 +238,4 @@ const Login = () => {
   );
 };
 
-export default Login;
+export default Register;

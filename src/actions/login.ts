@@ -1,20 +1,44 @@
 "use server";
 
 import { signIn } from "@/lib/auth";
-import { formSchema } from "@/types/loginTypes";
+import { formSchema } from "@/types/authTypes";
 import { z } from "zod";
 
-export const login = async (values: z.infer<typeof formSchema>) => {
-  const validatedFields = formSchema.safeParse(values);
-  if (!validatedFields.success) {
-    throw new Error("Validation failed");
+export async function login(values: z.infer<typeof formSchema>) {
+  try {
+    const validatedFields = formSchema.safeParse(values);
+
+    if (!validatedFields.success) {
+      return {
+        success: false,
+        message: "Invalid fields",
+      };
+    }
+
+    const { email, password } = validatedFields.data;
+
+    const result = await signIn("credentials", {
+      email,
+      password,
+      redirect: false,
+    });
+
+    if (result?.error) {
+      return {
+        success: false,
+        message: "Invalid credentials",
+      };
+    }
+
+    return {
+      success: true,
+      message: "Login successful",
+    };
+  } catch (error) {
+    console.log(error);
+    return {
+      success: false,
+      message: "Something went wrong",
+    };
   }
-
-  const { email, password } = validatedFields.data;
-
-  await signIn("credentials", {
-    email,
-    password,
-    redirectTo: "/",
-  });
-};
+}
