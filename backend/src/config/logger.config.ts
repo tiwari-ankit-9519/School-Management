@@ -53,7 +53,14 @@ interface MemoryUsage {
   external: string;
 }
 
-type LogLevel = "error" | "warn" | "info" | "http" | "audit" | "query" | "debug";
+type LogLevel =
+  | "error"
+  | "warn"
+  | "info"
+  | "http"
+  | "audit"
+  | "query"
+  | "debug";
 
 type SanitizableValue =
   | string
@@ -78,6 +85,7 @@ interface AuthenticatedUser {
   id: string;
   schoolId: string;
   role: string;
+  sessionId: string;
 }
 
 interface AuthenticatedRequest extends Request {
@@ -86,26 +94,27 @@ interface AuthenticatedRequest extends Request {
   context?: { ip: string };
 }
 
-const customLevels: { levels: CustomLevels; colors: Record<LogLevel, string> } = {
-  levels: {
-    error: 0,
-    warn: 1,
-    info: 2,
-    http: 3,
-    audit: 4,
-    query: 5,
-    debug: 6,
-  },
-  colors: {
-    error: "red bold",
-    warn: "yellow bold",
-    info: "green",
-    http: "magenta",
-    audit: "cyan bold",
-    query: "blue",
-    debug: "white",
-  },
-};
+const customLevels: { levels: CustomLevels; colors: Record<LogLevel, string> } =
+  {
+    levels: {
+      error: 0,
+      warn: 1,
+      info: 2,
+      http: 3,
+      audit: 4,
+      query: 5,
+      debug: 6,
+    },
+    colors: {
+      error: "red bold",
+      warn: "yellow bold",
+      info: "green",
+      http: "magenta",
+      audit: "cyan bold",
+      query: "blue",
+      debug: "white",
+    },
+  };
 
 winston.addColors(customLevels.colors);
 
@@ -204,7 +213,14 @@ function getMemoryUsage(): MemoryUsage {
 
 function flattenMetadata(obj: Record<string, unknown>, prefix = ""): string {
   return Object.entries(obj)
-    .filter(([, v]) => v !== undefined && v !== null && v !== "" && v !== "none" && v !== "unauthenticated")
+    .filter(
+      ([, v]) =>
+        v !== undefined &&
+        v !== null &&
+        v !== "" &&
+        v !== "none" &&
+        v !== "unauthenticated",
+    )
     .map(([k, v]) => {
       const key = prefix ? `${prefix}.${k}` : k;
       if (typeof v === "object" && !Array.isArray(v) && !(v instanceof Date)) {
@@ -221,9 +237,9 @@ function flattenMetadata(obj: Record<string, unknown>, prefix = ""): string {
 
 const LEVEL_LABEL: Record<string, string> = {
   error: "ERROR",
-  warn:  "WARN ",
-  info:  "INFO ",
-  http:  "HTTP ",
+  warn: "WARN ",
+  info: "INFO ",
+  http: "HTTP ",
   audit: "AUDIT",
   query: "QUERY",
   debug: "DEBUG",
@@ -244,9 +260,21 @@ function buildLog4jLine(
   const caller = metadata["caller"] as CallerInfo | undefined;
 
   const skip = new Set([
-    "module", "service", "environment", "version", "nodeId",
-    "hostname", "platform", "uptime", "memory", "pid", "caller",
-    "splat", "level", "message", "timestamp",
+    "module",
+    "service",
+    "environment",
+    "version",
+    "nodeId",
+    "hostname",
+    "platform",
+    "uptime",
+    "memory",
+    "pid",
+    "caller",
+    "splat",
+    "level",
+    "message",
+    "timestamp",
   ]);
 
   const rest: Record<string, unknown> = {};
@@ -263,9 +291,9 @@ function buildLog4jLine(
   if (withColor) {
     const colorMap: Record<string, string> = {
       error: "\x1b[31m\x1b[1m",
-      warn:  "\x1b[33m\x1b[1m",
-      info:  "\x1b[32m",
-      http:  "\x1b[35m",
+      warn: "\x1b[33m\x1b[1m",
+      info: "\x1b[32m",
+      http: "\x1b[35m",
       audit: "\x1b[36m\x1b[1m",
       query: "\x1b[34m",
       debug: "\x1b[37m",
@@ -424,7 +452,11 @@ export function createModuleLogger(moduleName: string): winston.Logger {
   return logger.child({ module: moduleName });
 }
 
-export function logRequest(req: AuthenticatedRequest, res: Response, duration: number): void {
+export function logRequest(
+  req: AuthenticatedRequest,
+  res: Response,
+  duration: number,
+): void {
   const logData = {
     requestId: req.requestId,
     method: req.method,

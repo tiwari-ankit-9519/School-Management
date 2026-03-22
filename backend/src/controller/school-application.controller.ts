@@ -25,6 +25,19 @@ export async function schoolApplicationRegistrationController(
   req: AuthenticatedRequest,
   res: Response,
 ): Promise<void> {
+  if (req.body.documents && typeof req.body.documents === "string") {
+    try {
+      req.body.documents = JSON.parse(req.body.documents);
+    } catch {
+      res.status(400).json({
+        success: false,
+        message: "Validation failed",
+        errors: [{ path: ["documents"], message: "Invalid documents format" }],
+      });
+      return;
+    }
+  }
+
   const parsed = SchoolApplicationSchema.safeParse(req.body);
   if (!parsed.success) {
     res.status(400).json({
@@ -34,17 +47,14 @@ export async function schoolApplicationRegistrationController(
     });
     return;
   }
-
   const files = (req.files as Express.Multer.File[]) ?? [];
   const auditContext = buildAuditContext(req);
-
   const application = await schoolApplicationRegistration(
     parsed.data,
     files,
     auditContext,
-    res.statusCode
+    res.statusCode,
   );
-
   res.status(201).json({
     success: true,
     message: "Application submitted successfully",
@@ -117,7 +127,11 @@ export async function getApplication(
 
   const auditContext = buildAuditContext(req);
 
-  const application = await getSingleApplication(id, auditContext, res.statusCode);
+  const application = await getSingleApplication(
+    id,
+    auditContext,
+    res.statusCode,
+  );
 
   res.status(200).json({
     success: true,
@@ -142,7 +156,12 @@ export async function approveApplicationController(
 
   const auditContext = buildAuditContext(req);
 
-  const school = await approveApplication(id, req.user!.id, auditContext, res.statusCode);
+  const school = await approveApplication(
+    id,
+    req.user!.id,
+    auditContext,
+    res.statusCode,
+  );
 
   res.status(200).json({
     success: true,
@@ -182,7 +201,7 @@ export async function rejectApplicationController(
     req.user!.id,
     parsed.data.rejectionReason,
     auditContext,
-    res.statusCode
+    res.statusCode,
   );
 
   res.status(200).json({
@@ -223,7 +242,7 @@ export async function requestMoreInfoController(
     parsed.data.notes,
     parsed.data.moreInfoFields,
     auditContext,
-    res.statusCode
+    res.statusCode,
   );
 
   res.status(200).json({
@@ -264,7 +283,7 @@ export async function resubmitApplicationController(
     parsed.data,
     files,
     auditContext,
-    res.statusCode
+    res.statusCode,
   );
 
   res.status(200).json({

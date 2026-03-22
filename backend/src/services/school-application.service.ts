@@ -20,6 +20,12 @@ import {
 } from "../config/cloudinary.config";
 import { CACHE_KEYS, CACHE_TTL, getCache, setCache } from "../utils/cache.util";
 import { hashPassword } from "../utils/password";
+import {
+  sendApplicationIdEmail,
+  sendMoreInfoEmail,
+  sendRejectionEmail,
+  sendWelcomeEmail,
+} from "./email.service";
 
 const log = createModuleLogger("SchoolApplicationServiceLogger");
 
@@ -27,7 +33,7 @@ export async function schoolApplicationRegistration(
   data: SchoolApplicationInput,
   files: Express.Multer.File[],
   context: AuditContext,
-  statusCode: number
+  statusCode: number,
 ): Promise<SchoolApplication> {
   try {
     log.info("School application process started", {
@@ -54,19 +60,182 @@ export async function schoolApplicationRegistration(
     const schoolApplicationExists = await prisma.schoolApplication.findFirst({
       where: {
         OR: [{ email: data.email }, { adminEmail: data.adminEmail }],
-        status: {
-          notIn: ["REJECTED"],
-        },
       },
     });
 
     if (schoolApplicationExists) {
+      if (schoolApplicationExists.status === "REJECTED") {
+        log.info("Resubmitting rejected school application", {
+          existingApplicationId: schoolApplicationExists.id,
+          email: data.email,
+          adminEmail: data.adminEmail,
+        });
+
+        const uploadedFiles: Array<{
+          uploadResult: CloudinaryUploadResult;
+          documentType: DocumentType;
+          title: string;
+        }> = [];
+
+        if (files.length > 0) {
+          log.info("Uploading documents to Cloudinary", {
+            fileCount: files.length,
+          });
+          for (let i = 0; i < files.length; i++) {
+            const file = files[i];
+            const documentMeta = data.documents?.[i];
+            const uploadResult = await uploadToCloudinary(
+              file,
+              "school-applications",
+            );
+            uploadedFiles.push({
+              uploadResult,
+              documentType: documentMeta?.documentType ?? "OTHER",
+              title: documentMeta?.title ?? file.originalname,
+            });
+            log.info("Document uploaded successfully", {
+              publicId: uploadResult.publicId,
+              documentType: documentMeta?.documentType,
+              title: documentMeta?.title,
+            });
+          }
+        }
+
+        const resubmittedApplication = await prisma.$transaction(async (tx) => {
+          const updated = await tx.schoolApplication.update({
+            where: { id: schoolApplicationExists.id },
+            data: {
+              schoolName: data.schoolName,
+              address: data.address,
+              city: data.city,
+              state: data.state,
+              country: data.country,
+              pincode: data.pincode,
+              phone: data.phone,
+              email: data.email,
+              website: data.website,
+              establishedYear: data.establishedYear,
+              affiliationNumber: data.affiliationNumber,
+              boardType: data.boardType,
+              adminFirstName: data.adminFirstName,
+              adminLastName: data.adminLastName,
+              adminEmail: data.adminEmail,
+              adminPhone: data.adminPhone,
+              adminGender: data.adminGender,
+              status: "PENDING",
+              appliedAt: new Date(),
+              reviewedAt: null,
+              reviewedBy: null,
+              rejectionReason: null,
+              notes: null,
+              moreInfoFields: [],
+            },
+          });
+
+          if (uploadedFiles.length > 0) {
+            const existingDocs = await tx.document.findMany({
+              where: {
+                ownerId: updated.id,
+                ownerType: "SCHOOL_APPLICATION",
+              },
+              select: { cloudinaryId: true },
+            });
+
+            await tx.document.deleteMany({
+              where: {
+                ownerId: updated.id,
+                ownerType: "SCHOOL_APPLICATION",
+              },
+            });
+
+            existingDocs.forEach(({ cloudinaryId }) => {
+              deleteFromCloudinary(cloudinaryId).catch((err) => {
+                log.warn("Failed to delete old document from Cloudinary", {
+                  cloudinaryId,
+                  error: (err as Error).message,
+                });
+              });
+            });
+
+            await tx.document.createMany({
+              data: uploadedFiles.map(
+                ({ uploadResult, documentType, title }) => ({
+                  ownerId: updated.id,
+                  ownerType: "SCHOOL_APPLICATION" as DocumentOwnerType,
+                  schoolApplicationId: updated.id,
+                  documentType,
+                  title,
+                  originalFileName: uploadResult.originalFileName,
+                  cloudinaryId: uploadResult.publicId,
+                  cloudinaryUrl: uploadResult.cloudinaryUrl,
+                  secureUrl: uploadResult.secureUrl,
+                  resourceType: uploadResult.resourceType,
+                  format: uploadResult.format,
+                  sizeBytes: uploadResult.sizeBytes,
+                  width: uploadResult.width,
+                  height: uploadResult.height,
+                  folder: uploadResult.folder,
+                  uploadedBy: "APPLICANT",
+                }),
+              ),
+            });
+
+            log.info("Documents saved to database", {
+              applicationId: updated.id,
+              documentCount: uploadedFiles.length,
+            });
+          }
+
+          return updated;
+        });
+
+        await createSystemLog({
+          level: "INFO",
+          message: "School application resubmitted",
+          module: "SchoolApplication",
+          metadata: {
+            applicationId: resubmittedApplication.id,
+            schoolName: data.schoolName,
+            email: data.email,
+            adminEmail: data.adminEmail,
+            documentCount: uploadedFiles.length,
+          },
+          context,
+          statusCode,
+        });
+
+        log.info("School application resubmitted successfully", {
+          applicationId: resubmittedApplication.id,
+          email: data.email,
+          adminEmail: data.adminEmail,
+          documentCount: uploadedFiles.length,
+        });
+
+        await sendApplicationIdEmail({
+          email: resubmittedApplication.adminEmail,
+          firstName: resubmittedApplication.adminFirstName,
+          lastName: resubmittedApplication.adminLastName,
+          schoolName: resubmittedApplication.schoolName,
+          applicationId: resubmittedApplication.id,
+          appliedAt: new Date(
+            resubmittedApplication.appliedAt,
+          ).toLocaleDateString("en-IN", {
+            day: "numeric",
+            month: "long",
+            year: "numeric",
+          }),
+        });
+
+        return resubmittedApplication;
+      }
+
       log.warn("School application already exists", {
         existingApplicationId: schoolApplicationExists.id,
         existingStatus: schoolApplicationExists.status,
         email: data.email,
         adminEmail: data.adminEmail,
       });
+
       throw new Error(
         "A school application with this email or admin email already exists",
       );
@@ -82,22 +251,18 @@ export async function schoolApplicationRegistration(
       log.info("Uploading documents to Cloudinary", {
         fileCount: files.length,
       });
-
       for (let i = 0; i < files.length; i++) {
         const file = files[i];
         const documentMeta = data.documents?.[i];
-
         const uploadResult = await uploadToCloudinary(
           file,
           "school-applications",
         );
-
         uploadedFiles.push({
           uploadResult,
           documentType: documentMeta?.documentType ?? "OTHER",
           title: documentMeta?.title ?? file.originalname,
         });
-
         log.info("Document uploaded successfully", {
           publicId: uploadResult.publicId,
           documentType: documentMeta?.documentType,
@@ -134,6 +299,7 @@ export async function schoolApplicationRegistration(
           data: uploadedFiles.map(({ uploadResult, documentType, title }) => ({
             ownerId: application.id,
             ownerType: "SCHOOL_APPLICATION" as DocumentOwnerType,
+            schoolApplicationId: application.id,
             documentType,
             title,
             originalFileName: uploadResult.originalFileName,
@@ -171,7 +337,7 @@ export async function schoolApplicationRegistration(
         documentCount: uploadedFiles.length,
       },
       context,
-      statusCode
+      statusCode,
     });
 
     log.info("School application submitted successfully", {
@@ -179,6 +345,22 @@ export async function schoolApplicationRegistration(
       email: data.email,
       adminEmail: data.adminEmail,
       documentCount: uploadedFiles.length,
+    });
+
+    await sendApplicationIdEmail({
+      email: newSchoolApplication.adminEmail,
+      firstName: newSchoolApplication.adminFirstName,
+      lastName: newSchoolApplication.adminLastName,
+      schoolName: newSchoolApplication.schoolName,
+      applicationId: newSchoolApplication.id,
+      appliedAt: new Date(newSchoolApplication.appliedAt).toLocaleDateString(
+        "en-IN",
+        {
+          day: "numeric",
+          month: "long",
+          year: "numeric",
+        },
+      ),
     });
 
     return newSchoolApplication;
@@ -223,7 +405,7 @@ export async function viewSchoolApplicationStatus(
       message: "Viewed school application",
       module: "SchoolApplication",
       metadata: {
-        applicationId: applicationExists.id,
+        applicationId,
         status: applicationExists.status,
       },
       context,
@@ -296,8 +478,8 @@ export async function getAllApplications(
           appliedAt: "desc",
         },
         include: {
-          documents: true
-        }
+          documents: true,
+        },
       }),
       prisma.schoolApplication.count({ where }),
     ]);
@@ -350,7 +532,7 @@ export async function getAllApplications(
 export async function getSingleApplication(
   applicationId: string,
   context: AuditContext,
-  statusCode: number
+  statusCode: number,
 ): Promise<SchoolApplication> {
   try {
     log.info("Fetching single applicaion", {
@@ -361,8 +543,8 @@ export async function getSingleApplication(
         id: applicationId,
       },
       include: {
-        documents: true
-      }
+        documents: true,
+      },
     });
     if (!applicationExists) {
       log.warn("Application not found", {
@@ -371,15 +553,15 @@ export async function getSingleApplication(
       throw new Error("Selected application not found");
     }
     await createSystemLog({
-        level: "INFO",
-        message: "Fetched single application",
-        module: "SchoolApplication",
-        context,
-        metadata: {
-          applicationId: applicationExists?.id,
-          status: applicationExists?.status,
-        },
-        statusCode
+      level: "INFO",
+      message: "Fetched single application",
+      module: "SchoolApplication",
+      context,
+      metadata: {
+        applicationId: applicationExists?.id,
+        status: applicationExists?.status,
+      },
+      statusCode,
     });
     log.info("Application fetched successfully", {
       applicationId: applicationExists.id,
@@ -401,7 +583,7 @@ export async function approveApplication(
   applicationId: string,
   superAdminId: string,
   context: AuditContext,
-  statusCode: number
+  statusCode: number,
 ): Promise<School> {
   try {
     log.info("Starting approve application service", {
@@ -509,37 +691,37 @@ export async function approveApplication(
     });
 
     await createAuditLog({
+      schoolId: result.school.id,
+      performedById: superAdminId,
+      action: "APPROVE",
+      module: "SchoolApplication",
+      resourceId: applicationId,
+      resourceType: "SchoolApplication",
+      newValues: {
         schoolId: result.school.id,
-        performedById: superAdminId,
-        action: "APPROVE",
-        module: "SchoolApplication",
-        resourceId: applicationId,
-        resourceType: "SchoolApplication",
-        newValues: {
-          schoolId: result.school.id,
-          schoolCode: result.school.code,
-          adminUserId: result.user.id,
-          adminRegNumber: result.userWithRegNumber?.regNumber,
-          status: "APPROVED",
-        },
-        statusCode,
-        isSuccessful: true,
-        context
+        schoolCode: result.school.code,
+        adminUserId: result.user.id,
+        adminRegNumber: result.userWithRegNumber?.regNumber,
+        status: "APPROVED",
+      },
+      statusCode,
+      isSuccessful: true,
+      context,
     });
 
     await createSystemLog({
-        level: "INFO",
-        message: "School application approved",
-        module: "SchoolApplication",
-        context,
-        metadata: {
-          applicationId,
-          schoolId: result.school.id,
-          schoolCode: result.school.code,
-          adminUserId: result.user.id,
-          adminRegNumber: result.userWithRegNumber?.regNumber,
-        },
-        statusCode,
+      level: "INFO",
+      message: "School application approved",
+      module: "SchoolApplication",
+      context,
+      metadata: {
+        applicationId,
+        schoolId: result.school.id,
+        schoolCode: result.school.code,
+        adminUserId: result.user.id,
+        adminRegNumber: result.userWithRegNumber?.regNumber,
+      },
+      statusCode,
     });
 
     log.info("Application approved successfully", {
@@ -550,7 +732,15 @@ export async function approveApplication(
       adminRegNumber: result.userWithRegNumber?.regNumber,
     });
 
-    // TODO: Send welcome email to admin with tempPassword
+    await sendWelcomeEmail({
+      email: application.adminEmail,
+      firstName: application.adminFirstName,
+      lastName: application.adminLastName,
+      tempPassword: result.tempPassword,
+      schoolName: application.schoolName,
+      schoolCode: result.school.code,
+      regNumber: result.userWithRegNumber?.regNumber ?? "",
+    });
 
     return result.school;
   } catch (error) {
@@ -570,7 +760,7 @@ export async function resubmitApplication(
   data: ResubmitApplicationInput,
   files: Express.Multer.File[],
   context: AuditContext,
-  statusCode: number
+  statusCode: number,
 ): Promise<SchoolApplication> {
   const uploadedFiles: Array<{
     uploadResult: CloudinaryUploadResult;
@@ -608,22 +798,18 @@ export async function resubmitApplication(
       log.info("Uploading documents to Cloudinary", {
         fileCount: files.length,
       });
-
       for (let i = 0; i < files.length; i++) {
         const file = files[i];
         const documentMeta = data.documents?.[i];
-
         const uploadResult = await uploadToCloudinary(
           file,
           "school-applications",
         );
-
         uploadedFiles.push({
           uploadResult,
           documentType: documentMeta?.documentType ?? "OTHER",
           title: documentMeta?.title ?? file.originalname,
         });
-
         log.info("Document uploaded successfully", {
           publicId: uploadResult.publicId,
           documentType: documentMeta?.documentType,
@@ -658,10 +844,35 @@ export async function resubmitApplication(
       });
 
       if (uploadedFiles.length > 0) {
+        const existingDocs = await tx.document.findMany({
+          where: {
+            ownerId: applicationId,
+            ownerType: "SCHOOL_APPLICATION",
+          },
+          select: { cloudinaryId: true },
+        });
+
+        await tx.document.deleteMany({
+          where: {
+            ownerId: applicationId,
+            ownerType: "SCHOOL_APPLICATION",
+          },
+        });
+
+        existingDocs.forEach(({ cloudinaryId }) => {
+          deleteFromCloudinary(cloudinaryId).catch((err) => {
+            log.warn("Failed to delete old document from Cloudinary", {
+              cloudinaryId,
+              error: (err as Error).message,
+            });
+          });
+        });
+
         await tx.document.createMany({
           data: uploadedFiles.map(({ uploadResult, documentType, title }) => ({
             ownerId: applicationId,
             ownerType: "SCHOOL_APPLICATION" as DocumentOwnerType,
+            schoolApplicationId: applicationId,
             documentType,
             title,
             originalFileName: uploadResult.originalFileName,
@@ -725,6 +936,7 @@ export async function resubmitApplication(
       applicationId,
       ipAddress: context.ipAddress,
     });
+
     throw err;
   }
 }
@@ -735,7 +947,7 @@ export async function requestMoreInfo(
   notes: string,
   moreInfoFields: string[],
   context: AuditContext,
-  statusCode: number
+  statusCode: number,
 ): Promise<void> {
   try {
     log.info("Requesting more info for application", {
@@ -807,7 +1019,7 @@ export async function requestMoreInfo(
         notes,
         moreInfoFields,
       },
-      statusCode
+      statusCode,
     });
 
     log.info("More info requested successfully", {
@@ -816,7 +1028,15 @@ export async function requestMoreInfo(
       moreInfoFields,
     });
 
-    // TODO: Send email to applicant requesting more information with notes and moreInfoFields
+    await sendMoreInfoEmail({
+      email: application.email,
+      firstName: application.adminFirstName,
+      lastName: application.adminLastName,
+      schoolName: application.schoolName,
+      notes,
+      moreInfoFields,
+      applicationId,
+    });
   } catch (error) {
     const err = error as Error;
     log.error("Failed to request more info", {
@@ -834,7 +1054,7 @@ export async function rejectApplication(
   superAdminId: string,
   rejectionReason: string,
   context: AuditContext,
-  statusCode: number
+  statusCode: number,
 ): Promise<void> {
   try {
     log.info("Starting reject application service", {
@@ -862,45 +1082,57 @@ export async function rejectApplication(
       );
     }
 
-    await prisma.schoolApplication.update({
-      where: { id: applicationId },
-      data: {
-        status: "REJECTED",
-        reviewedAt: new Date(),
-        reviewedBy: superAdminId,
-        rejectionReason,
-      },
+    await prisma.$transaction(async (tx) => {
+      await tx.schoolApplication.update({
+        where: { id: applicationId },
+        data: {
+          status: "REJECTED",
+          reviewedAt: new Date(),
+          reviewedBy: superAdminId,
+          rejectionReason,
+        },
+      });
+
+      await tx.schoolApplicationHistory.create({
+        data: {
+          applicationId,
+          status: "REJECTED",
+          rejectionReason,
+          notes: application.notes,
+          changedBy: superAdminId,
+        },
+      });
     });
 
     await createAuditLog({
-        performedById: superAdminId,
-        action: "REJECT",
-        module: "SchoolApplication",
-        resourceId: applicationId,
-        resourceType: "SchoolApplication",
-        oldValues: {
-          status: application.status,
-        },
-        newValues: {
-          status: "REJECTED",
-          rejectionReason,
-        },
-        context,
-        statusCode,
-        isSuccessful: true,
+      performedById: superAdminId,
+      action: "REJECT",
+      module: "SchoolApplication",
+      resourceId: applicationId,
+      resourceType: "SchoolApplication",
+      oldValues: {
+        status: application.status,
+      },
+      newValues: {
+        status: "REJECTED",
+        rejectionReason,
+      },
+      context,
+      statusCode,
+      isSuccessful: true,
     });
 
     await createSystemLog({
-        level: "INFO",
-        message: "School application rejected",
-        module: "SchoolApplication",
-        context,
-        statusCode,
-        metadata: {
-          applicationId,
-          rejectionReason,
-          reviewedBy: superAdminId,
-        },
+      level: "INFO",
+      message: "School application rejected",
+      module: "SchoolApplication",
+      context,
+      statusCode,
+      metadata: {
+        applicationId,
+        rejectionReason,
+        reviewedBy: superAdminId,
+      },
     });
 
     log.info("Application rejected successfully", {
@@ -909,7 +1141,13 @@ export async function rejectApplication(
       superAdminId,
     });
 
-    // TODO: Send rejection email to applicant with rejectionReason
+    await sendRejectionEmail({
+      email: application.email,
+      firstName: application.adminFirstName,
+      lastName: application.adminLastName,
+      schoolName: application.schoolName,
+      rejectionReason,
+    });
   } catch (error) {
     const err = error as Error;
     log.error("Failed to reject application", {

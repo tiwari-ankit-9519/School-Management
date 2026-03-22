@@ -1,7 +1,10 @@
 import type { Response, NextFunction } from "express";
 import { prisma } from "@/src/config/database.config";
 import { verifyAccessToken } from "@/src/utils/jwt.util";
-import { createModuleLogger, logSecurityEvent } from "@/src/config/logger.config";
+import {
+  createModuleLogger,
+  logSecurityEvent,
+} from "@/src/config/logger.config";
 import type { AuthenticatedRequest } from "@/src/middlewares/request-logger.middleware";
 import type { Role } from "@prisma/client";
 
@@ -23,8 +26,9 @@ export async function authenticate(
   next: NextFunction,
 ): Promise<void> {
   try {
-    let token: string | undefined =
-      req.cookies?.[ACCESS_TOKEN_COOKIE] as string | undefined;
+    let token: string | undefined = req.cookies?.[ACCESS_TOKEN_COOKIE] as
+      | string
+      | undefined;
 
     if (!token) {
       const authHeader = req.headers.authorization;
@@ -34,11 +38,16 @@ export async function authenticate(
     }
 
     if (!token) {
-      logSecurityEvent("MISSING_AUTH_TOKEN", req.context?.ip ?? "unknown", null, {
-        requestId: req.requestId,
-        path: req.path,
-        method: req.method,
-      });
+      logSecurityEvent(
+        "MISSING_AUTH_TOKEN",
+        req.context?.ip ?? "unknown",
+        null,
+        {
+          requestId: req.requestId,
+          path: req.path,
+          method: req.method,
+        },
+      );
       res.status(401).json({
         success: false,
         message: "Authentication required",
@@ -85,11 +94,16 @@ export async function authenticate(
     });
 
     if (!session) {
-      logSecurityEvent("SESSION_NOT_FOUND", req.context?.ip ?? "unknown", decoded.userId, {
-        requestId: req.requestId,
-        sessionId: decoded.sessionId,
-        path: req.path,
-      });
+      logSecurityEvent(
+        "SESSION_NOT_FOUND",
+        req.context?.ip ?? "unknown",
+        decoded.userId,
+        {
+          requestId: req.requestId,
+          sessionId: decoded.sessionId,
+          path: req.path,
+        },
+      );
       res.status(401).json({
         success: false,
         message: "Session not found, please login again",
@@ -98,11 +112,16 @@ export async function authenticate(
     }
 
     if (!session.isActive) {
-      logSecurityEvent("INACTIVE_SESSION_ACCESS", req.context?.ip ?? "unknown", decoded.userId, {
-        requestId: req.requestId,
-        sessionId: decoded.sessionId,
-        path: req.path,
-      });
+      logSecurityEvent(
+        "INACTIVE_SESSION_ACCESS",
+        req.context?.ip ?? "unknown",
+        decoded.userId,
+        {
+          requestId: req.requestId,
+          sessionId: decoded.sessionId,
+          path: req.path,
+        },
+      );
       res.status(401).json({
         success: false,
         message: "Session has been terminated, please login again",
@@ -116,11 +135,16 @@ export async function authenticate(
         data: { isActive: false },
       });
 
-      logSecurityEvent("EXPIRED_SESSION_ACCESS", req.context?.ip ?? "unknown", decoded.userId, {
-        requestId: req.requestId,
-        sessionId: decoded.sessionId,
-        path: req.path,
-      });
+      logSecurityEvent(
+        "EXPIRED_SESSION_ACCESS",
+        req.context?.ip ?? "unknown",
+        decoded.userId,
+        {
+          requestId: req.requestId,
+          sessionId: decoded.sessionId,
+          path: req.path,
+        },
+      );
       res.status(401).json({
         success: false,
         message: "Session expired, please login again",
@@ -140,11 +164,16 @@ export async function authenticate(
     });
 
     if (!user) {
-      logSecurityEvent("AUTH_USER_NOT_FOUND", req.context?.ip ?? "unknown", decoded.userId, {
-        requestId: req.requestId,
-        path: req.path,
-        userId: decoded.userId,
-      });
+      logSecurityEvent(
+        "AUTH_USER_NOT_FOUND",
+        req.context?.ip ?? "unknown",
+        decoded.userId,
+        {
+          requestId: req.requestId,
+          path: req.path,
+          userId: decoded.userId,
+        },
+      );
       res.status(401).json({
         success: false,
         message: "User not found",
@@ -153,12 +182,17 @@ export async function authenticate(
     }
 
     if (!user.isActive) {
-      logSecurityEvent("INACTIVE_USER_ACCESS_ATTEMPT", req.context?.ip ?? "unknown", user.id, {
-        requestId: req.requestId,
-        path: req.path,
-        userId: user.id,
-        role: user.role,
-      });
+      logSecurityEvent(
+        "INACTIVE_USER_ACCESS_ATTEMPT",
+        req.context?.ip ?? "unknown",
+        user.id,
+        {
+          requestId: req.requestId,
+          path: req.path,
+          userId: user.id,
+          role: user.role,
+        },
+      );
       res.status(403).json({
         success: false,
         message: "Your account has been deactivated. Please contact support.",
@@ -173,15 +207,21 @@ export async function authenticate(
       });
 
       if (!school?.isActive) {
-        logSecurityEvent("INACTIVE_SCHOOL_ACCESS_ATTEMPT", req.context?.ip ?? "unknown", user.id, {
-          requestId: req.requestId,
-          path: req.path,
-          userId: user.id,
-          schoolId: user.schoolId,
-        });
+        logSecurityEvent(
+          "INACTIVE_SCHOOL_ACCESS_ATTEMPT",
+          req.context?.ip ?? "unknown",
+          user.id,
+          {
+            requestId: req.requestId,
+            path: req.path,
+            userId: user.id,
+            schoolId: user.schoolId,
+          },
+        );
         res.status(403).json({
           success: false,
-          message: "Your school account has been deactivated. Please contact support.",
+          message:
+            "Your school account has been deactivated. Please contact support.",
         });
         return;
       }
@@ -191,6 +231,7 @@ export async function authenticate(
       id: user.id,
       schoolId: user.schoolId ?? "",
       role: user.role,
+      sessionId: decoded.sessionId,
     };
 
     log.debug("User authenticated successfully", {
@@ -231,13 +272,18 @@ export function authorize(...roles: Role[]) {
     }
 
     if (!roles.includes(req.user.role as Role)) {
-      logSecurityEvent("UNAUTHORIZED_ROLE_ACCESS", req.context?.ip ?? "unknown", req.user.id, {
-        requestId: req.requestId,
-        path: req.path,
-        method: req.method,
-        userRole: req.user.role,
-        requiredRoles: roles,
-      });
+      logSecurityEvent(
+        "UNAUTHORIZED_ROLE_ACCESS",
+        req.context?.ip ?? "unknown",
+        req.user.id,
+        {
+          requestId: req.requestId,
+          path: req.path,
+          method: req.method,
+          userRole: req.user.role,
+          requiredRoles: roles,
+        },
+      );
       res.status(403).json({
         success: false,
         message: "You do not have permission to access this resource",
@@ -355,13 +401,18 @@ export function checkPermission(module: string, action: PermissionAction) {
       });
 
       if (!permission) {
-        logSecurityEvent("PERMISSION_NOT_FOUND", req.context?.ip ?? "unknown", req.user.id, {
-          requestId: req.requestId,
-          path: req.path,
-          adminId: admin.id,
-          module,
-          action,
-        });
+        logSecurityEvent(
+          "PERMISSION_NOT_FOUND",
+          req.context?.ip ?? "unknown",
+          req.user.id,
+          {
+            requestId: req.requestId,
+            path: req.path,
+            adminId: admin.id,
+            module,
+            action,
+          },
+        );
         res.status(403).json({
           success: false,
           message: `You do not have access to the ${module} module`,
@@ -370,15 +421,20 @@ export function checkPermission(module: string, action: PermissionAction) {
       }
 
       if (!permission[action]) {
-        logSecurityEvent("PERMISSION_CHECK_DENIED", req.context?.ip ?? "unknown", req.user.id, {
-          requestId: req.requestId,
-          path: req.path,
-          method: req.method,
-          adminId: admin.id,
-          module,
-          action,
-          permissions: permission,
-        });
+        logSecurityEvent(
+          "PERMISSION_CHECK_DENIED",
+          req.context?.ip ?? "unknown",
+          req.user.id,
+          {
+            requestId: req.requestId,
+            path: req.path,
+            method: req.method,
+            adminId: admin.id,
+            module,
+            action,
+            permissions: permission,
+          },
+        );
         res.status(403).json({
           success: false,
           message: "You do not have permission to perform this action",

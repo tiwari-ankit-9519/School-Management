@@ -1,5 +1,6 @@
 import { email, z } from "zod";
 import { DocumentType, Gender } from "@prisma/client";
+
 export const SchoolApplicationSchema = z.object({
   schoolName: z
     .string({ error: "School name is required" })
@@ -31,7 +32,9 @@ export const SchoolApplicationSchema = z.object({
     .regex(/^\d{4,10}$/, { error: "Pincode must be 4 to 10 digits" }),
   phone: z
     .string({ error: "Phone number is required" })
-    .regex(/^\+?[0-9]{7,15}$/, { error: "Phone number must be 7 to 15 digits and can start with +" }),
+    .regex(/^\+?[0-9]{7,15}$/, {
+      error: "Phone number must be 7 to 15 digits and can start with +",
+    }),
   email: z
     .string({ error: "Email is required" })
     .email({ error: "Invalid email address" })
@@ -44,16 +47,19 @@ export const SchoolApplicationSchema = z.object({
     .max(100, { error: "Website must be at most 100 characters" })
     .optional()
     .or(z.literal("")),
-  establishedYear: z
+  establishedYear: z.coerce
     .number({ error: "Established year must be a number" })
     .int({ error: "Established year must be a whole number" })
     .min(1800, { error: "Established year must be after 1800" })
-    .max(new Date().getFullYear(), { error: "Established year cannot be in the future" }),
+    .max(new Date().getFullYear(), {
+      error: "Established year cannot be in the future",
+    }),
   affiliationNumber: z
     .string()
-    .min(3, { error: "Affiliation number must be at least 3 characters" })
-    .max(50, { error: "Affiliation number must be at most 50 characters" })
     .trim()
+    .refine((val) => val === "" || (val.length >= 3 && val.length <= 50), {
+      message: "Affiliation number must be between 3 and 50 characters",
+    })
     .optional(),
   boardType: z
     .string({ error: "Board type is required" })
@@ -64,13 +70,19 @@ export const SchoolApplicationSchema = z.object({
     .string({ error: "Admin first name is required" })
     .min(2, { error: "First name must be at least 2 characters" })
     .max(50, { error: "First name must be at most 50 characters" })
-    .regex(/^[a-zA-Z\s'-]+$/, { error: "First name can only contain letters, spaces, hyphens and apostrophes" })
+    .regex(/^[a-zA-Z\s'-]+$/, {
+      error:
+        "First name can only contain letters, spaces, hyphens and apostrophes",
+    })
     .trim(),
   adminLastName: z
     .string({ error: "Admin last name is required" })
     .min(2, { error: "Last name must be at least 2 characters" })
     .max(50, { error: "Last name must be at most 50 characters" })
-    .regex(/^[a-zA-Z\s'-]+$/, { error: "Last name can only contain letters, spaces, hyphens and apostrophes" })
+    .regex(/^[a-zA-Z\s'-]+$/, {
+      error:
+        "Last name can only contain letters, spaces, hyphens and apostrophes",
+    })
     .trim(),
   adminEmail: z
     .string({ error: "Admin email is required" })
@@ -80,7 +92,9 @@ export const SchoolApplicationSchema = z.object({
     .trim(),
   adminPhone: z
     .string({ error: "Admin phone number is required" })
-    .regex(/^\+?[0-9]{7,15}$/, { error: "Admin phone must be 7 to 15 digits and can start with +" }),
+    .regex(/^\+?[0-9]{7,15}$/, {
+      error: "Admin phone must be 7 to 15 digits and can start with +",
+    }),
   adminGender: z.nativeEnum(Gender, {
     error: "Gender must be MALE, FEMALE or OTHER",
   }),
@@ -93,6 +107,7 @@ export const SchoolApplicationSchema = z.object({
     )
     .optional(),
 });
+
 export const ReviewSchoolApplicationSchema = z.object({
   notes: z
     .string()
@@ -100,6 +115,7 @@ export const ReviewSchoolApplicationSchema = z.object({
     .trim()
     .optional(),
 });
+
 export const RejectSchoolApplicationSchema = z.object({
   rejectionReason: z
     .string({ error: "Rejection reason is required" })
@@ -107,7 +123,9 @@ export const RejectSchoolApplicationSchema = z.object({
     .max(500, { error: "Rejection reason must be at most 500 characters" })
     .trim(),
 });
-export const ResubmitApplicationSchema = z.object({
+
+export const ResubmitApplicationSchema = z
+  .object({
     affiliationNumber: z
       .string({ error: "Affiliation number must be a string" })
       .min(3, { error: "Affiliation number must be at least 3 characters" })
@@ -120,7 +138,7 @@ export const ResubmitApplicationSchema = z.object({
       .max(50, { error: "Board type must be at most 50 characters" })
       .trim()
       .optional(),
-    establishedYear: z
+    establishedYear: z.coerce
       .number({ error: "Established year must be a number" })
       .int({ error: "Established year must be a whole number" })
       .min(1800, { error: "Established year must be after 1800" })
@@ -172,7 +190,9 @@ export const ResubmitApplicationSchema = z.object({
           title: z
             .string({ error: "Document title must be a string" })
             .min(2, { error: "Document title must be at least 2 characters" })
-            .max(100, { error: "Document title must be at most 100 characters" })
+            .max(100, {
+              error: "Document title must be at most 100 characters",
+            })
             .trim(),
         }),
       )
@@ -192,6 +212,7 @@ export const ResubmitApplicationSchema = z.object({
         "At least one field or document must be provided for resubmission",
     },
   );
+
 export const RequestMoreInfoSchema = z.object({
   notes: z
     .string({ error: "Notes are required" })
@@ -202,16 +223,17 @@ export const RequestMoreInfoSchema = z.object({
     .array(
       z.enum(
         [
-          "affiliationNumber",
-          "boardType",
-          "establishedYear",
           "website",
+          "affiliationNumber",
           "phone",
           "address",
           "pincode",
-          "adminEmail",
           "adminPhone",
           "documents",
+          "schoolName",
+          "city",
+          "state",
+          "country",
         ],
         { error: "Invalid field specified" },
       ),
@@ -220,14 +242,25 @@ export const RequestMoreInfoSchema = z.object({
     .max(10, { error: "At most 10 fields can be specified" }),
 });
 
-export const LoginInputSchema = z.object({
-    email: z.string().email({error: "Please provide valid email"}),
-    password: z.string({error: "Password is required"})
-})
+export const LoginInputSchema = z
+  .object({
+    email: z.string().email({ error: "Please provide valid email" }).optional(),
+    regNumber: z.string().optional(),
+    password: z.string({ error: "Password is required" }),
+  })
+  .refine((data) => data.email || data.regNumber, {
+    message: "Either email or registration number is required",
+  });
 
-export type LoginSchemaInput = z.infer<typeof LoginInputSchema>
+export type LoginSchemaInput = z.infer<typeof LoginInputSchema>;
 export type RequestMoreInfoInput = z.infer<typeof RequestMoreInfoSchema>;
-export type ResubmitApplicationInput = z.infer<typeof ResubmitApplicationSchema>;
+export type ResubmitApplicationInput = z.infer<
+  typeof ResubmitApplicationSchema
+>;
 export type SchoolApplicationInput = z.infer<typeof SchoolApplicationSchema>;
-export type ReviewSchoolApplicationInput = z.infer<typeof ReviewSchoolApplicationSchema>;
-export type RejectSchoolApplicationInput = z.infer<typeof RejectSchoolApplicationSchema>;
+export type ReviewSchoolApplicationInput = z.infer<
+  typeof ReviewSchoolApplicationSchema
+>;
+export type RejectSchoolApplicationInput = z.infer<
+  typeof RejectSchoolApplicationSchema
+>;

@@ -1,6 +1,14 @@
 import { addEmailToQueue } from "@/src/queues/email.queue";
-import { createModuleLogger, logSecurityEvent } from "@/src/config/logger.config";
-import { welcomeEmailTemplate, moreInfoEmailTemplate, rejectionEmailTemplate } from "@/src/template/email.template";
+import {
+  createModuleLogger,
+  logSecurityEvent,
+} from "@/src/config/logger.config";
+import {
+  welcomeEmailTemplate,
+  moreInfoEmailTemplate,
+  rejectionEmailTemplate,
+  sendSchoolApplicationId,
+} from "@/src/template/email.template";
 
 const log = createModuleLogger("EmailService");
 
@@ -163,6 +171,61 @@ export async function sendWelcomeEmail(data: {
       email: data.email,
       schoolCode: data.schoolCode,
       regNumber: data.regNumber,
+    });
+    throw err;
+  }
+}
+
+export async function sendApplicationIdEmail(data: {
+  email: string;
+  firstName: string;
+  lastName: string;
+  schoolName: string;
+  applicationId: string;
+  appliedAt: string;
+}): Promise<void> {
+  try {
+    log.info("Queuing application ID email", {
+      email: data.email,
+      applicationId: data.applicationId,
+      schoolName: data.schoolName,
+    });
+
+    const trackingUrl = process.env.FRONTEND_URL
+      ? `${process.env.FRONTEND_URL}/track-application/${data.applicationId}`
+      : `https://yourapp.com/track-application/${data.applicationId}`;
+
+    const { subject, html, text } = sendSchoolApplicationId({
+      ...data,
+      trackingUrl,
+    });
+
+    await addEmailToQueue({
+      to: data.email,
+      subject,
+      html,
+      text,
+      priority: 1,
+    });
+
+    log.info("Application ID email queued successfully", {
+      email: data.email,
+      applicationId: data.applicationId,
+      schoolName: data.schoolName,
+    });
+  } catch (error) {
+    const err = error as Error;
+    log.error("Failed to queue application ID email", {
+      error: err.message,
+      email: data.email,
+      applicationId: data.applicationId,
+      schoolName: data.schoolName,
+    });
+    logSecurityEvent("APPLICATION_ID_EMAIL_QUEUE_FAILED", "internal", null, {
+      error: err.message,
+      email: data.email,
+      applicationId: data.applicationId,
+      schoolName: data.schoolName,
     });
     throw err;
   }

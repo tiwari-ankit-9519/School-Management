@@ -1,6 +1,10 @@
+import "dotenv/config";
 import helmet from "helmet";
 import type { Request, Response, NextFunction } from "express";
-import { createModuleLogger, logSecurityEvent } from "../config/logger.config.js";
+import {
+  createModuleLogger,
+  logSecurityEvent,
+} from "../config/logger.config.js";
 
 const log = createModuleLogger("SecurityMiddleware");
 
@@ -10,23 +14,17 @@ const allowedOrigins = (process.env.ALLOWED_ORIGINS || "")
   .split(",")
   .map((o) => o.trim())
   .filter(Boolean);
-const cdnUrl = process.env.CDN_URL || null;
 const cloudinaryUrl = "https://res.cloudinary.com";
 
 const imgSrcDirectives: string[] = ["'self'", "data:", "blob:", cloudinaryUrl];
-if (cdnUrl) imgSrcDirectives.push(cdnUrl);
 
 const mediaSrcDirectives: string[] = ["'self'", cloudinaryUrl];
-if (cdnUrl) mediaSrcDirectives.push(cdnUrl);
 
 export const securityHeaders = helmet({
   contentSecurityPolicy: {
     directives: {
       defaultSrc: ["'self'"],
-      scriptSrc: [
-        "'self'",
-        ...(isDevelopment ? ["'unsafe-eval'"] : []),
-      ],
+      scriptSrc: ["'self'", ...(isDevelopment ? ["'unsafe-eval'"] : [])],
       scriptSrcAttr: ["'none'"],
       styleSrc: ["'self'", "'unsafe-inline'"],
       styleSrcElem: ["'self'", "'unsafe-inline'"],
@@ -71,9 +69,7 @@ export const securityHeaders = helmet({
     permittedPolicies: "none",
   },
 
-  crossOriginEmbedderPolicy: isProduction
-    ? { policy: "require-corp" }
-    : false,
+  crossOriginEmbedderPolicy: isProduction ? { policy: "require-corp" } : false,
 
   crossOriginOpenerPolicy: {
     policy: "same-origin",
@@ -97,7 +93,7 @@ export const securityHeaders = helmet({
 export function corsMiddleware(
   req: Request,
   res: Response,
-  next: NextFunction
+  next: NextFunction,
 ): void {
   const origin = req.headers.origin;
 
@@ -114,11 +110,11 @@ export function corsMiddleware(
     res.setHeader("Access-Control-Allow-Origin", origin);
     res.setHeader(
       "Access-Control-Allow-Methods",
-      "GET, POST, PUT, PATCH, DELETE, OPTIONS"
+      "GET, POST, PUT, PATCH, DELETE, OPTIONS",
     );
     res.setHeader(
       "Access-Control-Allow-Headers",
-      "Content-Type, Authorization, X-Request-ID, X-Correlation-ID"
+      "Content-Type, Authorization, X-Request-ID, X-Correlation-ID",
     );
     res.setHeader("Access-Control-Allow-Credentials", "true");
     res.setHeader("Access-Control-Max-Age", "86400");
@@ -132,12 +128,17 @@ export function corsMiddleware(
       method: req.method,
     });
 
-    logSecurityEvent("CORS_ORIGIN_BLOCKED", req.ip ?? "unknown", (req as any).user?.id ?? null, {
-      requestId: (req as any).requestId,
-      origin,
-      path: req.path,
-      method: req.method,
-    });
+    logSecurityEvent(
+      "CORS_ORIGIN_BLOCKED",
+      req.ip ?? "unknown",
+      (req as any).user?.id ?? null,
+      {
+        requestId: (req as any).requestId,
+        origin,
+        path: req.path,
+        method: req.method,
+      },
+    );
   }
 
   if (req.method === "OPTIONS") {
@@ -151,7 +152,7 @@ export function corsMiddleware(
 export function enforceHttpsMiddleware(
   req: Request,
   res: Response,
-  next: NextFunction
+  next: NextFunction,
 ): void {
   if (!isProduction) {
     return next();
@@ -182,7 +183,7 @@ export function enforceHttpsMiddleware(
 export function requestSizeLimitMiddleware(
   req: Request,
   res: Response,
-  next: NextFunction
+  next: NextFunction,
 ): void {
   const contentLength = parseInt(req.headers["content-length"] || "0");
   const maxSize = parseInt(process.env.MAX_REQUEST_SIZE_BYTES || "10485760");
@@ -207,7 +208,7 @@ export function requestSizeLimitMiddleware(
         contentLength,
         maxSize,
         path: req.path,
-      }
+      },
     );
 
     res.status(413).json({
@@ -224,7 +225,7 @@ export function requestSizeLimitMiddleware(
 export function securityResponseHeadersMiddleware(
   req: Request,
   res: Response,
-  next: NextFunction
+  next: NextFunction,
 ): void {
   res.setHeader("X-Request-ID", (req as any).requestId || "unknown");
   res.setHeader("X-Content-Type-Options", "nosniff");
@@ -237,7 +238,7 @@ export function securityResponseHeadersMiddleware(
     res.setHeader("Expect-CT", "max-age=86400, enforce");
     res.setHeader(
       "Permissions-Policy",
-      "camera=(), microphone=(), geolocation=(), payment=(), usb=(), magnetometer=(), gyroscope=(), accelerometer=()"
+      "camera=(), microphone=(), geolocation=(), payment=(), usb=(), magnetometer=(), gyroscope=(), accelerometer=()",
     );
   }
 

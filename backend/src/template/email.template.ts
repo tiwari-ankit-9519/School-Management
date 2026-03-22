@@ -352,3 +352,177 @@ If you need help, please contact support and reference your school code.
 
   return { subject, html, text };
 }
+
+export function sendSchoolApplicationId(data: {
+  firstName: string;
+  lastName: string;
+  schoolName: string;
+  applicationId: string;
+  appliedAt: string;
+  trackingUrl: string;
+}): { subject: string; html: string; text: string } {
+  const subject = `Application Received - ${data.schoolName} | ID: ${data.applicationId}`;
+
+  const html = `
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Application Received - ${data.schoolName}</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background-color: #f4f6f9; color: #333; }
+    .wrapper { max-width: 600px; margin: 40px auto; background: #ffffff; border-radius: 12px; overflow: hidden; box-shadow: 0 4px 20px rgba(0,0,0,0.08); }
+    .header { background: linear-gradient(135deg, #1a6b3c 0%, #27ae60 100%); padding: 40px 32px; text-align: center; }
+    .header h1 { color: #ffffff; font-size: 26px; font-weight: 700; margin-bottom: 6px; }
+    .header p { color: rgba(255,255,255,0.85); font-size: 14px; }
+    .body { padding: 36px 32px; }
+    .greeting { font-size: 18px; font-weight: 600; margin-bottom: 12px; color: #1a6b3c; }
+    .text { font-size: 15px; line-height: 1.7; color: #555; margin-bottom: 24px; }
+    .id-box { background: #f0faf5; border: 2px dashed #27ae60; border-radius: 10px; padding: 28px 24px; margin-bottom: 28px; text-align: center; }
+    .id-box p { font-size: 13px; font-weight: 600; color: #1a6b3c; text-transform: uppercase; letter-spacing: 0.8px; margin-bottom: 10px; }
+    .id-box .id-value { font-size: 22px; font-weight: 700; color: #1a6b3c; letter-spacing: 2px; font-family: 'Courier New', Courier, monospace; word-break: break-all; }
+    .id-box .id-note { font-size: 12px; color: #5a9a74; margin-top: 10px; }
+    .info-box { background: #f9fafb; border: 1px solid #e5e7eb; border-radius: 8px; padding: 20px 24px; margin-bottom: 28px; }
+    .info-box h3 { font-size: 13px; font-weight: 600; color: #374151; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 16px; }
+    .info-row { display: flex; justify-content: space-between; padding: 8px 0; border-bottom: 1px solid #f0f0f0; font-size: 14px; }
+    .info-row:last-child { border-bottom: none; }
+    .info-row .label { color: #6b7280; font-weight: 500; }
+    .info-row .value { color: #111827; font-weight: 600; text-align: right; max-width: 60%; word-break: break-word; }
+    .steps-box { background: #eff6ff; border: 1px solid #bfdbfe; border-radius: 8px; padding: 24px; margin-bottom: 28px; }
+    .steps-box h3 { font-size: 13px; font-weight: 600; color: #1e40af; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 16px; }
+    .step { display: flex; align-items: flex-start; gap: 12px; margin-bottom: 12px; }
+    .step:last-child { margin-bottom: 0; }
+    .step-num { background: #1e40af; color: #fff; font-size: 12px; font-weight: 700; width: 22px; height: 22px; border-radius: 50%; display: flex; align-items: center; justify-content: center; flex-shrink: 0; margin-top: 1px; }
+    .step p { font-size: 14px; color: #1e3a8a; line-height: 1.6; }
+    .btn { display: block; width: fit-content; margin: 0 auto 28px; background: linear-gradient(135deg, #1a6b3c, #27ae60); color: #ffffff; text-decoration: none; padding: 14px 36px; border-radius: 8px; font-size: 15px; font-weight: 600; text-align: center; }
+    .notice-box { background: #fffbeb; border-left: 4px solid #f59e0b; border-radius: 4px; padding: 16px 20px; margin-bottom: 28px; }
+    .notice-box p { font-size: 14px; color: #78350f; line-height: 1.6; }
+    .divider { border: none; border-top: 1px solid #eee; margin: 24px 0; }
+    .footer { background: #f9fafb; padding: 24px 32px; text-align: center; }
+    .footer p { font-size: 12px; color: #aaa; line-height: 1.8; }
+  </style>
+</head>
+<body>
+  <div class="wrapper">
+
+    <div class="header">
+      <h1>Application Received ✓</h1>
+      <p>${data.schoolName}</p>
+    </div>
+
+    <div class="body">
+      <p class="greeting">Dear ${data.firstName} ${data.lastName},</p>
+      <p class="text">
+        We have successfully received your school registration application for <strong>${data.schoolName}</strong>. 
+        Your application is now under review by our team. Please save your Application ID below — 
+        you will need it to track your application status or contact support.
+      </p>
+
+      <!-- Application ID -->
+      <div class="id-box">
+        <p>Your Application ID</p>
+        <div class="id-value">${data.applicationId}</div>
+        <div class="id-note">Keep this ID safe. You will need it to track your application.</div>
+      </div>
+
+      <!-- Application Details -->
+      <div class="info-box">
+        <h3>Application Summary</h3>
+        <div class="info-row">
+          <span class="label">School Name</span>
+          <span class="value">${data.schoolName}</span>
+        </div>
+        <div class="info-row">
+          <span class="label">Applicant</span>
+          <span class="value">${data.firstName} ${data.lastName}</span>
+        </div>
+        <div class="info-row">
+          <span class="label">Submitted On</span>
+          <span class="value">${data.appliedAt}</span>
+        </div>
+        <div class="info-row">
+          <span class="label">Current Status</span>
+          <span class="value" style="color: #d97706;">Pending Review</span>
+        </div>
+      </div>
+
+      <!-- What Happens Next -->
+      <div class="steps-box">
+        <h3>What Happens Next</h3>
+        <div class="step">
+          <div class="step-num">1</div>
+          <p>Our team will review your application and verify the submitted information.</p>
+        </div>
+        <div class="step">
+          <div class="step-num">2</div>
+          <p>If additional information is required, you will receive an email with specific details.</p>
+        </div>
+        <div class="step">
+          <div class="step-num">3</div>
+          <p>Once approved, you will receive your school credentials and onboarding instructions.</p>
+        </div>
+      </div>
+
+      <!-- Track Button -->
+      <a href="${data.trackingUrl}" class="btn">Track Your Application</a>
+
+      <!-- Notice -->
+      <div class="notice-box">
+        <p>
+          <strong>Important:</strong> Please use your Application ID <strong>${data.applicationId}</strong> 
+          when contacting our support team regarding this application. 
+          Review typically takes 3–5 business days.
+        </p>
+      </div>
+
+      <hr class="divider" />
+
+      <p class="text">
+        If you have any questions or did not submit this application, please contact our support team immediately.
+      </p>
+    </div>
+
+    <div class="footer">
+      <p>This is an automated email. Please do not reply directly to this message.</p>
+      <p>© ${new Date().getFullYear()} School Management System. All rights reserved.</p>
+    </div>
+
+  </div>
+</body>
+</html>
+  `;
+
+  const text = `
+Dear ${data.firstName} ${data.lastName},
+
+We have successfully received your school registration application for ${data.schoolName}.
+
+YOUR APPLICATION ID: ${data.applicationId}
+
+Please save this ID. You will need it to track your application or contact support.
+
+Application Summary:
+  - School Name   : ${data.schoolName}
+  - Applicant     : ${data.firstName} ${data.lastName}
+  - Submitted On  : ${data.appliedAt}
+  - Current Status: Pending Review
+
+What Happens Next:
+  1. Our team will review your application and verify the submitted information.
+  2. If additional information is required, you will receive an email with specific details.
+  3. Once approved, you will receive your school credentials and onboarding instructions.
+
+Track your application here: ${data.trackingUrl}
+
+Important: Please quote your Application ID (${data.applicationId}) when contacting support.
+Review typically takes 3–5 business days.
+
+If you did not submit this application, please contact our support team immediately.
+
+© ${new Date().getFullYear()} School Management System
+  `.trim();
+
+  return { subject, html, text };
+}

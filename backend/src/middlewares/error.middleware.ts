@@ -1,6 +1,11 @@
 import type { Request, Response, NextFunction } from "express";
-import { createModuleLogger, logAudit, logSecurityEvent } from "../config/logger.config.js";
+import {
+  createModuleLogger,
+  logAudit,
+  logSecurityEvent,
+} from "../config/logger.config.js";
 import { ZodError } from "zod";
+import { AuthenticatedRequest } from "./request-logger.middleware.js";
 
 const log = createModuleLogger("ErrorHandler");
 
@@ -26,7 +31,11 @@ export class AppError extends Error {
   statusCode: number;
   metadata: Record<string, unknown>;
 
-  constructor(message: string, statusCode: number = 500, metadata: Record<string, unknown> = {}) {
+  constructor(
+    message: string,
+    statusCode: number = 500,
+    metadata: Record<string, unknown> = {},
+  ) {
     super(message);
     this.name = "AppError";
     this.statusCode = statusCode;
@@ -49,7 +58,10 @@ export class NotFoundError extends AppError {
   resource: string;
 
   constructor(resource: string, id?: string) {
-    super(`${resource}${id ? ` with id ${id}` : ""} not found`, HTTP_STATUS.NOT_FOUND);
+    super(
+      `${resource}${id ? ` with id ${id}` : ""} not found`,
+      HTTP_STATUS.NOT_FOUND,
+    );
     this.name = "NotFoundError";
     this.resource = resource;
   }
@@ -63,7 +75,9 @@ export class UnauthorizedError extends AppError {
 }
 
 export class ForbiddenError extends AppError {
-  constructor(message: string = "You do not have permission to perform this action") {
+  constructor(
+    message: string = "You do not have permission to perform this action",
+  ) {
     super(message, HTTP_STATUS.FORBIDDEN);
     this.name = "ForbiddenError";
   }
@@ -114,11 +128,15 @@ type ErrorType =
   | "RATE_LIMITED"
   | "UNHANDLED_ERROR";
 
-function classifyError(error: Error & { code?: string; statusCode?: number }): ErrorType {
+function classifyError(
+  error: Error & { code?: string; statusCode?: number },
+): ErrorType {
   if (error instanceof ZodError) return "VALIDATION_ERROR";
   if (error.name === "PrismaClientKnownRequestError") return "DATABASE_ERROR";
-  if (error.name === "PrismaClientValidationError") return "DATABASE_VALIDATION_ERROR";
-  if (error.name === "PrismaClientInitializationError") return "DATABASE_INIT_ERROR";
+  if (error.name === "PrismaClientValidationError")
+    return "DATABASE_VALIDATION_ERROR";
+  if (error.name === "PrismaClientInitializationError")
+    return "DATABASE_INIT_ERROR";
   if (error.name === "JsonWebTokenError") return "JWT_INVALID";
   if (error.name === "TokenExpiredError") return "JWT_EXPIRED";
   if (error.name === "NotBeforeError") return "JWT_NOT_ACTIVE";
@@ -130,26 +148,85 @@ function classifyError(error: Error & { code?: string; statusCode?: number }): E
   return "UNHANDLED_ERROR";
 }
 
-function getPrismaErrorDetails(error: PrismaKnownError): { status: HttpStatus; message: string } {
+function getPrismaErrorDetails(error: PrismaKnownError): {
+  status: HttpStatus;
+  message: string;
+} {
   switch (error.code) {
-    case "P2000": return { status: HTTP_STATUS.BAD_REQUEST, message: "Input value too long for field" };
-    case "P2001": return { status: HTTP_STATUS.NOT_FOUND, message: "Record not found" };
+    case "P2000":
+      return {
+        status: HTTP_STATUS.BAD_REQUEST,
+        message: "Input value too long for field",
+      };
+    case "P2001":
+      return { status: HTTP_STATUS.NOT_FOUND, message: "Record not found" };
     case "P2002": {
       const fields = error.meta?.target?.join(", ") ?? "unknown field";
-      return { status: HTTP_STATUS.CONFLICT, message: `A record with this ${fields} already exists` };
+      return {
+        status: HTTP_STATUS.CONFLICT,
+        message: `A record with this ${fields} already exists`,
+      };
     }
-    case "P2003": return { status: HTTP_STATUS.BAD_REQUEST, message: "Foreign key constraint violation" };
-    case "P2004": return { status: HTTP_STATUS.BAD_REQUEST, message: "Database constraint violation" };
-    case "P2005": return { status: HTTP_STATUS.BAD_REQUEST, message: "Invalid field value stored in database" };
-    case "P2006": return { status: HTTP_STATUS.BAD_REQUEST, message: "Invalid value provided for field" };
-    case "P2011": return { status: HTTP_STATUS.BAD_REQUEST, message: "Required field cannot be null" };
-    case "P2012": return { status: HTTP_STATUS.BAD_REQUEST, message: "Missing required field" };
-    case "P2014": return { status: HTTP_STATUS.BAD_REQUEST, message: "Relation violation — required relation missing" };
-    case "P2015": return { status: HTTP_STATUS.NOT_FOUND, message: "Related record not found" };
-    case "P2018": return { status: HTTP_STATUS.NOT_FOUND, message: "Required connected records not found" };
-    case "P2025": return { status: HTTP_STATUS.NOT_FOUND, message: "Record not found or missing required relation" };
-    case "P2034": return { status: HTTP_STATUS.CONFLICT, message: "Transaction conflict, please retry" };
-    default: return { status: HTTP_STATUS.INTERNAL_SERVER_ERROR, message: "A database error occurred" };
+    case "P2003":
+      return {
+        status: HTTP_STATUS.BAD_REQUEST,
+        message: "Foreign key constraint violation",
+      };
+    case "P2004":
+      return {
+        status: HTTP_STATUS.BAD_REQUEST,
+        message: "Database constraint violation",
+      };
+    case "P2005":
+      return {
+        status: HTTP_STATUS.BAD_REQUEST,
+        message: "Invalid field value stored in database",
+      };
+    case "P2006":
+      return {
+        status: HTTP_STATUS.BAD_REQUEST,
+        message: "Invalid value provided for field",
+      };
+    case "P2011":
+      return {
+        status: HTTP_STATUS.BAD_REQUEST,
+        message: "Required field cannot be null",
+      };
+    case "P2012":
+      return {
+        status: HTTP_STATUS.BAD_REQUEST,
+        message: "Missing required field",
+      };
+    case "P2014":
+      return {
+        status: HTTP_STATUS.BAD_REQUEST,
+        message: "Relation violation — required relation missing",
+      };
+    case "P2015":
+      return {
+        status: HTTP_STATUS.NOT_FOUND,
+        message: "Related record not found",
+      };
+    case "P2018":
+      return {
+        status: HTTP_STATUS.NOT_FOUND,
+        message: "Required connected records not found",
+      };
+    case "P2025":
+      return {
+        status: HTTP_STATUS.NOT_FOUND,
+        message: "Record not found or missing required relation",
+      };
+    case "P2034":
+      return {
+        status: HTTP_STATUS.CONFLICT,
+        message: "Transaction conflict, please retry",
+      };
+    default:
+      return {
+        status: HTTP_STATUS.INTERNAL_SERVER_ERROR,
+        message: "A database error occurred",
+      };
   }
 }
 
@@ -157,9 +234,9 @@ function getPrismaErrorDetails(error: PrismaKnownError): { status: HttpStatus; m
 
 export async function errorHandler(
   error: Error & { code?: string; statusCode?: number; retryAfter?: number },
-  req: Request,
+  req: AuthenticatedRequest,
   res: Response,
-  _next: NextFunction
+  _next: NextFunction,
 ): Promise<void> {
   const errorType = classifyError(error);
   const requestId = req.requestId ?? "unknown";
@@ -176,7 +253,8 @@ export async function errorHandler(
     method: req.method,
     ip,
     userAgent: req.headers["user-agent"],
-    stack: process.env.ENABLE_ERROR_STACK_TRACE === "true" ? error.stack : undefined,
+    stack:
+      process.env.ENABLE_ERROR_STACK_TRACE === "true" ? error.stack : undefined,
   };
 
   // Zod Validation Error
@@ -221,7 +299,10 @@ export async function errorHandler(
 
   // Prisma Validation Error
   if (error.name === "PrismaClientValidationError") {
-    log.error("Prisma validation error", { ...baseLogContext, error: error.message });
+    log.error("Prisma validation error", {
+      ...baseLogContext,
+      error: error.message,
+    });
 
     res.status(HTTP_STATUS.BAD_REQUEST).json({
       success: false,
@@ -264,7 +345,11 @@ export async function errorHandler(
       errorMessage: error.message,
     });
 
-    log.warn("JWT error", { ...baseLogContext, error: error.message, errorName: error.name });
+    log.warn("JWT error", {
+      ...baseLogContext,
+      error: error.message,
+      errorName: error.name,
+    });
 
     const jwtMessages: Record<string, string> = {
       TokenExpiredError: "Your session has expired, please log in again",
@@ -290,7 +375,10 @@ export async function errorHandler(
       message: error.message,
     });
 
-    log.warn("Unauthorized access attempt", { ...baseLogContext, error: error.message });
+    log.warn("Unauthorized access attempt", {
+      ...baseLogContext,
+      error: error.message,
+    });
 
     res.status(HTTP_STATUS.UNAUTHORIZED).json({
       success: false,
@@ -319,7 +407,8 @@ export async function errorHandler(
 
     res.status(HTTP_STATUS.FORBIDDEN).json({
       success: false,
-      message: error.message || "You do not have permission to perform this action",
+      message:
+        error.message || "You do not have permission to perform this action",
       requestId,
     });
     return;
@@ -335,7 +424,10 @@ export async function errorHandler(
       retryAfter: error.retryAfter,
     });
 
-    log.warn("Rate limit exceeded", { ...baseLogContext, retryAfter: error.retryAfter });
+    log.warn("Rate limit exceeded", {
+      ...baseLogContext,
+      retryAfter: error.retryAfter,
+    });
 
     res.status(HTTP_STATUS.TOO_MANY_REQUESTS).json({
       success: false,
@@ -393,7 +485,10 @@ export async function errorHandler(
 
 // ─── Not Found & Method Not Allowed ──────────────────────────────────────────
 
-export function notFoundHandler(req: Request, res: Response): void {
+export function notFoundHandler(
+  req: AuthenticatedRequest,
+  res: Response,
+): void {
   const requestId = req.requestId ?? "unknown";
   const ip = req.ip ?? req.socket?.remoteAddress ?? "unknown";
   const userId = req.user?.id ?? null;
@@ -423,7 +518,10 @@ export function notFoundHandler(req: Request, res: Response): void {
   });
 }
 
-export function methodNotAllowedHandler(req: Request, res: Response): void {
+export function methodNotAllowedHandler(
+  req: AuthenticatedRequest,
+  res: Response,
+): void {
   const requestId = req.requestId ?? "unknown";
 
   log.warn("Method not allowed", {

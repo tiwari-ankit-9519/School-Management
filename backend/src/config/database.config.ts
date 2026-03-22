@@ -9,7 +9,9 @@ const log = createModuleLogger("DatabaseConfig");
 const isDevelopment = process.env.NODE_ENV === "development";
 const isProduction = process.env.NODE_ENV === "production";
 const logQueries = process.env.ENABLE_QUERY_LOGGING === "true";
-const SLOW_QUERY_THRESHOLD = parseInt(process.env.SLOW_QUERY_THRESHOLD ?? "2000");
+const SLOW_QUERY_THRESHOLD = parseInt(
+  process.env.SLOW_QUERY_THRESHOLD ?? "2000",
+);
 
 if (!process.env.DATABASE_URL) {
   throw new Error("DATABASE_URL must be set in .env file");
@@ -62,9 +64,13 @@ const pool = new Pool({
   connectionString: process.env.DATABASE_URL,
   max: parseInt(process.env.DB_POOL_MAX ?? "10"),
   min: parseInt(process.env.DB_POOL_MIN ?? "2"),
-  idleTimeoutMillis: parseInt(process.env.DB_IDLE_TIMEOUT_MS ?? "30000"),
-  connectionTimeoutMillis: parseInt(process.env.DB_CONNECTION_TIMEOUT_MS ?? "5000"),
+  idleTimeoutMillis: parseInt(process.env.DB_IDLE_TIMEOUT_MS ?? "600000"),
+  connectionTimeoutMillis: parseInt(
+    process.env.DB_CONNECTION_TIMEOUT_MS ?? "5000",
+  ),
   allowExitOnIdle: false,
+  keepAlive: true,
+  keepAliveInitialDelayMillis: 10000,
 });
 
 pool.on("connect", () => {
@@ -130,7 +136,8 @@ function formatParamValue(value: unknown): string {
   if (typeof value === "string") return `'${value.replace(/'/g, "''")}'`;
   if (typeof value === "boolean") return value ? "TRUE" : "FALSE";
   if (value instanceof Date) return `'${value.toISOString()}'`;
-  if (typeof value === "object") return `'${JSON.stringify(value).replace(/'/g, "''")}'`;
+  if (typeof value === "object")
+    return `'${JSON.stringify(value).replace(/'/g, "''")}'`;
   return String(value);
 }
 
@@ -223,8 +230,9 @@ export async function connectDatabase(): Promise<void> {
     log.info("Database connected successfully");
     const result = await basePrisma.$queryRaw<NowResult[]>`SELECT NOW() as now`;
     log.info("Database server time", { serverTime: result[0].now });
-    const databaseName =
-      await basePrisma.$queryRaw<DatabaseNameResult[]>`SELECT current_database()`;
+    const databaseName = await basePrisma.$queryRaw<
+      DatabaseNameResult[]
+    >`SELECT current_database()`;
     log.info("Connected to database", {
       database: databaseName[0].current_database,
     });

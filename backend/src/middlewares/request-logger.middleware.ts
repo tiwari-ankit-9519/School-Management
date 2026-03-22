@@ -43,7 +43,12 @@ const SENSITIVE_BODY_KEYS = [
   "cardNumber",
 ] as const;
 
-const SKIP_LOG_PATHS = ["/health", "/ping", "/favicon.ico", "/metrics"] as const;
+const SKIP_LOG_PATHS = [
+  "/health",
+  "/ping",
+  "/favicon.ico",
+  "/metrics",
+] as const;
 
 const SLOW_REQUEST_THRESHOLD = parseInt(
   process.env.SLOW_REQUEST_THRESHOLD_MS ?? "3000",
@@ -83,6 +88,7 @@ interface AuthenticatedUser {
   id: string;
   schoolId: string;
   role: string;
+  sessionId: string;
 }
 
 interface SessionWithId {
@@ -120,7 +126,7 @@ interface BodyObject {
 
 type BodyArray = BodyValue[];
 
-function buildRequestContext(req: Request): RequestContext {
+function buildRequestContext(req: AuthenticatedRequest): RequestContext {
   const ip = getClientIp(req);
   const rawUserAgent = req.headers["user-agent"] ?? "";
   const safeUserAgent = sanitizeUserAgent(rawUserAgent);
@@ -148,13 +154,14 @@ function buildRequestContext(req: Request): RequestContext {
     origin: typeof origin === "string" ? origin : null,
     acceptLanguage: typeof acceptLanguage === "string" ? acceptLanguage : null,
     contentType: typeof contentType === "string" ? contentType : null,
-    xRequestedWith:
-      typeof xRequestedWith === "string" ? xRequestedWith : null,
+    xRequestedWith: typeof xRequestedWith === "string" ? xRequestedWith : null,
     isVpnOrProxy,
   };
 }
 
-function sanitizeHeaders(headers: Record<string, string | undefined>): SanitizedHeaders {
+function sanitizeHeaders(
+  headers: Record<string, string | undefined>,
+): SanitizedHeaders {
   const sanitized: SanitizedHeaders = { ...headers };
   SENSITIVE_HEADERS.forEach((key) => {
     if (sanitized[key]) {
@@ -172,9 +179,7 @@ function sanitizeBody(body: BodyValue): BodyValue {
   for (const key of Object.keys(sanitized)) {
     const lowerKey = key.toLowerCase();
     const obj = sanitized as BodyObject;
-    if (
-      SENSITIVE_BODY_KEYS.some((sk) => lowerKey.includes(sk.toLowerCase()))
-    ) {
+    if (SENSITIVE_BODY_KEYS.some((sk) => lowerKey.includes(sk.toLowerCase()))) {
       obj[key] = "[REDACTED]";
     } else if (typeof obj[key] === "object" && obj[key] !== null) {
       obj[key] = sanitizeBody(obj[key]);
@@ -232,7 +237,7 @@ function isSuspiciousPath(path: string): boolean {
 }
 
 export function requestIdMiddleware(
-  req: Request,
+  req: AuthenticatedRequest,
   res: Response,
   next: NextFunction,
 ): void {
@@ -274,7 +279,7 @@ export function requestIdMiddleware(
 }
 
 export function requestContextMiddleware(
-  req: Request,
+  req: AuthenticatedRequest,
   _res: Response,
   next: NextFunction,
 ): void {
@@ -289,7 +294,7 @@ export function requestContextMiddleware(
 }
 
 export function requestLoggerMiddleware(
-  req: Request,
+  req: AuthenticatedRequest,
   res: Response,
   next: NextFunction,
 ): void {
@@ -375,12 +380,12 @@ export function requestLoggerMiddleware(
   };
 
   res.end = function (...args: Parameters<typeof res.end>): Response {
-  if (!res.headersSent) {
-    const duration = Date.now() - (req.startTime ?? Date.now());
-    res.setHeader("X-Response-Time", `${duration}ms`);
-  }
-  return originalEnd(...args) as Response;
-} as typeof res.end;
+    if (!res.headersSent) {
+      const duration = Date.now() - (req.startTime ?? Date.now());
+      res.setHeader("X-Response-Time", `${duration}ms`);
+    }
+    return originalEnd(...args) as Response;
+  } as typeof res.end;
 
   res.on("finish", () => {
     const duration = Date.now() - (req.startTime ?? Date.now());
@@ -498,7 +503,7 @@ export function requestLoggerMiddleware(
 }
 
 export function suspiciousRequestMiddleware(
-  req: Request,
+  req: AuthenticatedRequest,
   res: Response,
   next: NextFunction,
 ): void | Response {
@@ -577,9 +582,15 @@ export interface AuditContext {
   spanId?: string;
 }
 
-export function buildAuditContext(req: Request): AuditContext {
+export function buildAuditContext(req: AuthenticatedRequest): AuditContext {
   const context = req.context ?? buildRequestContext(req);
-  const { ip, deviceInfo, fingerprint, isPrivateIp: privateIp, isVpnOrProxy } = context;
+  const {
+    ip,
+    deviceInfo,
+    fingerprint,
+    isPrivateIp: privateIp,
+    isVpnOrProxy,
+  } = context;
 
   return {
     ipAddress: ip,

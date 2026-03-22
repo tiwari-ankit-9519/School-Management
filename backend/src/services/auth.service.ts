@@ -2,7 +2,10 @@ import { prisma } from "@/src/config/database.config";
 import { createModuleLogger } from "@/src/config/logger.config";
 import { createAuditLog, createSystemLog } from "@/src/utils/audit.util";
 import { verifyPassword } from "@/src/utils/password";
-import { generateAccessToken, getAccessTokenExpiry } from "@/src/utils/jwt.util";
+import {
+  generateAccessToken,
+  getAccessTokenExpiry,
+} from "@/src/utils/jwt.util";
 import type { AuditContext } from "@/src/middlewares/request-logger.middleware";
 import type { User } from "@prisma/client";
 import type { LoginSchemaInput } from "@/src/validations/input.validations";
@@ -12,7 +15,7 @@ const log = createModuleLogger("LoginService");
 export async function login(
   data: LoginSchemaInput,
   context: AuditContext,
-  statusCode: number
+  statusCode: number,
 ): Promise<{
   user: Omit<User, "passwordHash">;
   token: string;
@@ -23,12 +26,15 @@ export async function login(
       ipAddress: context.ipAddress,
     });
 
-    const user = await prisma.user.findUnique({
-      where: { email: data.email },
+    const user = await prisma.user.findFirst({
+      where: { OR: [{ email: data.email }, { regNumber: data.regNumber }] },
     });
 
     if (!user) {
-      log.warn("Login failed. User does not exist", { email: data.email });
+      log.warn("Login failed. User does not exist", {
+        email: data.email,
+        regNumber: data.regNumber,
+      });
       await createSystemLog({
         level: "ERROR",
         module: "LoginService",
@@ -72,11 +78,16 @@ export async function login(
           context,
           metadata: { userId: user.id, schoolId: user.schoolId },
         });
-        throw new Error("Your school account has been deactivated. Please contact support.");
+        throw new Error(
+          "Your school account has been deactivated. Please contact support.",
+        );
       }
     }
 
-    const isPasswordValid = await verifyPassword(data.password, user.passwordHash);
+    const isPasswordValid = await verifyPassword(
+      data.password,
+      user.passwordHash,
+    );
 
     if (!isPasswordValid) {
       log.warn("Login failed. Wrong password", {
@@ -131,7 +142,7 @@ export async function login(
         sessionId: session.id,
         role: user.role,
       },
-      userId: user.id
+      userId: user.id,
     });
 
     const { passwordHash: _, ...userWithoutPassword } = user;
@@ -155,4 +166,49 @@ export async function login(
     });
     throw err;
   }
+}
+
+export async function logout(
+  userId: string,
+  token: string,
+  context: AuditContext,
+  statusCode: number,
+) {
+  try {
+    log.info("Trying to logout the user", {
+      user: userId,
+    });
+
+    const userSession = await prisma.session.findUnique({
+      where: { token },
+    });
+
+    if (!userSession || userSession.userId !== userId) {
+      log.warn("Invalid session", {
+        userSession,
+      });
+      throw new Error("Invalid session");
+    }
+
+    await prisma.session.update({
+      where: { token },
+      data: {
+        isActive: false,
+        updatedAt: new Date(),
+      },
+    });
+
+    await createSystemLog({
+      level: "INFO",
+      module: "LoginService",
+      message: "User logged in successfully",
+      context,
+      statusCode,
+      metadata: {
+        userId,
+        userSession,
+      },
+      userId,
+    });
+  } catch (error) {}
 }

@@ -1,0 +1,369 @@
+"use client";
+import { zodResolver } from "@hookform/resolvers/zod";
+import { useForm, useWatch } from "react-hook-form";
+import { Button } from "@/components/ui/button";
+import { useLogin } from "@/hooks/useAuth";
+import { ArrowRight, Lock, User } from "lucide-react";
+import AnimatedInput from "@/components/smoothui/animated-input";
+import { motion } from "motion/react";
+import Image from "next/image";
+import { LoginFormValue, loginSchema } from "@/validations/validations";
+
+const LoginPage = () => {
+  const { mutate: login, isPending } = useLogin();
+  const {
+    handleSubmit,
+    formState: { errors },
+    control,
+    setValue,
+  } = useForm<LoginFormValue>({
+    resolver: zodResolver(loginSchema),
+    defaultValues: { identifier: "", password: "" },
+  });
+
+  const identifierValue = useWatch({ control, name: "identifier" });
+  const passwordValue = useWatch({ control, name: "password" });
+
+  const onSubmit = (data: LoginFormValue) => {
+    const isEmail = data.identifier.includes("@");
+    login({
+      email: isEmail ? data.identifier : undefined,
+      regNumber: !isEmail ? data.identifier : undefined,
+      password: data.password,
+    });
+  };
+
+  return (
+    <div className="relative min-h-screen w-full overflow-hidden bg-[#050810] flex items-center justify-center px-4 py-12 sm:px-6">
+      <div className="absolute inset-0 overflow-hidden pointer-events-none select-none">
+        <div
+          className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[140%] h-[140%]"
+          style={{
+            background:
+              "radial-gradient(ellipse at 30% 50%, #1e3a5f22 0%, transparent 60%), radial-gradient(ellipse at 75% 40%, #0ea5e910 0%, transparent 55%), radial-gradient(ellipse at 50% 80%, #6366f108 0%, transparent 50%)",
+          }}
+        />
+
+        <motion.div
+          initial={{ opacity: 0, rotate: -6, y: 60 }}
+          animate={{ opacity: 1, rotate: -6, y: 0 }}
+          transition={{ duration: 1.2, ease: [0.16, 1, 0.3, 1] }}
+          className="absolute -right-16 top-[-8%] w-[58vw] max-w-215 h-[75vh] min-h-130 rounded-3xl overflow-hidden shadow-2xl"
+          style={{ transformOrigin: "center center" }}
+        >
+          <div className="absolute inset-0 bg-linear-to-br from-[#0f2847] via-[#0c1e3a] to-[#071224]" />
+          <div
+            className="absolute inset-0 opacity-[0.035]"
+            style={{
+              backgroundImage:
+                "url(\"data:image/svg+xml,%3Csvg width='60' height='60' viewBox='0 0 60 60' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='none' fill-rule='evenodd'%3E%3Cg fill='%23ffffff' fill-opacity='1'%3E%3Cpath d='M36 34v-4h-2v4h-4v2h4v4h2v-4h4v-2h-4zm0-30V0h-2v4h-4v2h4v4h2V6h4V4h-4zM6 34v-4H4v4H0v2h4v4h2v-4h4v-2H6zM6 4V0H4v4H0v2h4v4h2V6h4V4H6z'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E\")",
+            }}
+          />
+
+          {/* Image Section */}
+          <div className="absolute inset-0 flex flex-col justify-between p-8 xl:p-12">
+            <div className="flex items-start justify-between">
+              <div>
+                <div className="text-white/30 text-xs font-manrope uppercase tracking-widest mb-1">
+                  Platform Preview
+                </div>
+                <div className="text-white text-lg font-bold font-jakarta">
+                  School Dashboard
+                </div>
+              </div>
+              <div className="flex gap-1.5">
+                {["bg-red-400/60", "bg-yellow-400/60", "bg-green-400/60"].map(
+                  (c, i) => (
+                    <div key={i} className={`w-2.5 h-2.5 rounded-full ${c}`} />
+                  ),
+                )}
+              </div>
+            </div>
+            <div className="flex flex-col gap-4">
+              <div className="grid grid-cols-3 gap-3">
+                {[
+                  {
+                    label: "Students",
+                    value: "12,840",
+                    delta: "+4.2%",
+                    up: true,
+                  },
+                  { label: "Schools", value: "340", delta: "+12%", up: true },
+                  { label: "Staff", value: "2,910", delta: "+1.8%", up: true },
+                ].map((s) => (
+                  <div
+                    key={s.label}
+                    className="bg-white/5 border border-white/10 rounded-2xl p-3.5 backdrop-blur-sm"
+                  >
+                    <div className="text-white/40 text-xs font-manrope mb-1.5">
+                      {s.label}
+                    </div>
+                    <div className="text-white text-lg font-bold font-jakarta leading-none mb-1">
+                      {s.value}
+                    </div>
+                    <div
+                      className={`text-xs font-manrope ${s.up ? "text-emerald-400" : "text-red-400"}`}
+                    >
+                      {s.delta} this month
+                    </div>
+                  </div>
+                ))}
+              </div>
+              <div className="bg-white/5 border border-white/10 rounded-2xl p-4 backdrop-blur-sm">
+                <div className="flex items-center justify-between mb-3">
+                  <span className="text-white/40 text-xs font-manrope uppercase tracking-wider">
+                    Attendance Rate · Today
+                  </span>
+                  <span className="text-emerald-400 text-xs font-manrope font-medium">
+                    Live
+                  </span>
+                </div>
+                <div className="flex items-end gap-1 h-10">
+                  {[72, 85, 78, 91, 88, 94, 82, 96, 89, 93, 87, 91].map(
+                    (h, i) => (
+                      <div
+                        key={i}
+                        className="flex-1 rounded-sm"
+                        style={{
+                          height: `${h}%`,
+                          background:
+                            i === 11
+                              ? "linear-gradient(to top, #6366f1, #818cf8)"
+                              : i > 8
+                                ? "rgba(99,102,241,0.5)"
+                                : "rgba(255,255,255,0.08)",
+                        }}
+                      />
+                    ),
+                  )}
+                </div>
+                <div className="flex items-center justify-between mt-2">
+                  <span className="text-white text-2xl font-bold font-jakarta">
+                    91.4%
+                  </span>
+                  <span className="text-white/30 text-xs font-manrope">
+                    Across 340 schools
+                  </span>
+                </div>
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                {[
+                  {
+                    label: "Fee Collection",
+                    value: "₹4.2Cr",
+                    sub: "This month",
+                    color: "from-indigo-500/20 to-indigo-600/5",
+                  },
+                  {
+                    label: "Avg. Performance",
+                    value: "78.3%",
+                    sub: "Board exams 2025",
+                    color: "from-sky-500/20 to-sky-600/5",
+                  },
+                ].map((c) => (
+                  <div
+                    key={c.label}
+                    className={`bg-linear-to-br ${c.color} border border-white/10 rounded-2xl p-3.5 backdrop-blur-sm`}
+                  >
+                    <div className="text-white/40 text-xs font-manrope mb-1">
+                      {c.label}
+                    </div>
+                    <div className="text-white text-xl font-bold font-jakarta">
+                      {c.value}
+                    </div>
+                    <div className="text-white/30 text-xs font-manrope mt-0.5">
+                      {c.sub}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+
+          <div className="absolute inset-0 bg-linear-to-r from-[#050810] via-[#050810]/30 to-transparent pointer-events-none" />
+          <div className="absolute inset-0 bg-linear-to-t from-[#050810]/60 via-transparent to-transparent pointer-events-none" />
+        </motion.div>
+
+        {/* Bottom Footer */}
+        <div className="absolute bottom-6 right-6 hidden xl:flex flex-col gap-2">
+          {[
+            "Springfield Academy",
+            "Greenwood High",
+            "Sunrise Public School",
+          ].map((name, i) => (
+            <motion.div
+              key={name}
+              initial={{ opacity: 0, x: 20 }}
+              animate={{ opacity: 1, x: 0 }}
+              transition={{ delay: 0.8 + i * 0.12, duration: 0.5 }}
+              className="flex items-center gap-2.5 bg-white/5 border border-white/10 rounded-full px-3 py-1.5 backdrop-blur-sm"
+            >
+              <div className="w-4 h-4 rounded-full bg-indigo-500/40 border border-indigo-400/30 shrink-0" />
+              <span className="text-white/50 text-xs font-manrope">{name}</span>
+            </motion.div>
+          ))}
+        </div>
+      </div>
+
+      {/* Form Section*/}
+      <motion.div
+        initial={{ opacity: 0, y: 32 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.7, ease: [0.16, 1, 0.3, 1] }}
+        className="relative z-10 w-full max-w-105"
+      >
+        <div className="relative bg-white/4 border border-white/10 rounded-3xl p-8 sm:p-10 backdrop-blur-2xl shadow-[0_0_0_1px_rgba(255,255,255,0.05),0_32px_80px_rgba(0,0,0,0.6)]">
+          <div className="absolute inset-0 rounded-3xl overflow-hidden pointer-events-none">
+            <div className="absolute inset-x-0 top-0 h-px bg-linear-to-r from-transparent via-white/20 to-transparent" />
+            <div className="absolute inset-x-0 bottom-0 h-px bg-linear-to-r from-transparent via-white/5 to-transparent" />
+          </div>
+          <div className="mb-8">
+            <div className="flex items-center gap-3 mb-8">
+              <div className="w-9 h-9 rounded-xl bg-indigo-500/20 border border-indigo-400/30 flex items-center justify-center shrink-0">
+                <Image
+                  src="/logo.png"
+                  alt="EduSphere Logo"
+                  width={24}
+                  height={24}
+                  className="object-contain"
+                />
+              </div>
+              <div>
+                <span className="text-white text-sm font-bold font-jakarta tracking-tight block leading-none">
+                  EduSphere
+                </span>
+                <span className="text-white/30 text-xs font-manrope">
+                  School Management SaaS
+                </span>
+              </div>
+            </div>
+            <h1 className="text-2xl sm:text-3xl font-extrabold font-jakarta text-white leading-tight mb-1.5">
+              Sign in to your portal
+            </h1>
+            <p className="text-sm text-white/40 font-manrope">
+              Access your school&apos;s management dashboard
+            </p>
+          </div>
+
+          <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
+            <div className="space-y-1.5">
+              <AnimatedInput
+                label="Email or Registration Number"
+                icon={<User className="h-4 w-4 text-indigo-400" />}
+                value={identifierValue}
+                onChange={(val) =>
+                  setValue("identifier", val, { shouldValidate: true })
+                }
+                inputClassName="h-12 rounded-xl border-white/10 bg-white/5 text-white placeholder:text-white/20 focus-visible:ring-indigo-500/50 focus-visible:border-indigo-500/50"
+                labelClassName="text-white/40"
+              />
+              {errors.identifier && (
+                <motion.p
+                  initial={{ opacity: 0, y: -4 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  className="text-xs text-red-400 font-manrope ml-1"
+                >
+                  {errors.identifier.message}
+                </motion.p>
+              )}
+            </div>
+            <div className="space-y-1.5">
+              <AnimatedInput
+                label="Password"
+                icon={<Lock className="h-4 w-4 text-indigo-400" />}
+                type="password"
+                value={passwordValue}
+                onChange={(val) =>
+                  setValue("password", val, { shouldValidate: true })
+                }
+                inputClassName="h-12 rounded-xl border-white/10 bg-white/5 text-white placeholder:text-white/20 focus-visible:ring-indigo-500/50 focus-visible:border-indigo-500/50"
+                labelClassName="text-white/40"
+              />
+              {errors.password && (
+                <motion.p
+                  initial={{ opacity: 0, y: -4 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  className="text-xs text-red-400 font-manrope ml-1"
+                >
+                  {errors.password.message}
+                </motion.p>
+              )}
+            </div>
+            <div className="flex justify-end pt-0.5">
+              <a
+                href="#"
+                className="text-xs text-indigo-400 font-manrope hover:text-indigo-300 transition-colors"
+              >
+                Forgot password?
+              </a>
+            </div>
+            <Button
+              type="submit"
+              disabled={isPending}
+              className="w-full h-12 rounded-xl font-jakarta font-bold text-sm bg-indigo-600 hover:bg-indigo-500 text-white border-0 transition-all duration-200 shadow-lg shadow-indigo-500/20 hover:shadow-indigo-500/30 group mt-1"
+            >
+              {isPending ? (
+                <span className="flex items-center gap-2">
+                  <svg
+                    className="animate-spin h-4 w-4"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                  >
+                    <circle
+                      className="opacity-25"
+                      cx="12"
+                      cy="12"
+                      r="10"
+                      stroke="currentColor"
+                      strokeWidth="4"
+                    />
+                    <path
+                      className="opacity-75"
+                      fill="currentColor"
+                      d="M4 12a8 8 0 018-8v8H4z"
+                    />
+                  </svg>
+                  Signing in...
+                </span>
+              ) : (
+                <span className="flex items-center gap-2">
+                  Sign In
+                  <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-1" />
+                </span>
+              )}
+            </Button>
+          </form>
+
+          <div className="mt-6 pt-6 border-t border-white/6">
+            <p className="text-center text-xs text-white/30 font-manrope">
+              Need access?{" "}
+              <a
+                href="#"
+                className="text-indigo-400 hover:text-indigo-300 transition-colors font-medium"
+              >
+                Contact your administrator
+              </a>
+            </p>
+          </div>
+          <div className="mt-5 flex items-center justify-center gap-1.5">
+            {["Springfield Academy", "Greenwood High", "+338 more"].map(
+              (name, i) => (
+                <span
+                  key={i}
+                  className="text-[10px] text-white/20 font-manrope px-2 py-0.5 rounded-full border border-white/6 bg-white/2"
+                >
+                  {name}
+                </span>
+              ),
+            )}
+          </div>
+        </div>
+        <p className="text-center text-[11px] text-white/20 font-manrope mt-5">
+          © 2025 EduSphere · Trusted by 340+ schools across India
+        </p>
+      </motion.div>
+    </div>
+  );
+};
+
+export default LoginPage;
