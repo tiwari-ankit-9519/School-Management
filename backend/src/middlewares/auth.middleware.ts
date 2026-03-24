@@ -9,7 +9,6 @@ import type { AuthenticatedRequest } from "@/src/middlewares/request-logger.midd
 import type { Role } from "@prisma/client";
 
 const log = createModuleLogger("AuthMiddleware");
-
 const ACCESS_TOKEN_COOKIE = "access_token";
 
 type PermissionAction =
@@ -61,7 +60,6 @@ export async function authenticate(
     } catch (error) {
       const err = error as Error;
       const isExpired = err.message.includes("expired");
-
       logSecurityEvent(
         isExpired ? "EXPIRED_ACCESS_TOKEN" : "INVALID_ACCESS_TOKEN",
         req.context?.ip ?? "unknown",
@@ -73,7 +71,6 @@ export async function authenticate(
           error: err.message,
         },
       );
-
       res.status(401).json({
         success: false,
         message: isExpired
@@ -134,7 +131,6 @@ export async function authenticate(
         where: { id: session.id },
         data: { isActive: false },
       });
-
       logSecurityEvent(
         "EXPIRED_SESSION_ACCESS",
         req.context?.ip ?? "unknown",
@@ -205,7 +201,6 @@ export async function authenticate(
         where: { id: user.schoolId },
         select: { isActive: true },
       });
-
       if (!school?.isActive) {
         logSecurityEvent(
           "INACTIVE_SCHOOL_ACCESS_ATTEMPT",
@@ -361,24 +356,28 @@ export function checkPermission(module: string, action: PermissionAction) {
         return;
       }
 
-      if (req.user.role !== "ADMIN") {
-        next();
-        return;
-      }
-
       const admin = await prisma.admin.findUnique({
         where: { userId: req.user.id },
         select: { id: true },
       });
 
       if (!admin) {
-        log.warn("Admin profile not found for user", {
-          userId: req.user.id,
-          requestId: req.requestId,
-        });
+        logSecurityEvent(
+          "PERMISSION_DENIED_NO_ADMIN_PROFILE",
+          req.context?.ip ?? "unknown",
+          req.user.id,
+          {
+            requestId: req.requestId,
+            path: req.path,
+            method: req.method,
+            userRole: req.user.role,
+            module,
+            action,
+          },
+        );
         res.status(403).json({
           success: false,
-          message: "Admin profile not found",
+          message: "You do not have permission to access this resource",
         });
         return;
       }

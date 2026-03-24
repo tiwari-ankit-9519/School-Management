@@ -1,9 +1,15 @@
 import { Response } from "express";
-import { login, logout } from "@/src/services/auth.service";
+import {
+  login,
+  logout,
+  changePasswordService,
+} from "@/src/services/auth.service";
 import {
   AuthenticatedRequest,
   buildAuditContext,
 } from "../middlewares/request-logger.middleware";
+import { ResetPasswordSchema } from "../validations/input.validations";
+import { HTTP_STATUS } from "../utils/constants";
 
 export async function loginUser(
   req: AuthenticatedRequest,
@@ -45,5 +51,28 @@ export async function logoutUser(
   res.status(200).json({
     success: true,
     message: "Logged out successfully",
+  });
+}
+
+export async function changePassword(
+  req: AuthenticatedRequest,
+  res: Response,
+): Promise<void> {
+  const parsed = ResetPasswordSchema.safeParse(req.body);
+  if (!parsed.success) {
+    res.status(400).json({
+      success: false,
+      message: "Validation failed",
+      errors: parsed.error.issues,
+    });
+    return;
+  }
+
+  const auditContext = buildAuditContext(req);
+  res.status(HTTP_STATUS.OK);
+  await changePasswordService(parsed.data, auditContext, res.statusCode);
+  res.json({
+    success: true,
+    message: "Password reset successfully",
   });
 }

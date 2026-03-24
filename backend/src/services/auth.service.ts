@@ -1,14 +1,17 @@
 import { prisma } from "@/src/config/database.config";
 import { createModuleLogger } from "@/src/config/logger.config";
 import { createAuditLog, createSystemLog } from "@/src/utils/audit.util";
-import { verifyPassword } from "@/src/utils/password";
+import { hashPassword, verifyPassword } from "@/src/utils/password";
 import {
   generateAccessToken,
   getAccessTokenExpiry,
 } from "@/src/utils/jwt.util";
 import type { AuditContext } from "@/src/middlewares/request-logger.middleware";
 import type { User } from "@prisma/client";
-import type { LoginSchemaInput } from "@/src/validations/input.validations";
+import type {
+  LoginSchemaInput,
+  ResetPasswordInput,
+} from "@/src/validations/input.validations";
 
 const log = createModuleLogger("LoginService");
 
@@ -211,4 +214,109 @@ export async function logout(
       userId,
     });
   } catch (error) {}
+}
+
+export async function changePasswordService(
+  data: ResetPasswordInput,
+  context: AuditContext,
+  statusCode: number,
+): Promise<void> {
+  try {
+    log.info("Password reset service starting", {
+      regNumber: data.regNumber,
+      email: data.email,
+      ipAddress: context.ipAddress,
+    });
+
+    const conditions = [];
+    if (data.email) {
+      conditions.push({ email: data.email });
+    }
+    if (data.regNumber) {
+      conditions.push({ regNumber: data.regNumber });
+    }
+
+    const userExists = await prisma.user.findFirst({
+      where: {
+        OR: conditions,
+      },
+      select: {
+        id: true,
+        passwordHash: true,
+      },
+    });
+
+    if (!userExists) {
+      log.warn("User does not exists with the email or regNumber", {
+        regNumber: data.regNumber,
+        email: data.email,
+      });
+      throw new Error("User does not exists");
+    }
+
+    const isPasswordValid = await verifyPassword(
+      data.oldPassword,
+      userExists.passwordHash,
+    );
+
+    if (!isPasswordValid) {
+      log.warn("Current password does not match", {
+        userId: userExists.id,
+      });
+      throw new Error("Password does not match existing password");
+    }
+
+    const isSamePassword = await verifyPassword(
+      data.newPassword,
+      userExists.passwordHash,
+    );
+
+    if (isSamePassword) {
+      log.warn("New password must be different from old password", {
+        userId: userExists.id,
+      });
+      throw new Error("New password must be different from old password");
+    }
+
+    const newHashedPassword = await hashPassword(data.newPassword);
+
+    await prisma.user.update({
+      where: {
+        id: userExists.id,
+      },
+      data: {
+        passwordHash: newHashedPassword,
+      },
+    });
+
+    await createSystemLog({
+      level: "INFO",
+      module: "Authentication",
+      message: "Password reset successfully",
+      context,
+      statusCode,
+      metadata: {
+        userId: userExists.id,
+      },
+    });
+
+    await createAuditLog({
+      context,
+      action: "PASSWORD_RESET",
+      module: "Authentication",
+      performedById: userExists.id,
+      resourceId: userExists.id,
+      resourceType: "Password reset",
+      isSuccessful: true,
+      statusCode,
+    });
+
+    log.info("Password has been reset");
+  } catch (error) {
+    const err = error as Error;
+    log.error("Failed to reset password", {
+      ipAddress: context.ipAddress,
+    });
+    throw err;
+  }
 }

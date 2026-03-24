@@ -8,6 +8,7 @@ import {
   moreInfoEmailTemplate,
   rejectionEmailTemplate,
   sendSchoolApplicationId,
+  sendModeratorWelcomeEmail,
 } from "@/src/template/email.template";
 
 const log = createModuleLogger("EmailService");
@@ -228,5 +229,68 @@ export async function sendApplicationIdEmail(data: {
       schoolName: data.schoolName,
     });
     throw err;
+  }
+}
+
+export async function sendModeratorInformation(data: {
+  firstName: string;
+  lastName: string;
+  email: string;
+  regNumber: string;
+  tempPassword: string;
+  designation: string;
+  department: string;
+  schoolName: string;
+}): Promise<void> {
+  try {
+    log.info("Queuing moderator info email", {
+      email: data.email,
+      regNumber: data.regNumber,
+      schoolName: data.schoolName,
+    });
+
+    const loginUrl = process.env.FRONTEND_URL
+      ? `${process.env.FRONTEND_URL}/login`
+      : "https://yourapp.com/login";
+
+    const { subject, html, text } = sendModeratorWelcomeEmail({
+      firstName: data.firstName,
+      lastName: data.lastName,
+      email: data.email,
+      regNumber: data.regNumber,
+      tempPassword: data.tempPassword,
+      designation: data.designation,
+      department: data.department,
+      schoolName: data.schoolName,
+      loginUrl,
+    });
+
+    await addEmailToQueue({
+      to: data.email,
+      subject,
+      html,
+      text,
+      priority: 1,
+    });
+
+    log.info("Moderator Info mail queued successfully", {
+      email: data.email,
+      regNumber: data.regNumber,
+      schoolName: data.schoolName,
+    });
+  } catch (error) {
+    const err = error as Error;
+    log.error("Failed to queue moderator info email", {
+      error: err.message,
+      email: data.email,
+      regNumebr: data.regNumber,
+      schoolName: data.schoolName,
+    });
+    logSecurityEvent("MODERATOR_EMAIL_QUEUE_FAILED", "internal", null, {
+      error: err.message,
+      email: data.email,
+      regNumber: data.regNumber,
+      schoolName: data.schoolName,
+    });
   }
 }

@@ -40,12 +40,3 @@ export async function verifyPassword(
     return false;
   }
 }
-
-export async function needsRehash(hash: string): Promise<boolean> {
-  try {
-    return argon2.needsRehash(hash, ARGON2_OPTIONS);
-  } catch (error) {
-    console.log(error);
-    return false;
-  }
-}

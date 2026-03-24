@@ -1,5 +1,5 @@
 import { email, z } from "zod";
-import { DocumentType, Gender } from "@prisma/client";
+import { DocumentType, Gender, Module, Prisma } from "@prisma/client";
 
 export const SchoolApplicationSchema = z.object({
   schoolName: z
@@ -252,6 +252,167 @@ export const LoginInputSchema = z
     message: "Either email or registration number is required",
   });
 
+export const AcademicYearInput = z
+  .object({
+    name: z
+      .string()
+      .min(3, { error: "Name should be of atleast 3 characters" })
+      .max(10, { error: "Name should be of max 10 characters" })
+      .regex(/^\d{4}-\d{2,4}$/, {
+        error: "Name should be in format 2024-25 or 2024-2025",
+      })
+      .trim(),
+    startDate: z.coerce.date({ error: "Start date is required" }),
+    endDate: z.coerce.date({ error: "End date is required" }),
+    isCurrent: z.coerce.boolean(),
+  })
+  .refine((data) => data.endDate > data.startDate, {
+    error: "End date must be after start date",
+    path: ["endDate"],
+  });
+
+export const ClassSchema = z.object({
+  name: z
+    .string()
+    .min(1, { error: "Class name is required" })
+    .max(10, { error: "Class name should be atmost 10 characters" })
+    .trim(),
+  section: z
+    .string()
+    .min(1, { error: "Section should be of atleast 1 character" })
+    .max(2, { error: "Section should be of atmost 2 characters" })
+    .trim(),
+  capacity: z.coerce
+    .number({ error: "Capacity must be a number" })
+    .min(10, { error: "Minimum capacity is 10" })
+    .max(50, {
+      error: "Maximum of 50 students can be enrolled in a single class",
+    }),
+  roomNumber: z
+    .string()
+    .min(3, { error: "Room number should be of atleast three characters" })
+    .max(10, { error: "Room number should be atmost 10 characters" })
+    .optional()
+    .or(z.literal(""))
+    .transform((val) => (val === "" ? null : val)),
+});
+
+export const SubjectSchema = z.object({
+  name: z
+    .string()
+    .min(2, { error: "Subject name should of minimum 2 characters" })
+    .max(15, { error: "Subject should be atmost of 15 characters" })
+    .trim(),
+  code: z
+    .string()
+    .min(2, { error: "Code must be atleast of 2 characters" })
+    .max(8, { error: "Code must be of atmost 8 characters" })
+    .trim(),
+});
+
+export const ResetPasswordSchema = z
+  .object({
+    email: z.email({ error: "Please provide valid email" }).optional(),
+    regNumber: z.string().optional(),
+    oldPassword: z
+      .string()
+      .min(6, { error: "Minimum 6 digit password is required" })
+      .max(20, { error: "Password can be of maximum 20 digits" }),
+    newPassword: z
+      .string()
+      .min(6, { error: "Minimum 6 digit password is required" })
+      .max(20, { error: "Password can be of maximum 20 digits" }),
+  })
+  .refine((data) => data.email || data.regNumber, {
+    message: "Either email or registration number is required",
+  });
+
+export const modulePermissionSchema = z.object({
+  module: z.enum(Module),
+  canCreate: z.boolean().default(false),
+  canRead: z.boolean().default(true),
+  canUpdate: z.boolean().default(false),
+  canDelete: z.boolean().default(false),
+  canApprove: z.boolean().default(false),
+  canExport: z.boolean().default(false),
+});
+
+export const ModeratorSchema = z.object({
+  firstName: z
+    .string()
+    .trim()
+    .min(2, { error: "First name should be of atleast 2 characters" })
+    .max(20, { error: "First name should be of atmost 20 characters" }),
+  lastName: z
+    .string()
+    .trim()
+    .min(2, { error: "Last name should be of atleast 2 characters" })
+    .max(20, { error: "Last name should be of atmost 20 characters" }),
+  gender: z.enum(Gender),
+  dateOfBirth: z.coerce
+    .date({ error: "Date is required" })
+    .refine((date) => date < new Date(), {
+      error: "Date of birth should be in past",
+    }),
+  email: z.email({ error: "Please provide a valid email address" }),
+  phone: z
+    .string({ error: "Phone number is required" })
+    .regex(/^\+?[0-9]{7,15}$/, {
+      error: "Phone number must be 7 to 15 digits and can start with +",
+    }),
+  designation: z
+    .string()
+    .trim()
+    .max(100, { error: "Designation must be of atmost 100 characters" })
+    .optional(),
+  department: z
+    .string()
+    .trim()
+    .max(100, { error: "Department must be of atmost 100 characters" })
+    .optional(),
+  permissions: z
+    .array(modulePermissionSchema)
+    .min(1, { error: "Atleast 1 module permission is required" })
+    .refine(
+      (perms) => {
+        const modules = perms.map((p) => p.module);
+        return new Set(modules).size === modules.length;
+      },
+      {
+        error: "Duplicate modules are not allowed",
+      },
+    ),
+});
+
+export const moderatorWithDetails = Prisma.validator<Prisma.AdminDefaultArgs>()(
+  {
+    include: {
+      user: {
+        select: {
+          id: true,
+          regNumber: true,
+          email: true,
+          phone: true,
+          role: true,
+          isActive: true,
+          isVerified: true,
+          createdAt: true,
+        },
+      },
+      permissions: true,
+    },
+  },
+);
+
+// Types export
+export type ModeratorWithDetails = Prisma.AdminGetPayload<
+  typeof moderatorWithDetails
+>;
+export type ResetPasswordInput = z.infer<typeof ResetPasswordSchema>;
+export type CreateModeratorInput = z.infer<typeof ModeratorSchema>;
+export type SubjectInput = z.infer<typeof SubjectSchema>;
+export type ClassInput = z.infer<typeof ClassSchema>;
+export type AcademicYearInput = z.infer<typeof AcademicYearInput>;
 export type LoginSchemaInput = z.infer<typeof LoginInputSchema>;
 export type RequestMoreInfoInput = z.infer<typeof RequestMoreInfoSchema>;
 export type ResubmitApplicationInput = z.infer<

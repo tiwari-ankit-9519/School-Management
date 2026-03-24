@@ -526,3 +526,185 @@ If you did not submit this application, please contact our support team immediat
 
   return { subject, html, text };
 }
+
+export function sendModeratorWelcomeEmail(data: {
+  firstName: string;
+  lastName: string;
+  email: string;
+  regNumber: string;
+  tempPassword: string;
+  designation: string;
+  department: string;
+  schoolName: string;
+  loginUrl: string;
+}): { subject: string; html: string; text: string } {
+  const subject = `Welcome to ${data.schoolName} | Your Account Details`;
+
+  const html = `
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Welcome to ${data.schoolName}</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background-color: #f4f6f9; color: #333; }
+    .wrapper { max-width: 600px; margin: 40px auto; background: #ffffff; border-radius: 12px; overflow: hidden; box-shadow: 0 4px 20px rgba(0,0,0,0.08); }
+    .header { background: linear-gradient(135deg, #1e3a5f 0%, #2563eb 100%); padding: 40px 32px; text-align: center; }
+    .header h1 { color: #ffffff; font-size: 26px; font-weight: 700; margin-bottom: 6px; }
+    .header p { color: rgba(255,255,255,0.85); font-size: 14px; }
+    .body { padding: 36px 32px; }
+    .greeting { font-size: 18px; font-weight: 600; margin-bottom: 12px; color: #1e3a5f; }
+    .text { font-size: 15px; line-height: 1.7; color: #555; margin-bottom: 24px; }
+    .credentials-box { background: #eff6ff; border: 2px dashed #2563eb; border-radius: 10px; padding: 28px 24px; margin-bottom: 28px; }
+    .credentials-box p.label { font-size: 13px; font-weight: 600; color: #1e3a5f; text-transform: uppercase; letter-spacing: 0.8px; margin-bottom: 16px; text-align: center; }
+    .credential-row { display: flex; justify-content: space-between; align-items: center; padding: 10px 0; border-bottom: 1px solid #bfdbfe; font-size: 14px; }
+    .credential-row:last-child { border-bottom: none; }
+    .credential-row .key { color: #3b82f6; font-weight: 600; }
+    .credential-row .val { color: #1e3a5f; font-weight: 700; font-family: 'Courier New', Courier, monospace; letter-spacing: 1px; word-break: break-all; text-align: right; max-width: 60%; }
+    .info-box { background: #f9fafb; border: 1px solid #e5e7eb; border-radius: 8px; padding: 20px 24px; margin-bottom: 28px; }
+    .info-box h3 { font-size: 13px; font-weight: 600; color: #374151; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 16px; }
+    .info-row { display: flex; justify-content: space-between; padding: 8px 0; border-bottom: 1px solid #f0f0f0; font-size: 14px; }
+    .info-row:last-child { border-bottom: none; }
+    .info-row .label { color: #6b7280; font-weight: 500; }
+    .info-row .value { color: #111827; font-weight: 600; text-align: right; max-width: 60%; word-break: break-word; }
+    .steps-box { background: #f0fdf4; border: 1px solid #86efac; border-radius: 8px; padding: 24px; margin-bottom: 28px; }
+    .steps-box h3 { font-size: 13px; font-weight: 600; color: #166534; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 16px; }
+    .step { display: flex; align-items: flex-start; gap: 12px; margin-bottom: 12px; }
+    .step:last-child { margin-bottom: 0; }
+    .step-num { background: #16a34a; color: #fff; font-size: 12px; font-weight: 700; width: 22px; height: 22px; border-radius: 50%; display: flex; align-items: center; justify-content: center; flex-shrink: 0; margin-top: 1px; }
+    .step p { font-size: 14px; color: #166534; line-height: 1.6; }
+    .btn { display: block; width: fit-content; margin: 0 auto 28px; background: linear-gradient(135deg, #1e3a5f, #2563eb); color: #ffffff; text-decoration: none; padding: 14px 36px; border-radius: 8px; font-size: 15px; font-weight: 600; text-align: center; }
+    .warning-box { background: #fff7ed; border-left: 4px solid #f97316; border-radius: 4px; padding: 16px 20px; margin-bottom: 28px; }
+    .warning-box p { font-size: 14px; color: #7c2d12; line-height: 1.6; }
+    .divider { border: none; border-top: 1px solid #eee; margin: 24px 0; }
+    .footer { background: #f9fafb; padding: 24px 32px; text-align: center; }
+    .footer p { font-size: 12px; color: #aaa; line-height: 1.8; }
+  </style>
+</head>
+<body>
+  <div class="wrapper">
+
+    <div class="header">
+      <h1>Welcome to the Team 🎉</h1>
+      <p>${data.schoolName}</p>
+    </div>
+
+    <div class="body">
+      <p class="greeting">Dear ${data.firstName} ${data.lastName},</p>
+      <p class="text">
+        Your moderator account has been created on the <strong>${data.schoolName}</strong> management portal.
+        You can now log in using the credentials below. Please change your password immediately after your first login.
+      </p>
+
+      <div class="credentials-box">
+        <p class="label">Your Login Credentials</p>
+        <div class="credential-row">
+          <span class="key">Registration No.</span>
+          <span class="val">${data.regNumber}</span>
+        </div>
+        <div class="credential-row">
+          <span class="key">Email</span>
+          <span class="val">${data.email}</span>
+        </div>
+        <div class="credential-row">
+          <span class="key">Temporary Password</span>
+          <span class="val">${data.tempPassword}</span>
+        </div>
+      </div>
+
+      <div class="info-box">
+        <h3>Your Profile Details</h3>
+        <div class="info-row">
+          <span class="label">Full Name</span>
+          <span class="value">${data.firstName} ${data.lastName}</span>
+        </div>
+        <div class="info-row">
+          <span class="label">Designation</span>
+          <span class="value">${data.designation}</span>
+        </div>
+        <div class="info-row">
+          <span class="label">Department</span>
+          <span class="value">${data.department}</span>
+        </div>
+        <div class="info-row">
+          <span class="label">School</span>
+          <span class="value">${data.schoolName}</span>
+        </div>
+      </div>
+
+      <div class="steps-box">
+        <h3>Getting Started</h3>
+        <div class="step">
+          <div class="step-num">1</div>
+          <p>Log in using your registration number or email and the temporary password provided above.</p>
+        </div>
+        <div class="step">
+          <div class="step-num">2</div>
+          <p>Change your password immediately from your profile settings.</p>
+        </div>
+        <div class="step">
+          <div class="step-num">3</div>
+          <p>Review your assigned permissions and reach out to your administrator if anything needs adjustment.</p>
+        </div>
+      </div>
+
+      <a href="${data.loginUrl}" class="btn">Login to Portal</a>
+
+      <div class="warning-box">
+        <p>
+          <strong>Security Notice:</strong> This email contains sensitive login credentials.
+          Do not share your password with anyone. If you did not expect this email,
+          please contact your school administrator immediately.
+        </p>
+      </div>
+
+      <hr class="divider" />
+
+      <p class="text">
+        If you have any questions or face any issues logging in, please contact your school administrator.
+      </p>
+    </div>
+
+    <div class="footer">
+      <p>This is an automated email. Please do not reply directly to this message.</p>
+      <p>© ${new Date().getFullYear()} School Management System. All rights reserved.</p>
+    </div>
+
+  </div>
+</body>
+</html>
+  `;
+
+  const text = `
+Dear ${data.firstName} ${data.lastName},
+
+Your moderator account has been created on the ${data.schoolName} management portal.
+
+YOUR LOGIN CREDENTIALS
+  Registration No. : ${data.regNumber}
+  Email            : ${data.email}
+  Temp Password    : ${data.tempPassword}
+
+YOUR PROFILE DETAILS
+  Full Name   : ${data.firstName} ${data.lastName}
+  Designation : ${data.designation}
+  Department  : ${data.department}
+  School      : ${data.schoolName}
+
+GETTING STARTED
+  1. Log in using your registration number or email and the temporary password above.
+  2. Change your password immediately from your profile settings.
+  3. Review your assigned permissions and reach out to your administrator if anything needs adjustment.
+
+Login here: ${data.loginUrl}
+
+SECURITY NOTICE: Do not share your password with anyone.
+If you did not expect this email, contact your school administrator immediately.
+
+© ${new Date().getFullYear()} School Management System
+  `.trim();
+
+  return { subject, html, text };
+}
