@@ -1,3 +1,4 @@
+import "dotenv/config";
 import { addEmailToQueue } from "@/src/queues/email.queue";
 import {
   createModuleLogger,
@@ -9,6 +10,8 @@ import {
   rejectionEmailTemplate,
   sendSchoolApplicationId,
   sendModeratorWelcomeEmail,
+  sendPasswordResetLinkEmail,
+  sendPasswordChangedSuccessEmail,
 } from "@/src/template/email.template";
 
 const log = createModuleLogger("EmailService");
@@ -291,6 +294,85 @@ export async function sendModeratorInformation(data: {
       email: data.email,
       regNumber: data.regNumber,
       schoolName: data.schoolName,
+    });
+  }
+}
+
+export async function sendPasswordResetEmail(data: {
+  email: string;
+  regNumber: string;
+  expiresInMinutes: number;
+  resetToken: string;
+}): Promise<void> {
+  try {
+    log.info("Queuing sendPasswordResetEmail", {
+      email: data.email,
+      regNumber: data.regNumber,
+    });
+
+    const resetLink = process.env.FRONTEND_URL
+      ? `${process.env.FRONTEND_URL}/reset-password?token=${data.resetToken}`
+      : "https://youarpp.com/reset-password?token=${data.resetToken}";
+
+    const { subject, html, text } = sendPasswordResetLinkEmail({
+      email: data.email,
+      regNumber: data.regNumber,
+      resetLink,
+      expiresInMinutes: data.expiresInMinutes,
+    });
+
+    await addEmailToQueue({
+      to: data.email,
+      subject,
+      html,
+      text,
+      priority: 1,
+    });
+
+    log.info("Password reset email queued successfully");
+  } catch (error) {
+    const err = error as Error;
+    log.error("Failed to queue password reset email", {
+      error: err.message,
+      email: data.email,
+      regNumber: data.regNumber,
+    });
+  }
+}
+
+export async function sendResetPasswordSuccessEmail(data: {
+  email: string;
+  regNumber: string;
+  ipAddress: string;
+  changedAt: Date;
+}): Promise<void> {
+  try {
+    log.info("Queuing password change success email", {
+      email: data.email,
+      regNumber: data.regNumber,
+    });
+
+    const { subject, html, text } = sendPasswordChangedSuccessEmail({
+      email: data.email,
+      regNumber: data.regNumber,
+      ipAddress: data.ipAddress,
+      changedAt: data.changedAt,
+    });
+
+    await addEmailToQueue({
+      to: data.email,
+      subject,
+      html,
+      text,
+      priority: 1,
+    });
+    log.info("Password change email queued successfully");
+  } catch (error) {
+    const err = error as Error;
+    log.error("Failed to queue password reset success mail", {
+      error: err.message,
+      email: data.email,
+      regNumber: data.regNumber,
     });
   }
 }

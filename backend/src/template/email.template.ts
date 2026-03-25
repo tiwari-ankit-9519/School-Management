@@ -335,15 +335,15 @@ Welcome to ${data.schoolName}, ${data.firstName} ${data.lastName}!
 
 Your school has been successfully registered. Here are your login credentials:
 
-Registration Number: ${data.regNumber}
-Email: ${data.email}
-Temporary Password: ${data.tempPassword}
+Registration Number: ${" " + data.regNumber}
+Email: ${" " + data.email}
+Temporary Password: ${" " + data.tempPassword}
 
 IMPORTANT: Please change your password immediately after your first login.
 
-Login here: ${data.loginUrl}
+Login here: ${" " + data.loginUrl}
 
-School Code: ${data.schoolCode}
+School Code: ${" " + data.schoolCode}
 
 If you need help, please contact support and reference your school code.
 
@@ -504,9 +504,9 @@ YOUR APPLICATION ID: ${data.applicationId}
 Please save this ID. You will need it to track your application or contact support.
 
 Application Summary:
-  - School Name   : ${data.schoolName}
-  - Applicant     : ${data.firstName} ${data.lastName}
-  - Submitted On  : ${data.appliedAt}
+  - School Name   : ${" " + data.schoolName}
+  - Applicant     : ${" " + data.firstName} ${data.lastName}
+  - Submitted On  : ${" " + data.appliedAt}
   - Current Status: Pending Review
 
 What Happens Next:
@@ -688,10 +688,10 @@ YOUR LOGIN CREDENTIALS
   Temp Password    : ${data.tempPassword}
 
 YOUR PROFILE DETAILS
-  Full Name   : ${data.firstName} ${data.lastName}
-  Designation : ${data.designation}
-  Department  : ${data.department}
-  School      : ${data.schoolName}
+  Full Name   : ${" " + data.firstName} ${data.lastName}
+  Designation : ${" " + data.designation}
+  Department  : ${" " + data.department}
+  School      : ${" " + data.schoolName}
 
 GETTING STARTED
   1. Log in using your registration number or email and the temporary password above.
@@ -702,6 +702,245 @@ Login here: ${data.loginUrl}
 
 SECURITY NOTICE: Do not share your password with anyone.
 If you did not expect this email, contact your school administrator immediately.
+
+© ${new Date().getFullYear()} School Management System
+  `.trim();
+
+  return { subject, html, text };
+}
+
+export function sendPasswordResetLinkEmail(data: {
+  email: string;
+  regNumber: string;
+  resetLink: string;
+  expiresInMinutes: number;
+}): { subject: string; html: string; text: string } {
+  const subject = `Password Reset Request | Action Required`;
+
+  const html = `
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Password Reset</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background-color: #f4f6f9; color: #333; }
+    .wrapper { max-width: 600px; margin: 40px auto; background: #ffffff; border-radius: 12px; overflow: hidden; box-shadow: 0 4px 20px rgba(0,0,0,0.08); }
+    .header { background: linear-gradient(135deg, #1e3a5f 0%, #2563eb 100%); padding: 40px 32px; text-align: center; }
+    .header h1 { color: #ffffff; font-size: 26px; font-weight: 700; margin-bottom: 6px; }
+    .header p { color: rgba(255,255,255,0.85); font-size: 14px; }
+    .body { padding: 36px 32px; }
+    .greeting { font-size: 18px; font-weight: 600; margin-bottom: 12px; color: #1e3a5f; }
+    .text { font-size: 15px; line-height: 1.7; color: #555; margin-bottom: 24px; }
+    .reset-box { background: #eff6ff; border: 2px dashed #2563eb; border-radius: 10px; padding: 28px 24px; margin-bottom: 28px; text-align: center; }
+    .reset-box p.label { font-size: 13px; font-weight: 600; color: #1e3a5f; text-transform: uppercase; letter-spacing: 0.8px; margin-bottom: 8px; }
+    .reset-box p.expires { font-size: 13px; color: #6b7280; margin-top: 16px; }
+    .reset-box p.expires span { font-weight: 700; color: #dc2626; }
+    .btn { display: inline-block; background: linear-gradient(135deg, #1e3a5f, #2563eb); color: #ffffff !important; text-decoration: none; padding: 14px 36px; border-radius: 8px; font-size: 15px; font-weight: 600; margin-top: 8px; }
+    .link-fallback { background: #f9fafb; border: 1px solid #e5e7eb; border-radius: 8px; padding: 16px 20px; margin-bottom: 28px; word-break: break-all; }
+    .link-fallback p.label { font-size: 12px; color: #6b7280; margin-bottom: 8px; font-weight: 500; }
+    .link-fallback p.link { font-size: 13px; color: #2563eb; font-family: 'Courier New', Courier, monospace; }
+    .warning-box { background: #fff7ed; border-left: 4px solid #f97316; border-radius: 4px; padding: 16px 20px; margin-bottom: 28px; }
+    .warning-box p { font-size: 14px; color: #7c2d12; line-height: 1.6; }
+    .info-box { background: #fef2f2; border: 1px solid #fecaca; border-radius: 8px; padding: 20px 24px; margin-bottom: 28px; }
+    .info-box p { font-size: 14px; color: #991b1b; line-height: 1.7; }
+    .divider { border: none; border-top: 1px solid #eee; margin: 24px 0; }
+    .footer { background: #f9fafb; padding: 24px 32px; text-align: center; }
+    .footer p { font-size: 12px; color: #aaa; line-height: 1.8; }
+  </style>
+</head>
+<body>
+  <div class="wrapper">
+    <div class="header">
+      <h1>Password Reset Request 🔐</h1>
+      <p>School Management System</p>
+    </div>
+    <div class="body">
+      <p class="greeting">Dear User,</p>
+      <p class="text">
+        We received a request to reset the password for your account associated with
+        registration number <strong>${data.regNumber}</strong> and email <strong>${data.email}</strong>.
+        Click the button below to reset your password.
+      </p>
+      <div class="reset-box">
+        <p class="label">Reset Your Password</p>
+        <a href="${data.resetLink}" class="btn">Reset Password</a>
+        <p class="expires">
+          This link expires in <span>${data.expiresInMinutes} minutes</span>.
+        </p>
+      </div>
+      <div class="link-fallback">
+        <p class="label">If the button doesn't work, copy and paste this link into your browser:</p>
+        <p class="link">${data.resetLink}</p>
+      </div>
+      <div class="info-box">
+        <p>
+          <strong>Did not request this?</strong> If you did not request a password reset,
+          you can safely ignore this email. Your password will remain unchanged.
+          However, if you believe your account may be compromised, please contact
+          your school administrator immediately.
+        </p>
+      </div>
+      <div class="warning-box">
+        <p>
+          <strong>Security Notice:</strong> This link is valid for <strong>${data.expiresInMinutes} minutes</strong> only
+          and can be used once. Never share this link with anyone including school staff.
+        </p>
+      </div>
+      <hr class="divider" />
+      <p class="text">
+        If you need further assistance, please contact your school administrator.
+      </p>
+    </div>
+    <div class="footer">
+      <p>This is an automated email. Please do not reply directly to this message.</p>
+      <p>© ${new Date().getFullYear()} School Management System. All rights reserved.</p>
+    </div>
+  </div>
+</body>
+</html>
+  `;
+
+  const text = `
+Dear User,
+
+We received a request to reset the password for your account.
+
+Registration No. : ${data.regNumber}
+Email            :  ${data.email}
+
+Reset your password using the link below:
+${data.resetLink}
+
+This link expires in ${data.expiresInMinutes} minutes and can only be used once.
+
+Did not request this? Ignore this email — your password will remain unchanged.
+
+SECURITY NOTICE: Never share this link with anyone.
+
+© ${new Date().getFullYear()} School Management System
+  `.trim();
+
+  return { subject, html, text };
+}
+
+export function sendPasswordChangedSuccessEmail(data: {
+  email: string;
+  regNumber: string;
+  ipAddress: string;
+  changedAt: Date;
+}): { subject: string; html: string; text: string } {
+  const subject = `Password Changed Successfully | Security Alert`;
+
+  const formattedDate = data.changedAt.toLocaleString("en-IN", {
+    dateStyle: "long",
+    timeStyle: "short",
+  });
+
+  const html = `
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Password Changed</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background-color: #f4f6f9; color: #333; }
+    .wrapper { max-width: 600px; margin: 40px auto; background: #ffffff; border-radius: 12px; overflow: hidden; box-shadow: 0 4px 20px rgba(0,0,0,0.08); }
+    .header { background: linear-gradient(135deg, #166534 0%, #16a34a 100%); padding: 40px 32px; text-align: center; }
+    .header h1 { color: #ffffff; font-size: 26px; font-weight: 700; margin-bottom: 6px; }
+    .header p { color: rgba(255,255,255,0.85); font-size: 14px; }
+    .body { padding: 36px 32px; }
+    .greeting { font-size: 18px; font-weight: 600; margin-bottom: 12px; color: #166534; }
+    .text { font-size: 15px; line-height: 1.7; color: #555; margin-bottom: 24px; }
+    .success-box { background: #f0fdf4; border: 2px solid #86efac; border-radius: 10px; padding: 28px 24px; margin-bottom: 28px; text-align: center; }
+    .success-box .icon { font-size: 40px; margin-bottom: 12px; }
+    .success-box p { font-size: 15px; color: #166534; font-weight: 600; }
+    .info-box { background: #f9fafb; border: 1px solid #e5e7eb; border-radius: 8px; padding: 20px 24px; margin-bottom: 28px; }
+    .info-box h3 { font-size: 13px; font-weight: 600; color: #374151; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 16px; }
+    .info-row { display: flex; justify-content: space-between; padding: 8px 0; border-bottom: 1px solid #f0f0f0; font-size: 14px; }
+    .info-row:last-child { border-bottom: none; }
+    .info-row .label { color: #6b7280; font-weight: 500; }
+    .info-row .value { color: #111827; font-weight: 600; text-align: right; max-width: 60%; word-break: break-word; }
+    .warning-box { background: #fef2f2; border-left: 4px solid #dc2626; border-radius: 4px; padding: 16px 20px; margin-bottom: 28px; }
+    .warning-box p { font-size: 14px; color: #991b1b; line-height: 1.6; }
+    .divider { border: none; border-top: 1px solid #eee; margin: 24px 0; }
+    .footer { background: #f9fafb; padding: 24px 32px; text-align: center; }
+    .footer p { font-size: 12px; color: #aaa; line-height: 1.8; }
+  </style>
+</head>
+<body>
+  <div class="wrapper">
+    <div class="header">
+      <h1>Password Changed ✓</h1>
+      <p>School Management System</p>
+    </div>
+    <div class="body">
+      <p class="greeting">Dear User,</p>
+      <p class="text">
+        This is a confirmation that the password for your account has been
+        successfully changed. If you made this change, no further action is required.
+      </p>
+      <div class="success-box">
+        <div class="icon">🔒</div>
+        <p>Your password has been updated successfully.</p>
+      </div>
+      <div class="info-box">
+        <h3>Change Details</h3>
+        <div class="info-row">
+          <span class="label">Registration No.</span>
+          <span class="value">${data.regNumber}</span>
+        </div>
+        <div class="info-row">
+          <span class="label">Email</span>
+          <span class="value">${data.email}</span>
+        </div>
+        <div class="info-row">
+          <span class="label">Changed At</span>
+          <span class="value">${formattedDate}</span>
+        </div>
+        <div class="info-row">
+          <span class="label">IP Address</span>
+          <span class="value">${data.ipAddress}</span>
+        </div>
+      </div>
+      <div class="warning-box">
+        <p>
+          <strong>Not you?</strong> If you did not make this change, your account may be compromised.
+          Please contact your school administrator immediately and do not log in
+          until your account has been secured.
+        </p>
+      </div>
+      <hr class="divider" />
+      <p class="text">
+        For any concerns, please reach out to your school administrator right away.
+      </p>
+    </div>
+    <div class="footer">
+      <p>This is an automated email. Please do not reply directly to this message.</p>
+      <p>© ${new Date().getFullYear()} School Management System. All rights reserved.</p>
+    </div>
+  </div>
+</body>
+</html>
+  `;
+
+  const text = `
+Dear User,
+
+Your password has been changed successfully.
+
+CHANGE DETAILS
+  Registration No. : ${" " + data.regNumber}
+  Email            : ${" " + data.email}
+  Changed At       : ${" " + formattedDate}
+  IP Address       : ${" " + data.ipAddress}
+
+NOT YOU? If you did not make this change, your account may be compromised.
+Contact your school administrator immediately.
 
 © ${new Date().getFullYear()} School Management System
   `.trim();

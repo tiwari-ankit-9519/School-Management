@@ -9,9 +9,16 @@ import {
 import type { AuditContext } from "@/src/middlewares/request-logger.middleware";
 import type { User } from "@prisma/client";
 import type {
+  ChangePasswordInput,
   LoginSchemaInput,
   ResetPasswordInput,
+  SendResetPasswordInput,
 } from "@/src/validations/input.validations";
+import { randomBytes } from "crypto";
+import {
+  sendPasswordResetEmail,
+  sendResetPasswordSuccessEmail,
+} from "./email.service";
 
 const log = createModuleLogger("LoginService");
 
@@ -217,39 +224,32 @@ export async function logout(
 }
 
 export async function changePasswordService(
-  data: ResetPasswordInput,
+  data: ChangePasswordInput,
+  userId: string,
   context: AuditContext,
   statusCode: number,
 ): Promise<void> {
   try {
     log.info("Password reset service starting", {
-      regNumber: data.regNumber,
-      email: data.email,
+      userId,
       ipAddress: context.ipAddress,
     });
 
-    const conditions = [];
-    if (data.email) {
-      conditions.push({ email: data.email });
-    }
-    if (data.regNumber) {
-      conditions.push({ regNumber: data.regNumber });
-    }
-
-    const userExists = await prisma.user.findFirst({
+    const userExists = await prisma.user.findUnique({
       where: {
-        OR: conditions,
+        id: userId,
       },
       select: {
         id: true,
         passwordHash: true,
+        email: true,
+        regNumber: true,
       },
     });
 
     if (!userExists) {
       log.warn("User does not exists with the email or regNumber", {
-        regNumber: data.regNumber,
-        email: data.email,
+        userId,
       });
       throw new Error("User does not exists");
     }
@@ -312,11 +312,205 @@ export async function changePasswordService(
     });
 
     log.info("Password has been reset");
+
+    await sendResetPasswordSuccessEmail({
+      email: userExists.email ?? "",
+      regNumber: userExists.regNumber,
+      ipAddress: context.ipAddress,
+      changedAt: new Date(),
+    });
   } catch (error) {
     const err = error as Error;
     log.error("Failed to reset password", {
       ipAddress: context.ipAddress,
     });
     throw err;
+  }
+}
+
+export async function sendResetPasswordService(
+  data: SendResetPasswordInput,
+  context: AuditContext,
+  statusCode: number,
+): Promise<void> {
+  try {
+    log.info("Starting service to send password reset email", {
+      userEmail: data.email,
+      userRegNumber: data.regNumber,
+      userPhone: data.phone,
+      ipAddress: context.ipAddress,
+    });
+
+    const conditions = [];
+
+    if (data.email) {
+      conditions.push({ email: data.email });
+    }
+    if (data.regNumber) {
+      conditions.push({ regNumber: data.regNumber });
+    }
+    if (data.phone) {
+      conditions.push({ phone: data.phone });
+    }
+
+    const userExists = await prisma.user.findFirst({
+      where: {
+        OR: conditions,
+      },
+    });
+
+    if (!userExists) {
+      log.warn("User does not exists", {
+        userEmail: data.email,
+        userRegNumber: data.regNumber,
+        userPhone: data.phone,
+      });
+      throw new Error("User does not exists");
+    }
+
+    const resetToken = randomBytes(32).toString("hex");
+    const expires = new Date(Date.now() + 3600000);
+
+    await prisma.passwordReset.create({
+      data: {
+        userId: userExists.id,
+        token: resetToken,
+        expiresAt: expires,
+        ipAddress: context.ipAddress,
+      },
+    });
+
+    await createSystemLog({
+      level: "INFO",
+      module: "PasswordResetEmail",
+      message: "Password reset email sent successfully",
+      context,
+      statusCode,
+      metadata: {
+        userEmail: data.email,
+        userRegNumber: data.regNumber,
+        userPhone: data.phone,
+      },
+    });
+
+    log.info("Password reset email sent successfully");
+    await sendPasswordResetEmail({
+      email: userExists.email ?? "",
+      regNumber: userExists.regNumber,
+      expiresInMinutes: 60,
+      resetToken,
+    });
+  } catch (error) {
+    const err = error as Error;
+    log.error("Failed to send reset password email", {
+      userEmail: data.email,
+      userRegNumber: data.regNumber,
+      userPhone: data.phone,
+      ipAddress: context.ipAddress,
+    });
+  }
+}
+
+export async function resetPasswordService(
+  data: ResetPasswordInput,
+  context: AuditContext,
+  statusCode: number,
+): Promise<void> {
+  try {
+    log.info("Starting password reset service", {
+      userEmail: data.email,
+      userRegNumber: data.regNumber,
+      ipAddress: context.ipAddress,
+    });
+    const conditions = [];
+
+    if (data.email) {
+      conditions.push({ email: data.email });
+    }
+    if (data.regNumber) {
+      conditions.push({ regNumber: data.regNumber });
+    }
+
+    const userExists = await prisma.user.findFirst({
+      where: {
+        OR: conditions,
+      },
+      select: {
+        id: true,
+        passwordHash: true,
+        email: true,
+        regNumber: true,
+      },
+    });
+
+    if (!userExists) {
+      log.warn("User does not exists", {
+        userEmail: data.email,
+        userRegNumber: data.regNumber,
+      });
+      throw new Error("User does not exists");
+    }
+
+    const verificationToken = await prisma.passwordReset.findUnique({
+      where: {
+        token: data.token,
+      },
+    });
+
+    if (!verificationToken) {
+      log.warn("Invalid or expired reset link", {
+        userEmail: data.email,
+        userRegNumber: data.regNumber,
+      });
+      throw new Error("Invalid or expired reset link");
+    }
+
+    if (verificationToken.expiresAt < new Date()) {
+      await prisma.passwordReset.deleteMany({
+        where: {
+          userId: userExists.id,
+        },
+      });
+      log.warn("Reset link has expired. Please request a new one.");
+      throw new Error("Reset link has expired. Please request a new one.");
+    }
+
+    const newHashedPassword = await hashPassword(data.newPassword);
+
+    await prisma.user.update({
+      where: {
+        id: userExists.id,
+      },
+      data: {
+        passwordHash: newHashedPassword,
+      },
+    });
+
+    await createSystemLog({
+      level: "INFO",
+      module: "PasswordReset",
+      message: "Password reset successful",
+      context,
+      statusCode,
+      metadata: {
+        userEmail: data.email,
+        userRegNumber: data.regNumber,
+      },
+    });
+
+    log.info("Password reset successful");
+    await sendResetPasswordSuccessEmail({
+      email: userExists.email ?? "",
+      regNumber: userExists.regNumber,
+      ipAddress: context.ipAddress,
+      changedAt: new Date(),
+    });
+  } catch (error) {
+    const err = error as Error;
+    log.error("Failed to reset password", {
+      userEmail: data.email,
+      userRegNumber: data.regNumber,
+      ipAddress: context.ipAddress,
+    });
   }
 }

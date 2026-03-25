@@ -310,21 +310,44 @@ export const SubjectSchema = z.object({
     .trim(),
 });
 
+export const ChangePasswordSchema = z.object({
+  oldPassword: z
+    .string()
+    .min(6, { error: "Minimum 6 digit password is required" })
+    .max(20, { error: "Password can be of maximum 20 digits" }),
+  newPassword: z
+    .string()
+    .min(6, { error: "Minimum 6 digit password is required" })
+    .max(20, { error: "Password can be of maximum 20 digits" }),
+});
+
+export const SendResetPasswordSchema = z
+  .object({
+    email: z.email({ error: "Please provide valid email" }).optional(),
+    regNumber: z.string().optional(),
+    phone: z
+      .string({ error: "Phone number is required" })
+      .regex(/^\+?[0-9]{7,15}$/, {
+        error: "Phone number must be 7 to 15 digits and can start with +",
+      })
+      .optional(),
+  })
+  .refine((data) => data.email || data.regNumber || data.phone, {
+    error: "Either email, registration number or phone is required",
+  });
+
 export const ResetPasswordSchema = z
   .object({
     email: z.email({ error: "Please provide valid email" }).optional(),
     regNumber: z.string().optional(),
-    oldPassword: z
-      .string()
-      .min(6, { error: "Minimum 6 digit password is required" })
-      .max(20, { error: "Password can be of maximum 20 digits" }),
+    token: z.string({ error: "Token is required" }),
     newPassword: z
       .string()
       .min(6, { error: "Minimum 6 digit password is required" })
       .max(20, { error: "Password can be of maximum 20 digits" }),
   })
   .refine((data) => data.email || data.regNumber, {
-    message: "Either email or registration number is required",
+    error: "Either email, registration number or phone is required",
   });
 
 export const modulePermissionSchema = z.object({
@@ -409,6 +432,8 @@ export type ModeratorWithDetails = Prisma.AdminGetPayload<
   typeof moderatorWithDetails
 >;
 export type ResetPasswordInput = z.infer<typeof ResetPasswordSchema>;
+export type SendResetPasswordInput = z.infer<typeof SendResetPasswordSchema>;
+export type ChangePasswordInput = z.infer<typeof ChangePasswordSchema>;
 export type CreateModeratorInput = z.infer<typeof ModeratorSchema>;
 export type SubjectInput = z.infer<typeof SubjectSchema>;
 export type ClassInput = z.infer<typeof ClassSchema>;

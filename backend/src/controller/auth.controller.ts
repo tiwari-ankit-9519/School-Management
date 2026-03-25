@@ -3,12 +3,18 @@ import {
   login,
   logout,
   changePasswordService,
+  sendResetPasswordService,
+  resetPasswordService,
 } from "@/src/services/auth.service";
 import {
   AuthenticatedRequest,
   buildAuditContext,
 } from "../middlewares/request-logger.middleware";
-import { ResetPasswordSchema } from "../validations/input.validations";
+import {
+  ChangePasswordSchema,
+  ResetPasswordSchema,
+  SendResetPasswordSchema,
+} from "../validations/input.validations";
 import { HTTP_STATUS } from "../utils/constants";
 
 export async function loginUser(
@@ -58,7 +64,38 @@ export async function changePassword(
   req: AuthenticatedRequest,
   res: Response,
 ): Promise<void> {
-  const parsed = ResetPasswordSchema.safeParse(req.body);
+  const parsed = ChangePasswordSchema.safeParse(req.body);
+  if (!parsed.success) {
+    res.status(400).json({
+      success: false,
+      message: "Validation failed",
+      errors: parsed.error.issues,
+    });
+    return;
+  }
+  const userId = req.user?.id;
+  if (!userId) {
+    throw new Error("User ID is required");
+  }
+  const auditContext = buildAuditContext(req);
+  res.status(HTTP_STATUS.OK);
+  await changePasswordService(
+    parsed.data,
+    userId,
+    auditContext,
+    res.statusCode,
+  );
+  res.json({
+    success: true,
+    message: "Password reset successfully",
+  });
+}
+
+export async function sendResetPassword(
+  req: AuthenticatedRequest,
+  res: Response,
+): Promise<void> {
+  const parsed = SendResetPasswordSchema.safeParse(req.body);
   if (!parsed.success) {
     res.status(400).json({
       success: false,
@@ -70,7 +107,29 @@ export async function changePassword(
 
   const auditContext = buildAuditContext(req);
   res.status(HTTP_STATUS.OK);
-  await changePasswordService(parsed.data, auditContext, res.statusCode);
+  await sendResetPasswordService(parsed.data, auditContext, res.statusCode);
+  res.json({
+    success: true,
+    message: "Password reset mail sent successfully",
+  });
+}
+
+export async function resetPassword(
+  req: AuthenticatedRequest,
+  res: Response,
+): Promise<void> {
+  const parsed = ResetPasswordSchema.safeParse(req.body);
+  if (!parsed.success) {
+    res.status(400).json({
+      success: false,
+      message: "Validation failed",
+      errors: parsed.error.issues,
+    });
+    return;
+  }
+  const auditContext = buildAuditContext(req);
+  res.status(HTTP_STATUS.OK);
+  await resetPasswordService(parsed.data, auditContext, res.statusCode);
   res.json({
     success: true,
     message: "Password reset successfully",
