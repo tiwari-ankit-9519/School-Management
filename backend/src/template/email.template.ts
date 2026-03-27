@@ -947,3 +947,320 @@ Contact your school administrator immediately.
 
   return { subject, html, text };
 }
+
+export function sendTeacherApplicationSubmittedEmail(data: {
+  firstName: string;
+  lastName: string;
+  email: string;
+  phone: string;
+  qualification: string;
+  experience: number;
+  specialization?: string;
+  schoolName: string;
+  applicationId: string;
+}): { subject: string; html: string; text: string } {
+  const subject = `Application Received | ${data.schoolName}`;
+
+  const html = `
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Application Received</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background-color: #f4f6f9; color: #333; }
+    .wrapper { max-width: 600px; margin: 40px auto; background: #ffffff; border-radius: 12px; overflow: hidden; box-shadow: 0 4px 20px rgba(0,0,0,0.08); }
+    .header { background: linear-gradient(135deg, #1e3a5f 0%, #2563eb 100%); padding: 40px 32px; text-align: center; }
+    .header h1 { color: #ffffff; font-size: 26px; font-weight: 700; margin-bottom: 6px; }
+    .header p { color: rgba(255,255,255,0.85); font-size: 14px; }
+    .body { padding: 36px 32px; }
+    .greeting { font-size: 18px; font-weight: 600; margin-bottom: 12px; color: #1e3a5f; }
+    .text { font-size: 15px; line-height: 1.7; color: #555; margin-bottom: 24px; }
+    .status-box { background: #eff6ff; border: 2px solid #2563eb; border-radius: 10px; padding: 24px; margin-bottom: 28px; text-align: center; }
+    .status-box .icon { font-size: 36px; margin-bottom: 10px; }
+    .status-box p { font-size: 15px; color: #1e3a5f; font-weight: 600; }
+    .status-box span { display: inline-block; margin-top: 8px; background: #dbeafe; color: #1d4ed8; font-size: 12px; font-weight: 700; padding: 4px 12px; border-radius: 20px; letter-spacing: 0.5px; text-transform: uppercase; }
+    .info-box { background: #f9fafb; border: 1px solid #e5e7eb; border-radius: 8px; padding: 20px 24px; margin-bottom: 28px; }
+    .info-box h3 { font-size: 13px; font-weight: 600; color: #374151; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 16px; }
+    .info-row { display: flex; justify-content: space-between; padding: 8px 0; border-bottom: 1px solid #f0f0f0; font-size: 14px; }
+    .info-row:last-child { border-bottom: none; }
+    .info-row .label { color: #6b7280; font-weight: 500; }
+    .info-row .value { color: #111827; font-weight: 600; text-align: right; max-width: 60%; word-break: break-word; }
+    .steps-box { background: #f0fdf4; border: 1px solid #86efac; border-radius: 8px; padding: 24px; margin-bottom: 28px; }
+    .steps-box h3 { font-size: 13px; font-weight: 600; color: #166534; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 16px; }
+    .step { display: flex; align-items: flex-start; gap: 12px; margin-bottom: 12px; }
+    .step:last-child { margin-bottom: 0; }
+    .step-num { background: #16a34a; color: #fff; font-size: 12px; font-weight: 700; width: 22px; height: 22px; border-radius: 50%; display: flex; align-items: center; justify-content: center; flex-shrink: 0; margin-top: 1px; }
+    .step p { font-size: 14px; color: #166534; line-height: 1.6; }
+    .ref-box { background: #fafafa; border: 1px dashed #d1d5db; border-radius: 8px; padding: 16px 20px; margin-bottom: 28px; text-align: center; }
+    .ref-box p.label { font-size: 12px; color: #6b7280; margin-bottom: 6px; font-weight: 500; text-transform: uppercase; letter-spacing: 0.5px; }
+    .ref-box p.ref { font-size: 15px; font-weight: 700; color: #1e3a5f; font-family: 'Courier New', Courier, monospace; letter-spacing: 1px; }
+    .divider { border: none; border-top: 1px solid #eee; margin: 24px 0; }
+    .footer { background: #f9fafb; padding: 24px 32px; text-align: center; }
+    .footer p { font-size: 12px; color: #aaa; line-height: 1.8; }
+  </style>
+</head>
+<body>
+  <div class="wrapper">
+    <div class="header">
+      <h1>Application Received 📋</h1>
+      <p>${data.schoolName}</p>
+    </div>
+    <div class="body">
+      <p class="greeting">Dear ${data.firstName} ${data.lastName},</p>
+      <p class="text">
+        Thank you for applying to <strong>${data.schoolName}</strong>. We have successfully received
+        your teacher application and it is currently under review. Our team will get back to you
+        with an update shortly.
+      </p>
+      <div class="status-box">
+        <div class="icon">✅</div>
+        <p>Your application has been submitted successfully.</p>
+        <span>Pending Review</span>
+      </div>
+      <div class="ref-box">
+        <p class="label">Application Reference ID</p>
+        <p class="ref">${data.applicationId}</p>
+      </div>
+      <div class="info-box">
+        <h3>Application Summary</h3>
+        <div class="info-row">
+          <span class="label">Full Name</span>
+          <span class="value">${data.firstName} ${data.lastName}</span>
+        </div>
+        <div class="info-row">
+          <span class="label">Email</span>
+          <span class="value">${data.email}</span>
+        </div>
+        <div class="info-row">
+          <span class="label">Phone</span>
+          <span class="value">${data.phone}</span>
+        </div>
+        <div class="info-row">
+          <span class="label">Qualification</span>
+          <span class="value">${data.qualification}</span>
+        </div>
+        <div class="info-row">
+          <span class="label">Experience</span>
+          <span class="value">${data.experience} ${data.experience === 1 ? "year" : "years"}</span>
+        </div>
+        ${
+          data.specialization
+            ? `
+        <div class="info-row">
+          <span class="label">Specialization</span>
+          <span class="value">${data.specialization}</span>
+        </div>`
+            : ""
+        }
+      </div>
+      <div class="steps-box">
+        <h3>What Happens Next</h3>
+        <div class="step">
+          <div class="step-num">1</div>
+          <p>Our team will review your application and attached documents.</p>
+        </div>
+        <div class="step">
+          <div class="step-num">2</div>
+          <p>You will be notified via email if you are shortlisted for further evaluation.</p>
+        </div>
+        <div class="step">
+          <div class="step-num">3</div>
+          <p>If selected, you will receive your account credentials and onboarding details.</p>
+        </div>
+      </div>
+      <hr class="divider" />
+      <p class="text">
+        If you have any questions regarding your application, please contact
+        the school administration with your reference ID.
+      </p>
+    </div>
+    <div class="footer">
+      <p>This is an automated email. Please do not reply directly to this message.</p>
+      <p>© ${new Date().getFullYear()} School Management System. All rights reserved.</p>
+    </div>
+  </div>
+</body>
+</html>
+  `;
+
+  const text = `
+Dear ${data.firstName} ${data.lastName},
+
+Thank you for applying to ${data.schoolName}. Your teacher application has been received and is currently under review.
+
+APPLICATION REFERENCE ID: ${data.applicationId}
+
+APPLICATION SUMMARY
+  Full Name      : ${data.firstName} ${data.lastName}
+  Email          : ${data.email}
+  Phone          : ${data.phone}
+  Qualification  : ${data.qualification}
+  Experience     : ${data.experience} ${data.experience === 1 ? "year" : "years"}
+  ${data.specialization ? `Specialization : ${data.specialization}` : ""}
+
+WHAT HAPPENS NEXT
+  1. Our team will review your application and attached documents.
+  2. You will be notified via email if you are shortlisted for further evaluation.
+  3. If selected, you will receive your account credentials and onboarding details.
+
+For any queries, please contact the school administration with your reference ID.
+
+© ${new Date().getFullYear()} School Management System
+  `.trim();
+
+  return { subject, html, text };
+}
+
+export function sendTeacherApplicationResubmittedEmail(data: {
+  firstName: string;
+  lastName: string;
+  email: string;
+  phone: string;
+  qualification: string;
+  experience: number;
+  specialization?: string;
+  schoolName: string;
+  applicationId: string;
+}): { subject: string; html: string; text: string } {
+  const subject = `Application Resubmitted | ${data.schoolName}`;
+
+  const html = `
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Application Resubmitted</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background-color: #f4f6f9; color: #333; }
+    .wrapper { max-width: 600px; margin: 40px auto; background: #ffffff; border-radius: 12px; overflow: hidden; box-shadow: 0 4px 20px rgba(0,0,0,0.08); }
+    .header { background: linear-gradient(135deg, #92400e 0%, #f59e0b 100%); padding: 40px 32px; text-align: center; }
+    .header h1 { color: #ffffff; font-size: 26px; font-weight: 700; margin-bottom: 6px; }
+    .header p { color: rgba(255,255,255,0.85); font-size: 14px; }
+    .body { padding: 36px 32px; }
+    .greeting { font-size: 18px; font-weight: 600; margin-bottom: 12px; color: #92400e; }
+    .text { font-size: 15px; line-height: 1.7; color: #555; margin-bottom: 24px; }
+    .status-box { background: #fffbeb; border: 2px solid #f59e0b; border-radius: 10px; padding: 24px; margin-bottom: 28px; text-align: center; }
+    .status-box .icon { font-size: 36px; margin-bottom: 10px; }
+    .status-box p { font-size: 15px; color: #92400e; font-weight: 600; }
+    .status-box span { display: inline-block; margin-top: 8px; background: #fde68a; color: #92400e; font-size: 12px; font-weight: 700; padding: 4px 12px; border-radius: 20px; letter-spacing: 0.5px; text-transform: uppercase; }
+    .info-box { background: #f9fafb; border: 1px solid #e5e7eb; border-radius: 8px; padding: 20px 24px; margin-bottom: 28px; }
+    .info-box h3 { font-size: 13px; font-weight: 600; color: #374151; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 16px; }
+    .info-row { display: flex; justify-content: space-between; padding: 8px 0; border-bottom: 1px solid #f0f0f0; font-size: 14px; }
+    .info-row:last-child { border-bottom: none; }
+    .info-row .label { color: #6b7280; font-weight: 500; }
+    .info-row .value { color: #111827; font-weight: 600; text-align: right; max-width: 60%; word-break: break-word; }
+    .notice-box { background: #fff7ed; border-left: 4px solid #f97316; border-radius: 4px; padding: 16px 20px; margin-bottom: 28px; }
+    .notice-box p { font-size: 14px; color: #7c2d12; line-height: 1.6; }
+    .ref-box { background: #fafafa; border: 1px dashed #d1d5db; border-radius: 8px; padding: 16px 20px; margin-bottom: 28px; text-align: center; }
+    .ref-box p.label { font-size: 12px; color: #6b7280; margin-bottom: 6px; font-weight: 500; text-transform: uppercase; letter-spacing: 0.5px; }
+    .ref-box p.ref { font-size: 15px; font-weight: 700; color: #92400e; font-family: 'Courier New', Courier, monospace; letter-spacing: 1px; }
+    .divider { border: none; border-top: 1px solid #eee; margin: 24px 0; }
+    .footer { background: #f9fafb; padding: 24px 32px; text-align: center; }
+    .footer p { font-size: 12px; color: #aaa; line-height: 1.8; }
+  </style>
+</head>
+<body>
+  <div class="wrapper">
+    <div class="header">
+      <h1>Application Resubmitted 🔄</h1>
+      <p>${data.schoolName}</p>
+    </div>
+    <div class="body">
+      <p class="greeting">Dear ${data.firstName} ${data.lastName},</p>
+      <p class="text">
+        Your previously rejected teacher application at <strong>${data.schoolName}</strong> has been
+        successfully resubmitted with your updated information. Our team will review
+        your application again and get back to you.
+      </p>
+      <div class="status-box">
+        <div class="icon">🔄</div>
+        <p>Your application has been resubmitted successfully.</p>
+        <span>Under Review Again</span>
+      </div>
+      <div class="ref-box">
+        <p class="label">Application Reference ID</p>
+        <p class="ref">${data.applicationId}</p>
+      </div>
+      <div class="info-box">
+        <h3>Updated Application Summary</h3>
+        <div class="info-row">
+          <span class="label">Full Name</span>
+          <span class="value">${data.firstName} ${data.lastName}</span>
+        </div>
+        <div class="info-row">
+          <span class="label">Email</span>
+          <span class="value">${data.email}</span>
+        </div>
+        <div class="info-row">
+          <span class="label">Phone</span>
+          <span class="value">${data.phone}</span>
+        </div>
+        <div class="info-row">
+          <span class="label">Qualification</span>
+          <span class="value">${data.qualification}</span>
+        </div>
+        <div class="info-row">
+          <span class="label">Experience</span>
+          <span class="value">${data.experience} ${data.experience === 1 ? "year" : "years"}</span>
+        </div>
+        ${
+          data.specialization
+            ? `
+        <div class="info-row">
+          <span class="label">Specialization</span>
+          <span class="value">${data.specialization}</span>
+        </div>`
+            : ""
+        }
+      </div>
+      <div class="notice-box">
+        <p>
+          <strong>Please note:</strong> This is a resubmission of your previously rejected application.
+          Ensure all your documents and information are accurate and complete to
+          improve your chances of approval.
+        </p>
+      </div>
+      <hr class="divider" />
+      <p class="text">
+        If you have any questions regarding your application, please contact
+        the school administration with your reference ID.
+      </p>
+    </div>
+    <div class="footer">
+      <p>This is an automated email. Please do not reply directly to this message.</p>
+      <p>© ${new Date().getFullYear()} School Management System. All rights reserved.</p>
+    </div>
+  </div>
+</body>
+</html>
+  `;
+
+  const text = `
+Dear ${data.firstName} ${data.lastName},
+
+Your previously rejected teacher application at ${data.schoolName} has been successfully resubmitted with your updated information.
+
+APPLICATION REFERENCE ID: ${data.applicationId}
+
+UPDATED APPLICATION SUMMARY
+  Full Name      : ${data.firstName} ${data.lastName}
+  Email          : ${data.email}
+  Phone          : ${data.phone}
+  Qualification  : ${data.qualification}
+  Experience     : ${data.experience} ${data.experience === 1 ? "year" : "years"}
+  ${data.specialization ? `Specialization : ${data.specialization}` : ""}
+
+Please note: Ensure all your documents and information are accurate and complete to improve your chances of approval.
+
+For any queries, please contact the school administration with your reference ID.
+
+© ${new Date().getFullYear()} School Management System
+  `.trim();
+
+  return { subject, html, text };
+}

@@ -12,6 +12,8 @@ import {
   sendModeratorWelcomeEmail,
   sendPasswordResetLinkEmail,
   sendPasswordChangedSuccessEmail,
+  sendTeacherApplicationSubmittedEmail,
+  sendTeacherApplicationResubmittedEmail,
 } from "@/src/template/email.template";
 
 const log = createModuleLogger("EmailService");
@@ -375,4 +377,88 @@ export async function sendResetPasswordSuccessEmail(data: {
       regNumber: data.regNumber,
     });
   }
+}
+
+export async function sendTeacherApplicationEmail(data: {
+  firstName: string;
+  lastName: string;
+  email: string;
+  phone: string;
+  qualification: string;
+  experience: number;
+  specialization?: string;
+  schoolName: string;
+  applicationId: string;
+}): Promise<void> {
+  log.info("Queuing teacher application email", {
+    email: data.email,
+    schoolName: data.schoolName,
+  });
+
+  const { subject, html, text } = sendTeacherApplicationSubmittedEmail({
+    firstName: data.firstName,
+    lastName: data.lastName,
+    email: data.email,
+    phone: data.phone,
+    qualification: data.qualification,
+    experience: data.experience,
+    specialization: data.specialization,
+    schoolName: data.schoolName,
+    applicationId: data.applicationId,
+  });
+
+  await addEmailToQueue({
+    to: data.email,
+    subject,
+    html,
+    text,
+    priority: 1,
+  });
+
+  log.info("Teacher Application email queued successfully", {
+    email: data.email,
+    schoolName: data.schoolName,
+  });
+}
+
+export async function sendTeacherApplicationResubmissionEmail(data: {
+  firstName: string;
+  lastName: string;
+  email: string;
+  phone: string;
+  qualification: string;
+  experience: number;
+  specialization?: string;
+  schoolName: string;
+  applicationId: string;
+}): Promise<void> {
+  log.info("Queuing teacher resubmission application email", {
+    email: data.email,
+    schoolName: data.schoolName,
+  });
+
+  const { subject, html, text } = sendTeacherApplicationResubmittedEmail({
+    firstName: data.firstName,
+    lastName: data.lastName,
+    email: data.email,
+    phone: data.phone,
+    qualification: data.qualification,
+    experience: data.experience,
+    specialization: data.specialization,
+    schoolName: data.schoolName,
+    applicationId: data.applicationId,
+  });
+
+  await addEmailToQueue({
+    to: data.email,
+    subject,
+    html,
+    text,
+    priority: 1,
+  });
+
+  log.info("Teacher Application resubmission email queued successfully", {
+    email: data.email,
+    schoolName: data.schoolName,
+  });
 }

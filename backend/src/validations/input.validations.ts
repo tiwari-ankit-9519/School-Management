@@ -101,7 +101,7 @@ export const SchoolApplicationSchema = z.object({
   documents: z
     .array(
       z.object({
-        documentType: z.nativeEnum(DocumentType),
+        documentType: z.enum(DocumentType),
         title: z.string().min(2).max(100).trim(),
       }),
     )
@@ -427,10 +427,69 @@ export const moderatorWithDetails = Prisma.validator<Prisma.AdminDefaultArgs>()(
   },
 );
 
+export const TeacherApplicationSchema = z.object({
+  firstName: z
+    .string({ error: "First Name is required" })
+    .trim()
+    .min(2, { error: "First name should be of atleast 2 characters" })
+    .max(20, { error: "First name should be of atmost 20 characters" }),
+  lastName: z
+    .string({ error: "Last Name is required" })
+    .trim()
+    .min(2, { error: "Last name should be of atleast 2 characters" })
+    .max(20, { error: "Last name should be of atmost 20 characters" }),
+  email: z.email({ error: "Please provide a valid email address" }),
+  phone: z
+    .string({ error: "Phone number is required" })
+    .regex(/^\+?[0-9]{7,15}$/, {
+      error: "Phone number must be 7 to 15 digits and can start with +",
+    }),
+  gender: z.enum(Gender),
+  dateOfBirth: z.coerce
+    .date({ error: "Date is required" })
+    .refine((date) => date < new Date(), {
+      error: "Date of birth should be in past",
+    }),
+  address: z
+    .string({ error: "Address is required" })
+    .min(10, { error: "Address must be at least 10 characters" })
+    .max(200, { error: "Address must be at most 200 characters" })
+    .trim(),
+  city: z
+    .string({ error: "City is required" })
+    .min(2, { error: "City must be at least 2 characters" })
+    .max(50, { error: "City must be at most 50 characters" })
+    .trim(),
+  state: z
+    .string({ error: "State is required" })
+    .min(2, { error: "State must be at least 2 characters" })
+    .max(50, { error: "State must be at most 50 characters" })
+    .trim(),
+  pincode: z
+    .string({ error: "Pincode is required" })
+    .regex(/^\d{4,10}$/, { error: "Pincode must be 4 to 10 digits" }),
+  qualification: z
+    .string({ error: "Qualification details are required" })
+    .trim()
+    .min(2, { error: "Qualification should be of atleast 2 characters" })
+    .max(40, { error: "Qualification should be of atmost 40 characters" }),
+  experience: z.coerce.number({ error: "Experience is required" }),
+  specialization: z.string({ error: "Specialization is required" }).optional(),
+  documents: z
+    .array(
+      z.object({
+        documentType: z.enum(DocumentType),
+        title: z.string().min(2).max(100).trim(),
+      }),
+    )
+    .optional(),
+});
+
 // Types export
 export type ModeratorWithDetails = Prisma.AdminGetPayload<
   typeof moderatorWithDetails
 >;
+export type TeacherApplicationInput = z.infer<typeof TeacherApplicationSchema>;
 export type ResetPasswordInput = z.infer<typeof ResetPasswordSchema>;
 export type SendResetPasswordInput = z.infer<typeof SendResetPasswordSchema>;
 export type ChangePasswordInput = z.infer<typeof ChangePasswordSchema>;
