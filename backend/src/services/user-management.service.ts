@@ -1,5 +1,5 @@
 import {
-  Admin,
+  ApplicationStatus,
   DocumentOwnerType,
   DocumentType,
   Role,
@@ -10,7 +10,9 @@ import { AuditContext } from "../middlewares/request-logger.middleware";
 import {
   CreateModeratorInput,
   ModeratorWithDetails,
+  ResubmitTeacherApplicationInput,
   TeacherApplicationInput,
+  TeacherWithDetails,
 } from "../validations/input.validations";
 import { prisma } from "../config/database.config";
 import { hashPassword } from "../utils/password";
@@ -19,12 +21,21 @@ import {
   sendModeratorInformation,
   sendTeacherApplicationEmail,
   sendTeacherApplicationResubmissionEmail,
+  sendTeacherApprovedEmailService,
 } from "./email.service";
 import {
   CloudinaryUploadResult,
   deleteFromCloudinary,
   uploadToCloudinary,
 } from "../config/cloudinary.config";
+import {
+  CACHE_KEYS,
+  CACHE_TTL,
+  deleteCache,
+  getCache,
+  setCache,
+} from "../utils/cache.util";
+import { application } from "express";
 
 const log = createModuleLogger("UserManagement");
 
@@ -529,6 +540,765 @@ export async function teacherApplicationService(
       ipAddress: context.ipAddress,
       teacherEmail: data.email,
     });
+    throw err;
+  }
+}
+
+// Getting all teacher application
+export async function getAllTeachersApplicationService(
+  context: AuditContext,
+  statusCode: number,
+  page: number = 1,
+  limit: number = 10,
+  schoolId: string,
+  status?: ApplicationStatus,
+): Promise<{
+  data: TeacherApplication[];
+  total: number;
+  page: number;
+  limit: number;
+  totalPages: number;
+}> {
+  try {
+    log.info("Fetching all teacher applications", {
+      page,
+      limit,
+      status: status ?? "ALL",
+      schoolId,
+      ipAddress: context.ipAddress,
+    });
+
+    const where = status ? { schoolId, status } : { schoolId };
+    const cacheKey = CACHE_KEYS.teacherApplications(
+      schoolId,
+      status ?? "ALL",
+      page,
+      limit,
+    );
+
+    const cached = await getCache<{
+      data: TeacherApplication[];
+      total: number;
+      page: number;
+      limit: number;
+      totalPages: number;
+    }>(cacheKey);
+
+    if (cached) {
+      log.info("Returning cached teacher applications", { cacheKey });
+      return cached;
+    }
+
+    const [applications, total] = await prisma.$transaction([
+      prisma.teacherApplication.findMany({
+        where,
+        skip: (page - 1) * limit,
+        take: limit,
+        orderBy: {
+          appliedAt: "desc",
+        },
+        include: {
+          documents: true,
+        },
+      }),
+      prisma.teacherApplication.count({ where }),
+    ]);
+
+    await createSystemLog({
+      level: "INFO",
+      message: "Fetched teacher applications",
+      module: "TeacherApplication",
+      context,
+      metadata: {
+        page,
+        limit,
+        total,
+        status: status ?? "ALL",
+      },
+      statusCode,
+    });
+
+    const response = {
+      data: applications,
+      total,
+      page,
+      limit,
+      totalPages: Math.ceil(total / limit),
+    };
+
+    await setCache(cacheKey, response, CACHE_TTL.SCHOOL_APPLICATIONS_LIST);
+
+    log.info("Fetched all school applications successfully", {
+      page,
+      limit,
+      total,
+      totalPages: Math.ceil(total / limit),
+      status: status ?? "ALL",
+    });
+
+    return response;
+  } catch (error) {
+    const err = error as Error;
+    log.error("Failed to get teacher applications", {
+      error: err.message,
+      ipAddress: context.ipAddress,
+      page,
+      limit,
+    });
+    throw err;
+  }
+}
+
+// Getting single teacher application
+export async function getTeacherApplicationService(
+  applicationId: string,
+  schoolId: string,
+  context: AuditContext,
+  statusCode: number,
+): Promise<TeacherApplication> {
+  try {
+    log.info(
+      `Starting the serivce to fetch teacher application with applicationId ${applicationId}`,
+      {
+        schoolId,
+        ipAddress: context.ipAddress,
+      },
+    );
+
+    const cacheKey = CACHE_KEYS.teacherApplication(schoolId, applicationId);
+
+    const cached = await getCache<TeacherApplication>(cacheKey);
+
+    if (cached) {
+      log.info("Returning cached teacher application", { cacheKey });
+      return cached;
+    }
+
+    const application = await prisma.teacherApplication.findUnique({
+      where: {
+        id: applicationId,
+        schoolId,
+      },
+    });
+
+    if (!application) {
+      log.warn("Application does not exists", {
+        applicationId,
+      });
+      throw new Error("Application does not exists");
+    }
+
+    await createSystemLog({
+      level: "INFO",
+      message: "Fetched teacher application",
+      module: "TeacherApplication",
+      context,
+      metadata: {
+        applicationId,
+        schoolId,
+      },
+      statusCode,
+    });
+
+    await setCache(cacheKey, application, CACHE_TTL.SCHOOL_APPLICATION_SINGLE);
+    log.info("Fetched application successfully");
+    return application;
+  } catch (error) {
+    const err = error as Error;
+    log.error(
+      `Failed to fetch the application with applicationId ${applicationId}`,
+      {
+        error: err.message,
+        ipAddress: context.ipAddress,
+      },
+    );
+    throw err;
+  }
+}
+
+// Moderator changing the status to shortlisted
+export async function shortlistApplicationService(
+  applicationId: string,
+  moderatorId: string,
+  schoolId: string,
+  context: AuditContext,
+  statusCode: number,
+): Promise<TeacherApplication> {
+  try {
+    log.info("Starting Shortlisting application service", {
+      schoolId,
+      applicationId,
+      ipAddress: context.ipAddress,
+    });
+
+    const application = await prisma.teacherApplication.findUnique({
+      where: {
+        schoolId,
+        id: applicationId,
+      },
+    });
+
+    if (!application) {
+      log.warn(
+        `Application ID ${applicationId} not found for schoolId ${schoolId}`,
+      );
+      throw new Error("Application ID not found");
+    }
+
+    if (application.status !== "PENDING") {
+      log.warn("Application is not in pending state");
+      throw new Error(
+        `Application cannot be shortlisted as it is already ${application.status}`,
+      );
+    }
+
+    const updatedApplication = await prisma.teacherApplication.update({
+      where: {
+        id: applicationId,
+      },
+      data: {
+        status: "SHORTLISTED",
+        reviewedAt: new Date(),
+        reviewedBy: moderatorId,
+      },
+    });
+
+    await deleteCache(CACHE_KEYS.teacherApplications(schoolId, "ALL", 1, 10));
+    await deleteCache(CACHE_KEYS.teacherApplication(schoolId, applicationId));
+
+    await createSystemLog({
+      level: "INFO",
+      message: "Teacher application shortlisted for admin",
+      module: "TeacherApplication",
+      context,
+      metadata: {
+        applicationId,
+        schoolId,
+        ipAddress: context.ipAddress,
+      },
+      statusCode,
+    });
+
+    await createAuditLog({
+      schoolId,
+      performedById: moderatorId,
+      action: "UPDATE",
+      module: "TeacherApplication",
+      resourceId: applicationId,
+      resourceType: "TeacherApplication",
+      oldValues: {
+        applicationId,
+        status: application.status,
+        teacherName: `${application.firstName} ${application.lastName}`,
+        teacherEmail: application.email,
+      },
+      newValues: {
+        status: updatedApplication.status,
+        reviewedBy: updatedApplication.reviewedBy,
+        reviewAt: updatedApplication.reviewedAt,
+      },
+      context,
+      isSuccessful: true,
+      statusCode,
+    });
+
+    log.info("Application shortlisted for further process", {
+      updatedApplication,
+    });
+
+    return updatedApplication;
+  } catch (error) {
+    const err = error as Error;
+    log.error("Failed to shortlist teacher application", {
+      error: err.message,
+      ipAddress: context.ipAddress,
+      schoolId,
+      applicationId,
+    });
+    throw err;
+  }
+}
+
+// Admin approving teacher application and creating teacher reg number
+export async function approveTeacherApplicationService(
+  applicationId: string,
+  schoolId: string,
+  adminId: string,
+  context: AuditContext,
+  statusCode: number,
+): Promise<TeacherWithDetails> {
+  try {
+    log.info("Starting service to approve teacher application", {
+      ipAddress: context.ipAddress,
+      schoolId,
+      applicationId,
+    });
+
+    const [application, school] = await Promise.all([
+      await prisma.teacherApplication.findUnique({
+        where: {
+          schoolId,
+          id: applicationId,
+        },
+      }),
+      await prisma.school.findUnique({
+        where: {
+          id: schoolId,
+        },
+      }),
+    ]);
+
+    if (!application) {
+      log.warn(`Application not found for applicationId ${applicationId}`);
+      throw new Error("Application not found");
+    }
+
+    if (application.status !== "SHORTLISTED") {
+      log.warn(`Application status is ${application.status}`);
+      throw new Error(
+        `Application must be SHORTLISTED before approval, current status is ${application.status}`,
+      );
+    }
+
+    const response = await prisma.$transaction(async (tx) => {
+      await tx.teacherApplication.update({
+        where: {
+          id: applicationId,
+        },
+        data: {
+          status: "SELECTED",
+        },
+      });
+
+      const [{ generate_registration_number: regNumber }] = await tx.$queryRaw<
+        [{ generate_registration_number: string }]
+      >`
+  SELECT generate_registration_number(${schoolId}, ${Role.TEACHER})
+`;
+
+      const tempPassword = `Teacher@${Math.random().toString(36).slice(-8)}`;
+      const hashedPassword = await hashPassword(tempPassword);
+
+      const user = await tx.user.create({
+        data: {
+          schoolId,
+          regNumber,
+          email: application.email,
+          phone: application.phone,
+          passwordHash: hashedPassword,
+          isActive: true,
+          isVerified: false,
+          role: "TEACHER",
+        },
+      });
+
+      const teacher = await tx.teacher.create({
+        data: {
+          userId: user.id,
+          firstName: application.firstName,
+          lastName: application.lastName,
+          dateOfBirth: application.dateOfBirth,
+          gender: application.gender,
+          address: application.address,
+          city: application.city,
+          state: application.state,
+          pincode: application.pincode,
+          qualification: application.qualification,
+          experience: application.experience,
+          specialization: application.specialization,
+          joiningDate: new Date(),
+        },
+      });
+
+      log.info("Teacher created successfully", {
+        userName: `${application.firstName} ${application.lastName}`,
+        userRegNumber: regNumber,
+      });
+
+      return {
+        teacher: await tx.teacher.findUniqueOrThrow({
+          where: { userId: user.id },
+          include: {
+            user: {
+              select: {
+                id: true,
+                regNumber: true,
+                email: true,
+                phone: true,
+                role: true,
+                isActive: true,
+                isVerified: true,
+                createdAt: true,
+              },
+            },
+          },
+        }),
+        tempPassword,
+      };
+    });
+
+    await deleteCache(CACHE_KEYS.teacherApplication(schoolId, applicationId));
+    await deleteCache(CACHE_KEYS.teacherApplications(schoolId, "ALL", 1, 10));
+    await deleteCache(
+      CACHE_KEYS.teacherApplications(schoolId, "SHORTLISTED", 1, 10),
+    );
+
+    await createSystemLog({
+      level: "INFO",
+      module: "TeacherCreation",
+      message: "Teacher created",
+      context,
+      statusCode,
+      metadata: {
+        schoolId,
+        regNumber: response.teacher.user.regNumber,
+        userFirstName: response.teacher.firstName,
+        userLastName: response.teacher.lastName,
+        userDOB: response.teacher.dateOfBirth,
+        email: response.teacher.user.email,
+      },
+    });
+
+    await createAuditLog({
+      schoolId,
+      performedById: adminId,
+      action: "CREATE",
+      module: "User",
+      resourceId: response.teacher.user.regNumber,
+      resourceType: "TeacherCreation",
+      oldValues: {
+        status: application.status,
+      },
+      newValues: {
+        regNumber: response.teacher.user.regNumber,
+        userFirstName: response.teacher.firstName,
+        userLastName: response.teacher.lastName,
+        userDOB: response.teacher.dateOfBirth,
+        email: response.teacher.user.email,
+      },
+      context,
+      isSuccessful: true,
+      statusCode,
+    });
+
+    await sendTeacherApprovedEmailService({
+      firstName: application.firstName,
+      lastName: application.lastName,
+      email: application.email,
+      phone: application.phone,
+      regNumber: response.teacher.user.regNumber,
+      tempPassword: response.tempPassword,
+      applicationId: applicationId,
+      schoolName: school?.name ?? "",
+    });
+
+    return response.teacher;
+  } catch (error) {
+    const err = error as Error;
+    log.error("Failed to approve teacher application", {
+      error: err.message,
+      ipAddress: context.ipAddress,
+      schoolId,
+      applicationId,
+    });
+    throw err;
+  }
+}
+
+// Admin moderator rejecting the teacher applicaiton
+export async function rejectTeacherApplicaitonService(
+  applicationId: string,
+  schoolId: string,
+  moderatorId: string,
+  rejectionReason: string,
+  context: AuditContext,
+  statusCode: number,
+): Promise<void> {
+  try {
+    log.info(
+      `Starting service to reject teacher application with applicationId ${applicationId}`,
+      {
+        applicationId,
+        schoolId,
+        ipAddress: context.ipAddress,
+      },
+    );
+
+    const teacherApplicationExists = await prisma.teacherApplication.findUnique(
+      {
+        where: {
+          schoolId,
+          id: applicationId,
+        },
+      },
+    );
+
+    if (!teacherApplicationExists) {
+      log.warn(`No application found with applicationId ${applicationId}`);
+      throw new Error(
+        `No application found with applicationId ${applicationId}`,
+      );
+    }
+
+    if (teacherApplicationExists.status !== "PENDING") {
+      log.warn(`Application is not in pending state`, {
+        applicationId,
+        currentStatus: teacherApplicationExists.status,
+      });
+      throw new Error(
+        `Application cannot be rejected as it is already ${teacherApplicationExists.status}`,
+      );
+    }
+
+    await prisma.$transaction(async (tx) => {
+      await tx.teacherApplication.update({
+        where: {
+          schoolId,
+          id: applicationId,
+        },
+        data: {
+          status: "REJECTED",
+          reviewedAt: new Date(),
+          reviewedBy: moderatorId,
+          rejectionReason,
+        },
+      });
+
+      await tx.teacherApplicationHistory.create({
+        data: {
+          applicationId,
+          status: "REJECTED",
+          rejectionReason,
+          changedBy: moderatorId,
+          previousStatus: teacherApplicationExists.status,
+        },
+      });
+    });
+
+    await createAuditLog({
+      schoolId,
+      performedById: moderatorId,
+      action: "REJECT",
+      module: "TeacherApplication",
+      resourceId: teacherApplicationExists.id,
+      resourceType: "TeacherApplication",
+      oldValues: {
+        status: teacherApplicationExists.status,
+      },
+      newValues: {
+        status: "REJECTED",
+        rejectionReason,
+      },
+      context,
+      isSuccessful: true,
+      statusCode,
+    });
+
+    await createSystemLog({
+      level: "INFO",
+      message: "Teacher Application Rejected",
+      module: "TeacherApplication",
+      context,
+      statusCode,
+      metadata: {
+        applicationId,
+        rejectionReason,
+        reviewedBy: moderatorId,
+        previousStatus: teacherApplicationExists.status,
+      },
+    });
+
+    // Todo: Need to send email for rejected application
+  } catch (error) {
+    const err = error as Error;
+    log.error(
+      `Failed to reject teacher application with applicationId ${applicationId}`,
+      {
+        error: err.message,
+        ipAddress: context.ipAddress,
+        applicationId,
+        schoolId,
+      },
+    );
+    throw err;
+  }
+}
+
+// Teacher resubmitting the application
+export async function resubmitTeacherApplicationService(
+  applicationId: string,
+  data: ResubmitTeacherApplicationInput,
+  files: Express.Multer.File[],
+  context: AuditContext,
+  statusCode: number,
+): Promise<TeacherApplication> {
+  const uploadedFiles: Array<{
+    uploadResult: CloudinaryUploadResult;
+    documentType: DocumentType;
+    title: string;
+  }> = [];
+
+  try {
+    log.info("Resubmitting Teacher application", {
+      applicationId,
+      ipAddress: context.ipAddress,
+      fileCount: files.length,
+    });
+
+    const teacherApplication = await prisma.teacherApplication.findUnique({
+      where: {
+        id: applicationId,
+      },
+    });
+
+    if (!teacherApplication) {
+      log.warn(`Application not found with applicationId ${applicationId}`);
+      throw new Error(
+        `Application not found with applicationId ${applicationId}`,
+      );
+    }
+
+    if (teacherApplication.status !== "REJECTED") {
+      log.warn(`Application is not in REJECTED state`, {
+        applicationId,
+        currentStatus: teacherApplication.status,
+      });
+      throw new Error(
+        `Application cannot be resubmitted as it is ${teacherApplication.status}`,
+      );
+    }
+
+    if (files.length > 0) {
+      log.info("Uploading documents to Cloudinary", {
+        fileCount: files.length,
+      });
+      for (let i = 0; i < files.length; i++) {
+        const file = files[i];
+        const documentMeta = data.documents?.[i];
+        const uploadResult = await uploadToCloudinary(
+          file,
+          "teacher-applications",
+        );
+        uploadedFiles.push({
+          uploadResult,
+          documentType: documentMeta?.documentType ?? "OTHER",
+          title: documentMeta?.title ?? file.originalname,
+        });
+        log.info("Document uploaded successfully", {
+          publicId: uploadResult.publicId,
+          documentType: documentMeta?.documentType,
+          title: documentMeta?.title,
+        });
+      }
+    }
+
+    const updatedApplication = await prisma.$transaction(async (tx) => {
+      const updated = await tx.teacherApplication.update({
+        where: { id: applicationId },
+        data: {
+          ...(data.specialization && {
+            specialization: data.specialization,
+          }),
+          status: "PENDING",
+          reviewedAt: null,
+          reviewedBy: null,
+        },
+      });
+
+      if (uploadedFiles.length > 0) {
+        const existingDocs = await tx.document.findMany({
+          where: {
+            ownerId: applicationId,
+            ownerType: "TEACHER_APPLICATION",
+          },
+          select: { cloudinaryId: true },
+        });
+
+        await tx.document.deleteMany({
+          where: {
+            ownerId: applicationId,
+            ownerType: "TEACHER_APPLICATION",
+          },
+        });
+
+        existingDocs.forEach(({ cloudinaryId }) => {
+          deleteFromCloudinary(cloudinaryId).catch((err) => {
+            log.warn("Failed to delete old document from Cloudinary", {
+              cloudinaryId,
+              error: (err as Error).message,
+            });
+          });
+        });
+
+        await tx.document.createMany({
+          data: uploadedFiles.map(({ uploadResult, documentType, title }) => ({
+            ownerId: applicationId,
+            ownerType: "TEACHER_APPLICATION" as DocumentOwnerType,
+            schoolApplicationId: applicationId,
+            documentType,
+            title,
+            originalFileName: uploadResult.originalFileName,
+            cloudinaryId: uploadResult.publicId,
+            cloudinaryUrl: uploadResult.cloudinaryUrl,
+            secureUrl: uploadResult.secureUrl,
+            resourceType: uploadResult.resourceType,
+            format: uploadResult.format,
+            sizeBytes: uploadResult.sizeBytes,
+            width: uploadResult.width,
+            height: uploadResult.height,
+            folder: uploadResult.folder,
+            uploadedBy: "APPLICANT",
+          })),
+        });
+
+        log.info("Documents saved to database", {
+          applicationId,
+          documentCount: uploadedFiles.length,
+        });
+      }
+
+      return updated;
+    });
+
+    await createSystemLog({
+      level: "INFO",
+      message: "Teacher application resubmitted",
+      module: "TeacherApplication",
+      metadata: {
+        applicationId,
+        updatedFields: Object.keys(data),
+        documentCount: uploadedFiles.length,
+      },
+      context,
+      statusCode,
+    });
+
+    log.info("Application resubmitted successfully", {
+      applicationId,
+      updatedFields: Object.keys(data),
+      documentCount: uploadedFiles.length,
+    });
+
+    return updatedApplication;
+  } catch (error) {
+    if (uploadedFiles.length > 0) {
+      log.warn("Cleaning up orphaned Cloudinary uploads", {
+        fileCount: uploadedFiles.length,
+      });
+      await Promise.allSettled(
+        uploadedFiles.map(({ uploadResult }) =>
+          deleteFromCloudinary(uploadResult.publicId),
+        ),
+      );
+    }
+
+    const err = error as Error;
+    log.error("Failed to resubmit teacher application", {
+      error: err.message,
+      applicationId,
+      ipAddress: context.ipAddress,
+    });
+
     throw err;
   }
 }

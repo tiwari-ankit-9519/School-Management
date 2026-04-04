@@ -1,5 +1,11 @@
 import { email, z } from "zod";
-import { DocumentType, Gender, Module, Prisma } from "@prisma/client";
+import {
+  DocumentType,
+  Gender,
+  Module,
+  ParentType,
+  Prisma,
+} from "@prisma/client";
 
 export const SchoolApplicationSchema = z.object({
   schoolName: z
@@ -117,6 +123,14 @@ export const ReviewSchoolApplicationSchema = z.object({
 });
 
 export const RejectSchoolApplicationSchema = z.object({
+  rejectionReason: z
+    .string({ error: "Rejection reason is required" })
+    .min(10, { error: "Rejection reason must be at least 10 characters" })
+    .max(500, { error: "Rejection reason must be at most 500 characters" })
+    .trim(),
+});
+
+export const RejectTeacherApplicationSchema = z.object({
   rejectionReason: z
     .string({ error: "Rejection reason is required" })
     .min(10, { error: "Rejection reason must be at least 10 characters" })
@@ -427,6 +441,25 @@ export const moderatorWithDetails = Prisma.validator<Prisma.AdminDefaultArgs>()(
   },
 );
 
+export const teacherWithDeatils = Prisma.validator<Prisma.TeacherDefaultArgs>()(
+  {
+    include: {
+      user: {
+        select: {
+          id: true,
+          regNumber: true,
+          email: true,
+          phone: true,
+          role: true,
+          isActive: true,
+          isVerified: true,
+          createdAt: true,
+        },
+      },
+    },
+  },
+);
+
 export const TeacherApplicationSchema = z.object({
   firstName: z
     .string({ error: "First Name is required" })
@@ -485,9 +518,236 @@ export const TeacherApplicationSchema = z.object({
     .optional(),
 });
 
+const classGrade = z.union([
+  z.string().regex(/^([1-9]|1[0-2])$/, {
+    error: "Class must be a number between 1 and 12",
+  }),
+  z.enum(["KG", "LKG", "UKG", "Nursery"], {
+    error:
+      "Class must be one of: KG, LKG, UKG, Nursery or a number between 1-12",
+  }),
+]);
+
+export const AdmissionApplicationSchema = z
+  .object({
+    firstName: z
+      .string({ error: "First name is required" })
+      .trim()
+      .min(2, { error: "First name should be at least 2 characters" })
+      .max(20, { error: "First name should be at most 20 characters" }),
+    lastName: z
+      .string({ error: "Last name is required" })
+      .trim()
+      .min(2, { error: "Last name should be at least 2 characters" })
+      .max(20, { error: "Last name should be at most 20 characters" }),
+    gender: z.enum(Gender, {
+      error: "Gender is required",
+    }),
+    dateOfBirth: z.coerce
+      .date({ error: "Date of birth is required" })
+      .refine((date) => date < new Date(), {
+        error: "Date of birth should be in the past",
+      }),
+    address: z
+      .string({ error: "Address is required" })
+      .trim()
+      .min(10, { error: "Address must be at least 10 characters" })
+      .max(200, { error: "Address must be at most 200 characters" }),
+    city: z
+      .string({ error: "City is required" })
+      .trim()
+      .min(2, { error: "City must be at least 2 characters" })
+      .max(50, { error: "City must be at most 50 characters" }),
+    state: z
+      .string({ error: "State is required" })
+      .trim()
+      .min(2, { error: "State must be at least 2 characters" })
+      .max(50, { error: "State must be at most 50 characters" }),
+    pincode: z
+      .string({ error: "Pincode is required" })
+      .regex(/^\d{4,10}$/, { error: "Pincode must be 4 to 10 digits" }),
+    previousSchool: z
+      .string()
+      .trim()
+      .min(2, { error: "Previous school name should be at least 2 characters" })
+      .max(100, {
+        error: "Previous school name should be at most 100 characters",
+      })
+      .optional(),
+    previousClass: classGrade.optional(),
+    appliedForClass: classGrade,
+    guardianFirstName: z
+      .string({ error: "Guardian first name is required" })
+      .trim()
+      .min(2, { error: "Guardian first name should be at least 2 characters" })
+      .max(20, {
+        error: "Guardian first name should be at most 20 characters",
+      }),
+    guardianLastName: z
+      .string({ error: "Guardian last name is required" })
+      .trim()
+      .min(2, { error: "Guardian last name should be at least 2 characters" })
+      .max(20, { error: "Guardian last name should be at most 20 characters" }),
+    guardianRelation: z.enum(ParentType, {
+      error: "Guardian relation is required",
+    }),
+    guardianPhone: z
+      .string({ error: "Guardian phone is required" })
+      .regex(/^\+?[1-9]\d{7,14}$/, { error: "Invalid phone number" }),
+    guardianEmail: z
+      .string()
+      .trim()
+      .email({ error: "Invalid email address" })
+      .optional(),
+    photoUrl: z.string().optional(),
+    guardianPhotoUrl: z.string().optional(),
+    documents: z
+      .array(
+        z.object({
+          documentType: z.enum(DocumentType),
+          title: z.string().min(2).max(100).trim(),
+        }),
+      )
+      .optional(),
+  })
+  .refine(
+    (data) => {
+      if (data.previousClass !== undefined && !data.previousSchool) {
+        return false;
+      }
+      return true;
+    },
+    {
+      error: "Previous school name is required when previous class is provided",
+      path: ["previousSchool"],
+    },
+  )
+  .refine(
+    (data) => {
+      if (
+        data.previousSchool !== undefined &&
+        data.previousClass === undefined
+      ) {
+        return false;
+      }
+      return true;
+    },
+    {
+      error: "Previous class is required when previous school is provided",
+      path: ["previousClass"],
+    },
+  );
+
+export const ResubmitAdmissionApplicationSchema = z
+  .object({
+    previousSchool: z
+      .string()
+      .trim()
+      .min(2, { error: "Previous school name should be at least 2 characters" })
+      .max(100, {
+        error: "Previous school name should be at most 100 characters",
+      })
+      .optional(),
+    previousClass: classGrade.optional(),
+    guardianEmail: z
+      .string()
+      .trim()
+      .email({ error: "Invalid email address" })
+      .optional(),
+    documents: z
+      .array(
+        z.object({
+          documentType: z.enum(DocumentType),
+          title: z.string().min(2).max(100).trim(),
+        }),
+      )
+      .optional(),
+  })
+  .refine(
+    (data) => {
+      if (data.previousClass !== undefined && !data.previousSchool) {
+        return false;
+      }
+      return true;
+    },
+    {
+      error: "Previous school name is required when previous class is provided",
+      path: ["previousSchool"],
+    },
+  )
+  .refine(
+    (data) => {
+      if (
+        data.previousSchool !== undefined &&
+        data.previousClass === undefined
+      ) {
+        return false;
+      }
+      return true;
+    },
+    {
+      error: "Previous class is required when previous school is provided",
+      path: ["previousClass"],
+    },
+  );
+
+export const RejectAdmissionApplicationSchema = z.object({
+  rejectionReason: z
+    .string({ error: "Rejection reason is required" })
+    .min(10, { error: "Rejection reason must be at least 10 characters" })
+    .max(500, { error: "Rejection reason must be at most 500 characters" })
+    .trim(),
+});
+
+export const ResubmitTeacherApplicationSchema = z
+  .object({
+    specialization: z
+      .string({ error: "Specialization is required" })
+      .optional(),
+    documents: z
+      .array(
+        z.object({
+          documentType: z.enum(DocumentType),
+          title: z.string().min(2).max(100).trim(),
+        }),
+      )
+      .optional(),
+  })
+  .refine(
+    (data) => {
+      const { documents, ...rest } = data;
+      const hasFields = Object.values(rest).some(
+        (value) => value !== undefined,
+      );
+      const hasDocuments = documents && documents.length > 0;
+      return hasFields || hasDocuments;
+    },
+    {
+      message:
+        "At least one field or document must be provided for resubmission",
+    },
+  );
+
 // Types export
 export type ModeratorWithDetails = Prisma.AdminGetPayload<
   typeof moderatorWithDetails
+>;
+export type TeacherWithDetails = Prisma.TeacherGetPayload<
+  typeof teacherWithDeatils
+>;
+
+export type ResubmitAdmissionApplicationInput = z.infer<
+  typeof ResubmitAdmissionApplicationSchema
+>;
+
+export type RejectAdmissionApplicationInput = z.infer<
+  typeof RejectAdmissionApplicationSchema
+>;
+export type AdmissionApplicationInput = z.infer<
+  typeof AdmissionApplicationSchema
+>;
+export type ResubmitTeacherApplicationInput = z.infer<
+  typeof ResubmitTeacherApplicationSchema
 >;
 export type TeacherApplicationInput = z.infer<typeof TeacherApplicationSchema>;
 export type ResetPasswordInput = z.infer<typeof ResetPasswordSchema>;
@@ -508,4 +768,8 @@ export type ReviewSchoolApplicationInput = z.infer<
 >;
 export type RejectSchoolApplicationInput = z.infer<
   typeof RejectSchoolApplicationSchema
+>;
+
+export type RejectTeacherApplicationInput = z.infer<
+  typeof RejectTeacherApplicationSchema
 >;

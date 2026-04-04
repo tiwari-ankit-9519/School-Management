@@ -53,7 +53,10 @@ export async function deleteCacheByPattern(pattern: string): Promise<void> {
       return;
     }
     await redis.del(...keys);
-    log.debug("Cache deleted by pattern", { pattern, keysDeleted: keys.length });
+    log.debug("Cache deleted by pattern", {
+      pattern,
+      keysDeleted: keys.length,
+    });
   } catch (error) {
     const err = error as Error;
     log.error("Failed to delete cache by pattern", {
@@ -68,6 +71,22 @@ export const CACHE_KEYS = {
     `school-applications:${status}:page:${page}:limit:${limit}`,
   schoolApplication: (applicationId: string) =>
     `school-application:${applicationId}`,
+  teacherApplications: (
+    schoolId: string,
+    status: string,
+    page: number,
+    limit: number,
+  ) => `teacher-applications:${status}:page:${page}:limit:${limit}:${schoolId}`,
+  teacherApplication: (applicationId: string, schoolId: string) =>
+    `admission-application:${applicationId}:${schoolId}`,
+  admissionApplications: (
+    schoolId: string,
+    status: string,
+    page: number,
+    limit: number,
+  ) => `teacher-applications:${status}:page:${page}:limit:${limit}:${schoolId}`,
+  admissionApplication: (applicationId: string, schoolId: string) =>
+    `admission-application:${applicationId}:${schoolId}`,
 } as const;
 
 export const CACHE_TTL = {

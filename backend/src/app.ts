@@ -44,6 +44,7 @@ import academicYearRoute from "@/src/routes/academic-year.route.js";
 import classRoute from "@/src/routes/class.route.js";
 import subjectRoute from "@/src/routes/subject.route.js";
 import usersRoute from "@/src/routes/user-management.route.js";
+import admissionRoute from "@/src/routes/admission.route.js";
 
 const log = createModuleLogger("Server");
 
@@ -164,6 +165,7 @@ app.use(`${API_PREFIX}/school/academic-year`, academicYearRoute);
 app.use(`${API_PREFIX}/school/class`, classRoute);
 app.use(`${API_PREFIX}/school/subject`, subjectRoute);
 app.use(`${API_PREFIX}/school/users`, usersRoute);
+app.use(`${API_PREFIX}/school/admission`, admissionRoute);
 
 app.use((req: Request, res: Response, _next: NextFunction) => {
   const knownPaths = [
@@ -173,6 +175,7 @@ app.use((req: Request, res: Response, _next: NextFunction) => {
     `${API_PREFIX}/school/class`,
     `${API_PREFIX}/school/subject`,
     `${API_PREFIX}/school/users`,
+    `${API_PREFIX}/school/admission`,
     "/health",
     "/ping",
   ];

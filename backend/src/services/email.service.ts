@@ -14,6 +14,9 @@ import {
   sendPasswordChangedSuccessEmail,
   sendTeacherApplicationSubmittedEmail,
   sendTeacherApplicationResubmittedEmail,
+  sendTeacherApprovedEmail,
+  sendAdmissionApplicationSubmittedEmail,
+  sendAdmissionApplicationResubmittedEmail,
 } from "@/src/template/email.template";
 
 const log = createModuleLogger("EmailService");
@@ -459,6 +462,102 @@ export async function sendTeacherApplicationResubmissionEmail(data: {
 
   log.info("Teacher Application resubmission email queued successfully", {
     email: data.email,
+    schoolName: data.schoolName,
+  });
+}
+
+export async function sendTeacherApprovedEmailService(data: {
+  firstName: string;
+  lastName: string;
+  email: string;
+  phone: string;
+  regNumber: string;
+  tempPassword: string;
+  schoolName: string;
+  applicationId: string;
+}): Promise<void> {
+  log.info("Queuing teacher approved email", {
+    email: data.email,
+    schoolName: data.schoolName,
+  });
+  const { subject, html, text } = sendTeacherApprovedEmail({
+    firstName: data.firstName,
+    lastName: data.lastName,
+    email: data.email,
+    phone: data.phone,
+    regNumber: data.regNumber,
+    tempPassword: data.tempPassword,
+    schoolName: data.schoolName,
+    applicationId: data.applicationId,
+  });
+  await addEmailToQueue({
+    to: data.email,
+    subject,
+    html,
+    text,
+    priority: 1,
+  });
+  log.info("Teacher approved email queued successfully", {
+    email: data.email,
+    schoolName: data.schoolName,
+  });
+}
+
+export async function sendAdmissionApplicationSubmittedEmailService(data: {
+  studentFirstName: string;
+  studentLastName: string;
+  guardianFirstName: string;
+  guardianLastName: string;
+  guardianEmail: string;
+  guardianPhone: string;
+  appliedForClass: string;
+  schoolName: string;
+  applicationId: string;
+}): Promise<void> {
+  log.info("Queuing admission application submitted email", {
+    email: data.guardianEmail,
+    schoolName: data.schoolName,
+  });
+  const { subject, html, text } = sendAdmissionApplicationSubmittedEmail(data);
+  await addEmailToQueue({
+    to: data.guardianEmail,
+    subject,
+    html,
+    text,
+    priority: 1,
+  });
+  log.info("Admission application submitted email queued successfully", {
+    email: data.guardianEmail,
+    schoolName: data.schoolName,
+  });
+}
+
+export async function sendAdmissionApplicationResubmittedEmailService(data: {
+  studentFirstName: string;
+  studentLastName: string;
+  guardianFirstName: string;
+  guardianLastName: string;
+  guardianEmail: string;
+  guardianPhone: string;
+  appliedForClass: string;
+  schoolName: string;
+  applicationId: string;
+}): Promise<void> {
+  log.info("Queuing admission application resubmission email", {
+    email: data.guardianEmail,
+    schoolName: data.schoolName,
+  });
+  const { subject, html, text } =
+    sendAdmissionApplicationResubmittedEmail(data);
+  await addEmailToQueue({
+    to: data.guardianEmail,
+    subject,
+    html,
+    text,
+    priority: 1,
+  });
+  log.info("Admission application resubmission email queued successfully", {
+    email: data.guardianEmail,
     schoolName: data.schoolName,
   });
 }

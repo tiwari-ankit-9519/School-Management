@@ -17,7 +17,16 @@ import {
   sanitizeReferrer,
 } from "@/src/utils/request-parser.util";
 
-const log = createModuleLogger("RequestLogger");
+interface ExtendedLogger {
+  info: (msg: string, ...args: any[]) => void;
+  warn: (msg: string, ...args: any[]) => void;
+  error: (msg: string, ...args: any[]) => void;
+  debug: (msg: string, ...args: any[]) => void;
+  http: (msg: string, ...args: any[]) => void;
+  audit: (msg: string, ...args: any[]) => void;
+}
+
+const log = createModuleLogger("RequestLogger") as unknown as ExtendedLogger;
 
 const SENSITIVE_HEADERS = [
   "authorization",
@@ -103,7 +112,7 @@ export interface AuthenticatedRequest extends Request {
   fingerprint?: string;
   user?: AuthenticatedUser;
   isBot?: boolean;
-  log?: ReturnType<typeof createRequestLogger>;
+  log?: any;
   session?: SessionWithId;
 }
 
@@ -253,18 +262,8 @@ export function requestIdMiddleware(
   res.setHeader("X-Request-ID", req.requestId);
 
   if (req.context.deviceInfo.isBot) {
-    log.warn("Bot traffic detected on request entry", {
-      requestId: req.requestId,
-      ip: req.context.ip,
-      isPrivateIp: req.context.isPrivateIp,
-      isVpnOrProxy: req.context.isVpnOrProxy,
-      fingerprint: req.context.fingerprint,
-      path: req.path,
-      userAgent: req.context.deviceInfo.raw,
-      browser: req.context.deviceInfo.browser,
-      os: req.context.deviceInfo.os,
-      deviceType: req.context.deviceInfo.deviceType,
-    });
+    const botMsg = `Bot traffic detected on request entry | requestId=${req.requestId} ip=${req.context.ip} isPrivateIp=${req.context.isPrivateIp} isVpnOrProxy=${req.context.isVpnOrProxy} fingerprint=${req.context.fingerprint} path=${req.path} userAgent=${req.context.deviceInfo.raw} browser=${req.context.deviceInfo.browser} os=${req.context.deviceInfo.os} deviceType=${req.context.deviceInfo.deviceType}`;
+    log.warn(botMsg);
     logSecurityEvent("BOT_TRAFFIC_DETECTED", req.context.ip, null, {
       requestId: req.requestId,
       path: req.path,
@@ -316,55 +315,13 @@ export function requestLoggerMiddleware(
     ip,
     deviceInfo,
     fingerprint,
-    referrer,
-    origin,
-    acceptLanguage,
     isPrivateIp: privateIp,
     isVpnOrProxy,
   } = context;
 
-  const incomingLog = {
-    requestId: req.requestId,
-    category,
-    method: req.method,
-    path: req.path,
-    originalUrl: req.originalUrl,
-    query: Object.keys(req.query).length > 0 ? req.query : undefined,
-    body: sanitizedBody,
-    bodySize: bodySize > 0 ? `${bodySize} bytes` : undefined,
-    headers: sanitizeHeaders({
-      "content-type": req.headers["content-type"],
-      "user-agent": req.headers["user-agent"],
-      "x-forwarded-for": req.headers["x-forwarded-for"] as string | undefined,
-      "accept-language": req.headers["accept-language"],
-      accept: req.headers["accept"],
-      origin: req.headers["origin"],
-      referer: req.headers["referer"],
-    }),
-    userId: req.user?.id ?? "unauthenticated",
-    schoolId: req.user?.schoolId ?? "none",
-    role: req.user?.role ?? "none",
-    ip,
-    isPrivateIp: privateIp,
-    isVpnOrProxy,
-    fingerprint,
-    referrer,
-    origin,
-    acceptLanguage,
-    device: {
-      browser: deviceInfo.browser,
-      browserVersion: deviceInfo.browserVersion,
-      os: deviceInfo.os,
-      osVersion: deviceInfo.osVersion,
-      device: deviceInfo.device,
-      deviceType: deviceInfo.deviceType,
-      platform: deviceInfo.platform,
-      isMobile: deviceInfo.isMobile,
-      isBot: deviceInfo.isBot,
-    },
-  };
+  const incomingLog = `Incoming request | requestId=${req.requestId} category=${category} method=${req.method} path=${req.path} originalUrl=${req.originalUrl} ip=${ip} isPrivateIp=${privateIp} isVpnOrProxy=${isVpnOrProxy} fingerprint=${fingerprint} device.isBot=${deviceInfo.isBot} device.deviceType=${deviceInfo.deviceType}`;
 
-  log.http("Incoming request", incomingLog);
+  log.http(incomingLog);
 
   const originalJson = res.json.bind(res);
   const originalEnd = res.end.bind(res);
@@ -389,48 +346,16 @@ export function requestLoggerMiddleware(
 
   res.on("finish", () => {
     const duration = Date.now() - (req.startTime ?? Date.now());
-
     const isSlow = duration > SLOW_REQUEST_THRESHOLD;
     const statusCode = res.statusCode;
     const contentLength = res.getHeader("content-length");
 
-    const outgoingLog = {
-      requestId: req.requestId,
-      category,
-      method: req.method,
-      path: req.path,
-      originalUrl: req.originalUrl,
-      statusCode,
-      duration: `${duration}ms`,
-      contentLength: contentLength ? `${contentLength} bytes` : undefined,
-      userId: req.user?.id ?? "unauthenticated",
-      schoolId: req.user?.schoolId ?? "none",
-      role: req.user?.role ?? "none",
-      ip,
-      isPrivateIp: privateIp,
-      isVpnOrProxy,
-      fingerprint,
-      isMobile: deviceInfo.isMobile,
-      isBot: deviceInfo.isBot,
-      browser: deviceInfo.browser,
-      os: deviceInfo.os,
-      deviceType: deviceInfo.deviceType,
-      isSlow,
-      ...(process.env.NODE_ENV === "development" &&
-        responseBody?.success === false && {
-          responseError: responseBody?.message,
-        }),
-    };
+    const baseData = `requestId=${req.requestId} category=${category} method=${req.method} path=${req.path} originalUrl=${req.originalUrl} statusCode=${statusCode} duration=${duration}ms userId=${req.user?.id ?? "unauthenticated"} schoolId=${req.user?.schoolId ?? "none"} role=${req.user?.role ?? "none"} ip=${ip} fingerprint=${fingerprint} isBot=${deviceInfo.isBot} isSlow=${isSlow}`;
 
     if (isSlow) {
-      log.warn("Slow request detected", {
-        ...outgoingLog,
-        threshold: `${SLOW_REQUEST_THRESHOLD}ms`,
-        browserVersion: deviceInfo.browserVersion,
-        osVersion: deviceInfo.osVersion,
-        device: deviceInfo.device,
-        platform: deviceInfo.platform,
-      });
+      log.warn(
+        `Slow request detected | ${baseData} threshold=${SLOW_REQUEST_THRESHOLD}ms`,
+      );
     }
 
     logRequest(req, res, duration);
@@ -442,9 +367,6 @@ export function requestLoggerMiddleware(
         path: req.path,
         fingerprint,
         isVpnOrProxy,
-        browser: deviceInfo.browser,
-        os: deviceInfo.os,
-        isMobile: deviceInfo.isMobile,
       });
     }
 
@@ -457,8 +379,6 @@ export function requestLoggerMiddleware(
         schoolId: req.user?.schoolId,
         fingerprint,
         isVpnOrProxy,
-        browser: deviceInfo.browser,
-        os: deviceInfo.os,
       });
     }
 
@@ -474,29 +394,21 @@ export function requestLoggerMiddleware(
     }
 
     if (statusCode >= 500) {
-      log.error("Server error response", outgoingLog);
+      log.error(`Server error response | ${baseData}`);
     } else if (statusCode >= 400) {
-      log.warn("Client error response", outgoingLog);
+      log.warn(`Client error response | ${baseData}`);
     } else {
-      log.http("Request completed", outgoingLog);
+      log.http(
+        `Request completed | ${baseData} contentLength=${contentLength ?? 0}`,
+      );
     }
   });
 
   res.on("error", (error: Error) => {
     const duration = Date.now() - (req.startTime ?? Date.now());
-    log.error("Response stream error", {
-      requestId: req.requestId,
-      method: req.method,
-      path: req.path,
-      duration: `${duration}ms`,
-      ip,
-      fingerprint,
-      error: error.message,
-      stack:
-        process.env.ENABLE_ERROR_STACK_TRACE === "true"
-          ? error.stack
-          : undefined,
-    });
+    log.error(
+      `Response stream error | requestId=${req.requestId} method=${req.method} path=${req.path} duration=${duration}ms ip=${ip} error=${error.message}`,
+    );
   });
 
   next();
@@ -513,32 +425,15 @@ export function suspiciousRequestMiddleware(
   const suspicious = isSuspiciousPath(path);
 
   if (suspicious) {
+    const suspMsg = `Suspicious request pattern detected | requestId=${req.requestId} ip=${ip} fingerprint=${fingerprint} isVpnOrProxy=${isVpnOrProxy} path=${path} method=${req.method} isBot=${deviceInfo.isBot}`;
     logSecurityEvent("SUSPICIOUS_REQUEST_PATTERN", ip, req.user?.id ?? null, {
       requestId: req.requestId,
       method: req.method,
       path,
       fingerprint,
       isVpnOrProxy,
-      browser: deviceInfo.browser,
-      browserVersion: deviceInfo.browserVersion,
-      os: deviceInfo.os,
-      osVersion: deviceInfo.osVersion,
-      deviceType: deviceInfo.deviceType,
-      isMobile: deviceInfo.isMobile,
-      isBot: deviceInfo.isBot,
-      schoolId: req.user?.schoolId ?? null,
     });
-    log.warn("Suspicious request pattern detected", {
-      requestId: req.requestId,
-      ip,
-      fingerprint,
-      isVpnOrProxy,
-      path,
-      method: req.method,
-      browser: deviceInfo.browser,
-      os: deviceInfo.os,
-      isBot: deviceInfo.isBot,
-    });
+    log.warn(suspMsg);
     return res.status(400).json({
       success: false,
       message: "Bad request",
