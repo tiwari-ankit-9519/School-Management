@@ -14,9 +14,12 @@ import {
   sendPasswordChangedSuccessEmail,
   sendTeacherApplicationSubmittedEmail,
   sendTeacherApplicationResubmittedEmail,
+  sendTeacherApplicationRejectedEmail,
   sendTeacherApprovedEmail,
   sendAdmissionApplicationSubmittedEmail,
   sendAdmissionApplicationResubmittedEmail,
+  sendAdmissionApplicationRejectedEmail,
+  sendAdmissionApplicationWaitlistedEmail,
 } from "@/src/template/email.template";
 
 const log = createModuleLogger("EmailService");
@@ -36,11 +39,9 @@ export async function sendMoreInfoEmail(data: {
       schoolName: data.schoolName,
       moreInfoFields: data.moreInfoFields,
     });
-
     const resubmitUrl = process.env.FRONTEND_URL
       ? `${process.env.FRONTEND_URL}/apply/resubmit/${data.applicationId}`
       : `https://yourapp.com/apply/resubmit/${data.applicationId}`;
-
     const { subject, html, text } = moreInfoEmailTemplate({
       firstName: data.firstName,
       lastName: data.lastName,
@@ -49,7 +50,6 @@ export async function sendMoreInfoEmail(data: {
       moreInfoFields: data.moreInfoFields,
       resubmitUrl,
     });
-
     await addEmailToQueue({
       to: data.email,
       subject,
@@ -57,7 +57,6 @@ export async function sendMoreInfoEmail(data: {
       text,
       priority: 2,
     });
-
     log.info("More info email queued successfully", {
       email: data.email,
       schoolName: data.schoolName,
@@ -91,16 +90,13 @@ export async function sendRejectionEmail(data: {
       email: data.email,
       schoolName: data.schoolName,
     });
-
     const reapplyUrl = process.env.FRONTEND_URL
       ? `${process.env.FRONTEND_URL}/apply`
       : "https://yourapp.com/apply";
-
     const { subject, html, text } = rejectionEmailTemplate({
       ...data,
       reapplyUrl,
     });
-
     await addEmailToQueue({
       to: data.email,
       subject,
@@ -108,7 +104,6 @@ export async function sendRejectionEmail(data: {
       text,
       priority: 2,
     });
-
     log.info("Rejection email queued successfully", {
       email: data.email,
       schoolName: data.schoolName,
@@ -144,16 +139,13 @@ export async function sendWelcomeEmail(data: {
       schoolCode: data.schoolCode,
       regNumber: data.regNumber,
     });
-
     const loginUrl = process.env.FRONTEND_URL
       ? `${process.env.FRONTEND_URL}/login`
       : "https://yourapp.com/login";
-
     const { subject, html, text } = welcomeEmailTemplate({
       ...data,
       loginUrl,
     });
-
     await addEmailToQueue({
       to: data.email,
       subject,
@@ -161,7 +153,6 @@ export async function sendWelcomeEmail(data: {
       text,
       priority: 1,
     });
-
     log.info("Welcome email queued successfully", {
       email: data.email,
       schoolCode: data.schoolCode,
@@ -199,16 +190,13 @@ export async function sendApplicationIdEmail(data: {
       applicationId: data.applicationId,
       schoolName: data.schoolName,
     });
-
     const trackingUrl = process.env.FRONTEND_URL
       ? `${process.env.FRONTEND_URL}/track-application/${data.applicationId}`
       : `https://yourapp.com/track-application/${data.applicationId}`;
-
     const { subject, html, text } = sendSchoolApplicationId({
       ...data,
       trackingUrl,
     });
-
     await addEmailToQueue({
       to: data.email,
       subject,
@@ -216,7 +204,6 @@ export async function sendApplicationIdEmail(data: {
       text,
       priority: 1,
     });
-
     log.info("Application ID email queued successfully", {
       email: data.email,
       applicationId: data.applicationId,
@@ -256,11 +243,9 @@ export async function sendModeratorInformation(data: {
       regNumber: data.regNumber,
       schoolName: data.schoolName,
     });
-
     const loginUrl = process.env.FRONTEND_URL
       ? `${process.env.FRONTEND_URL}/login`
       : "https://yourapp.com/login";
-
     const { subject, html, text } = sendModeratorWelcomeEmail({
       firstName: data.firstName,
       lastName: data.lastName,
@@ -272,7 +257,6 @@ export async function sendModeratorInformation(data: {
       schoolName: data.schoolName,
       loginUrl,
     });
-
     await addEmailToQueue({
       to: data.email,
       subject,
@@ -280,7 +264,6 @@ export async function sendModeratorInformation(data: {
       text,
       priority: 1,
     });
-
     log.info("Moderator Info mail queued successfully", {
       email: data.email,
       regNumber: data.regNumber,
@@ -291,7 +274,7 @@ export async function sendModeratorInformation(data: {
     log.error("Failed to queue moderator info email", {
       error: err.message,
       email: data.email,
-      regNumebr: data.regNumber,
+      regNumber: data.regNumber,
       schoolName: data.schoolName,
     });
     logSecurityEvent("MODERATOR_EMAIL_QUEUE_FAILED", "internal", null, {
@@ -314,18 +297,15 @@ export async function sendPasswordResetEmail(data: {
       email: data.email,
       regNumber: data.regNumber,
     });
-
     const resetLink = process.env.FRONTEND_URL
       ? `${process.env.FRONTEND_URL}/reset-password?token=${data.resetToken}`
-      : "https://youarpp.com/reset-password?token=${data.resetToken}";
-
+      : `https://yourapp.com/reset-password?token=${data.resetToken}`;
     const { subject, html, text } = sendPasswordResetLinkEmail({
       email: data.email,
       regNumber: data.regNumber,
       resetLink,
       expiresInMinutes: data.expiresInMinutes,
     });
-
     await addEmailToQueue({
       to: data.email,
       subject,
@@ -333,7 +313,6 @@ export async function sendPasswordResetEmail(data: {
       text,
       priority: 1,
     });
-
     log.info("Password reset email queued successfully");
   } catch (error) {
     const err = error as Error;
@@ -356,14 +335,12 @@ export async function sendResetPasswordSuccessEmail(data: {
       email: data.email,
       regNumber: data.regNumber,
     });
-
     const { subject, html, text } = sendPasswordChangedSuccessEmail({
       email: data.email,
       regNumber: data.regNumber,
       ipAddress: data.ipAddress,
       changedAt: data.changedAt,
     });
-
     await addEmailToQueue({
       to: data.email,
       subject,
@@ -397,19 +374,7 @@ export async function sendTeacherApplicationEmail(data: {
     email: data.email,
     schoolName: data.schoolName,
   });
-
-  const { subject, html, text } = sendTeacherApplicationSubmittedEmail({
-    firstName: data.firstName,
-    lastName: data.lastName,
-    email: data.email,
-    phone: data.phone,
-    qualification: data.qualification,
-    experience: data.experience,
-    specialization: data.specialization,
-    schoolName: data.schoolName,
-    applicationId: data.applicationId,
-  });
-
+  const { subject, html, text } = sendTeacherApplicationSubmittedEmail(data);
   await addEmailToQueue({
     to: data.email,
     subject,
@@ -417,7 +382,6 @@ export async function sendTeacherApplicationEmail(data: {
     text,
     priority: 1,
   });
-
   log.info("Teacher Application email queued successfully", {
     email: data.email,
     schoolName: data.schoolName,
@@ -439,19 +403,7 @@ export async function sendTeacherApplicationResubmissionEmail(data: {
     email: data.email,
     schoolName: data.schoolName,
   });
-
-  const { subject, html, text } = sendTeacherApplicationResubmittedEmail({
-    firstName: data.firstName,
-    lastName: data.lastName,
-    email: data.email,
-    phone: data.phone,
-    qualification: data.qualification,
-    experience: data.experience,
-    specialization: data.specialization,
-    schoolName: data.schoolName,
-    applicationId: data.applicationId,
-  });
-
+  const { subject, html, text } = sendTeacherApplicationResubmittedEmail(data);
   await addEmailToQueue({
     to: data.email,
     subject,
@@ -459,8 +411,37 @@ export async function sendTeacherApplicationResubmissionEmail(data: {
     text,
     priority: 1,
   });
-
   log.info("Teacher Application resubmission email queued successfully", {
+    email: data.email,
+    schoolName: data.schoolName,
+  });
+}
+
+export async function sendTeacherApplicationRejectedEmailService(data: {
+  firstName: string;
+  lastName: string;
+  email: string;
+  phone: string;
+  qualification: string;
+  experience: number;
+  specialization?: string;
+  schoolName: string;
+  applicationId: string;
+  rejectionReason: string;
+}): Promise<void> {
+  log.info("Queuing teacher application rejected email", {
+    email: data.email,
+    schoolName: data.schoolName,
+  });
+  const { subject, html, text } = sendTeacherApplicationRejectedEmail(data);
+  await addEmailToQueue({
+    to: data.email,
+    subject,
+    html,
+    text,
+    priority: 1,
+  });
+  log.info("Teacher application rejected email queued successfully", {
     email: data.email,
     schoolName: data.schoolName,
   });
@@ -480,16 +461,7 @@ export async function sendTeacherApprovedEmailService(data: {
     email: data.email,
     schoolName: data.schoolName,
   });
-  const { subject, html, text } = sendTeacherApprovedEmail({
-    firstName: data.firstName,
-    lastName: data.lastName,
-    email: data.email,
-    phone: data.phone,
-    regNumber: data.regNumber,
-    tempPassword: data.tempPassword,
-    schoolName: data.schoolName,
-    applicationId: data.applicationId,
-  });
+  const { subject, html, text } = sendTeacherApprovedEmail(data);
   await addEmailToQueue({
     to: data.email,
     subject,
@@ -557,6 +529,65 @@ export async function sendAdmissionApplicationResubmittedEmailService(data: {
     priority: 1,
   });
   log.info("Admission application resubmission email queued successfully", {
+    email: data.guardianEmail,
+    schoolName: data.schoolName,
+  });
+}
+
+export async function sendAdmissionApplicationRejectedEmailService(data: {
+  studentFirstName: string;
+  studentLastName: string;
+  guardianFirstName: string;
+  guardianLastName: string;
+  guardianEmail: string;
+  appliedForClass: string;
+  schoolName: string;
+  applicationId: string;
+  rejectionReason: string;
+}): Promise<void> {
+  log.info("Queuing admission application rejected email", {
+    email: data.guardianEmail,
+    schoolName: data.schoolName,
+  });
+  const { subject, html, text } = sendAdmissionApplicationRejectedEmail(data);
+  await addEmailToQueue({
+    to: data.guardianEmail,
+    subject,
+    html,
+    text,
+    priority: 1,
+  });
+  log.info("Admission application rejected email queued successfully", {
+    email: data.guardianEmail,
+    schoolName: data.schoolName,
+  });
+}
+
+export async function sendAdmissionApplicationWaitlistedEmailService(data: {
+  studentFirstName: string;
+  studentLastName: string;
+  guardianFirstName: string;
+  guardianLastName: string;
+  guardianEmail: string;
+  appliedForClass: string;
+  schoolName: string;
+  applicationId: string;
+  waitlistPosition: number;
+  waitlistReason: string;
+}): Promise<void> {
+  log.info("Queuing admission application waitlisted email", {
+    email: data.guardianEmail,
+    schoolName: data.schoolName,
+  });
+  const { subject, html, text } = sendAdmissionApplicationWaitlistedEmail(data);
+  await addEmailToQueue({
+    to: data.guardianEmail,
+    subject,
+    html,
+    text,
+    priority: 1,
+  });
+  log.info("Admission application waitlisted email queued successfully", {
     email: data.guardianEmail,
     schoolName: data.schoolName,
   });

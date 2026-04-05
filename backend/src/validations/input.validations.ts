@@ -728,10 +728,55 @@ export const ResubmitTeacherApplicationSchema = z
     },
   );
 
+export const studentWithDetails = Prisma.validator<Prisma.StudentDefaultArgs>()(
+  {
+    include: {
+      user: {
+        select: {
+          id: true,
+          regNumber: true,
+          email: true,
+          phone: true,
+          role: true,
+          isActive: true,
+          isVerified: true,
+          createdAt: true,
+        },
+      },
+      parent: {
+        select: {
+          id: true,
+          userId: true,
+          firstName: true,
+          lastName: true,
+          gender: true,
+          parentType: true,
+          dateOfBirth: true,
+          occupation: true,
+          qualification: true,
+          annualIncome: true,
+          address: true,
+          city: true,
+          state: true,
+          pincode: true,
+          alternatePhone: true,
+          createdAt: true,
+          updatedAt: true,
+        },
+      },
+    },
+  },
+);
+
 // Types export
 export type ModeratorWithDetails = Prisma.AdminGetPayload<
   typeof moderatorWithDetails
 >;
+
+export type StudentWithDetails = Prisma.StudentGetPayload<
+  typeof studentWithDetails
+>;
+
 export type TeacherWithDetails = Prisma.TeacherGetPayload<
   typeof teacherWithDeatils
 >;

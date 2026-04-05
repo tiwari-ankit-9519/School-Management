@@ -3,12 +3,14 @@ import {
   AdmissionStatus,
   DocumentOwnerType,
   DocumentType,
+  Role,
 } from "@prisma/client";
 import { createModuleLogger } from "../config/logger.config";
 import { AuditContext } from "../middlewares/request-logger.middleware";
 import {
   AdmissionApplicationInput,
   ResubmitAdmissionApplicationInput,
+  StudentWithDetails,
 } from "../validations/input.validations";
 import { prisma } from "../config/database.config";
 import cloudinary, {
@@ -18,8 +20,10 @@ import cloudinary, {
 } from "../config/cloudinary.config";
 import { createAuditLog, createSystemLog } from "../utils/audit.util";
 import {
+  sendAdmissionApplicationRejectedEmailService,
   sendAdmissionApplicationResubmittedEmailService,
   sendAdmissionApplicationSubmittedEmailService,
+  sendAdmissionApplicationWaitlistedEmailService,
 } from "./email.service";
 import { CACHE_KEYS, CACHE_TTL, getCache, setCache } from "../utils/cache.util";
 
@@ -578,7 +582,73 @@ export async function approveAdmissionApplicationService(
   schoolId: string,
   context: AuditContext,
   statusCode: number,
-) {}
+): Promise<StudentWithDetails> {
+  try {
+    log.info(
+      `Starting service to approve admission applicaiton with applicationId ${applicationId}`,
+      {
+        ipAddress: context.ipAddress,
+        schoolId,
+        reviewrId,
+      },
+    );
+
+    const [admissionApplicationExists, school] = await Promise.all([
+      await prisma.admissionApplication.findUnique({
+        where: {
+          id: applicationId,
+          schoolId,
+        },
+      }),
+
+      await prisma.school.findUnique({
+        where: {
+          id: schoolId,
+        },
+      }),
+    ]);
+
+    if (!admissionApplicationExists) {
+      log.warn(
+        `No admission application found with applicationId ${applicationId}`,
+      );
+      throw new Error(`Application not found`);
+    }
+
+    if (admissionApplicationExists.status !== "PENDING") {
+      log.warn(
+        `Application cannot accepted as it is in ${admissionApplicationExists.status}`,
+      );
+      throw new Error(
+        `Application cannot accepted as it is in ${admissionApplicationExists.status}`,
+      );
+    }
+
+    const response = await prisma.$transaction(async (tx) => {
+      const [{ generate_registration_number: studentRegNumber }] =
+        await tx.$queryRaw<[{ generate_registration_number: string }]>`
+        SELECT generate_registration_number(${schoolId}, ${Role.STUDENT})
+      `;
+      const [{ generate_registration_number: parentRegNumber }] =
+        await tx.$queryRaw<[{ generate_registration_number: string }]>`
+        SELECT generate_registration_number(${schoolId}, ${Role.PARENT})
+      `;
+
+      const tempPa;
+    });
+  } catch (error) {
+    const err = error as Error;
+    log.error(
+      `Failed to approve admission application with applicationId ${applicationId}`,
+      {
+        error: err.message,
+        ipAddress: context.ipAddress,
+        schoolId,
+      },
+    );
+    throw err;
+  }
+}
 
 export async function rejectAdmissionnApplicationService(
   applicationId: string,
@@ -595,12 +665,20 @@ export async function rejectAdmissionnApplicationService(
       schoolId,
     });
 
-    const admissionApplication = await prisma.admissionApplication.findUnique({
-      where: {
-        id: applicationId,
-        schoolId,
-      },
-    });
+    const [admissionApplication, school] = await Promise.all([
+      await prisma.admissionApplication.findUnique({
+        where: {
+          id: applicationId,
+          schoolId,
+        },
+      }),
+
+      await prisma.school.findUnique({
+        where: {
+          id: schoolId,
+        },
+      }),
+    ]);
 
     if (!admissionApplication) {
       log.warn(
@@ -644,6 +722,54 @@ export async function rejectAdmissionnApplicationService(
           previousStatus: admissionApplication.status,
         },
       });
+
+      const nextWaitListed = await tx.admissionApplication.findFirst({
+        where: {
+          schoolId,
+          appliedForClass: admissionApplication.appliedForClass,
+          status: "WAITLISTED",
+        },
+        orderBy: { waitlistPosition: "asc" },
+        select: { waitlistPosition: true, id: true },
+      });
+
+      if (nextWaitListed && nextWaitListed.waitlistPosition !== null) {
+        const promotedPosition = nextWaitListed.waitlistPosition;
+
+        await tx.admissionApplication.update({
+          where: {
+            id: nextWaitListed.id,
+          },
+          data: {
+            status: "APPROVED",
+            waitlistPosition: null,
+            waitlistReason: null,
+            reviewedAt: new Date(),
+            reviewedBy: moderatorId,
+          },
+        });
+
+        await tx.admissionApplication.updateMany({
+          where: {
+            schoolId,
+            appliedForClass: admissionApplication.appliedForClass,
+            status: "WAITLISTED",
+            waitlistPosition: { gt: promotedPosition },
+          },
+          data: {
+            waitlistPosition: { decrement: 1 },
+          },
+        });
+
+        await tx.admissonApplicationHistory.create({
+          data: {
+            applicationId: nextWaitListed.id,
+            status: "APPROVED",
+            changedBy: moderatorId,
+            previousStatus: "WAITLISTED",
+          },
+        });
+      }
     });
 
     await createAuditLog({
@@ -679,6 +805,17 @@ export async function rejectAdmissionnApplicationService(
       },
     });
     // TODO: Need to send admission applicaition rejection mail
+    await sendAdmissionApplicationRejectedEmailService({
+      studentFirstName: admissionApplication.firstName,
+      studentLastName: admissionApplication.lastName,
+      guardianFirstName: admissionApplication.guardianFirstName,
+      guardianLastName: admissionApplication.guardianLastName,
+      guardianEmail: admissionApplication.guardianEmail ?? "",
+      appliedForClass: admissionApplication.appliedForClass,
+      schoolName: school!.name,
+      applicationId,
+      rejectionReason,
+    });
   } catch (error) {
     const err = error as Error;
     log.error(
@@ -716,6 +853,12 @@ export async function resubmitAdmissionApplicationService(
       await prisma.admissionApplication.findUnique({
         where: { id: applicationId },
       });
+
+    const school = await prisma.school.findUnique({
+      where: {
+        id: admissionApplicationExists?.schoolId,
+      },
+    });
 
     if (!admissionApplicationExists) {
       log.warn(`Application not found with applicationId ${applicationId}`);
@@ -851,6 +994,17 @@ export async function resubmitAdmissionApplicationService(
       documentCount: uploadedFiles.length,
     });
 
+    await sendAdmissionApplicationResubmittedEmailService({
+      studentFirstName: admissionApplicationExists.firstName,
+      studentLastName: admissionApplicationExists.lastName,
+      guardianFirstName: admissionApplicationExists.guardianFirstName,
+      guardianLastName: admissionApplicationExists.guardianLastName,
+      guardianEmail: admissionApplicationExists.guardianEmail ?? "",
+      guardianPhone: admissionApplicationExists.guardianPhone,
+      appliedForClass: admissionApplicationExists.appliedForClass,
+      schoolName: school!.name,
+      applicationId,
+    });
     return updatedApplication;
   } catch (error) {
     if (uploadedFiles.length > 0) {
@@ -871,6 +1025,147 @@ export async function resubmitAdmissionApplicationService(
       ipAddress: context.ipAddress,
     });
 
+    throw err;
+  }
+}
+
+export async function waitlistAdmissionApplicationService(
+  applicationId: string,
+  schoolId: string,
+  waitlistReason: string,
+  moderatorId: string,
+  context: AuditContext,
+  statusCode: number,
+): Promise<void> {
+  try {
+    log.info(
+      `Statring service to waitlist admission applicaiton with applicationId ${applicationId}`,
+      {
+        schoolId,
+        ipAddress: context.ipAddress,
+      },
+    );
+
+    const [admissionApplication, school] = await Promise.all([
+      await prisma.admissionApplication.findUnique({
+        where: {
+          schoolId,
+          id: applicationId,
+        },
+      }),
+      await prisma.school.findUnique({
+        where: { id: schoolId },
+      }),
+    ]);
+
+    if (!admissionApplication) {
+      log.warn(`No application found with applicationId ${applicationId}`);
+      throw new Error(
+        `No application found wiht applicationId ${applicationId}`,
+      );
+    }
+
+    if (admissionApplication.status !== "PENDING") {
+      log.warn(
+        `Applicaiton cannot be marked waitlisted as it is ${admissionApplication.status}`,
+      );
+      throw new Error(
+        `Applicaiton cannot be marked waitlisted as it is ${admissionApplication.status}`,
+      );
+    }
+
+    const lastWaitlistPosition = await prisma.admissionApplication.findFirst({
+      where: {
+        schoolId,
+        appliedForClass: admissionApplication.appliedForClass,
+        status: "WAITLISTED",
+      },
+      orderBy: { waitlistPosition: "desc" },
+      select: {
+        waitlistPosition: true,
+      },
+    });
+
+    const nextWaitListPosition =
+      (lastWaitlistPosition?.waitlistPosition ?? 0) + 1;
+
+    await prisma.$transaction(async (tx) => {
+      await tx.admissionApplication.update({
+        where: {
+          id: applicationId,
+          schoolId,
+        },
+        data: {
+          status: "WAITLISTED",
+          waitlistPosition: nextWaitListPosition,
+          waitlistReason: waitlistReason,
+        },
+      });
+
+      await tx.admissonApplicationHistory.create({
+        data: {
+          applicationId,
+          status: "WAITLISTED",
+          changedBy: moderatorId,
+          previousStatus: admissionApplication.status,
+        },
+      });
+    });
+
+    await createSystemLog({
+      level: "INFO",
+      message: "Admission Application Waitlisted",
+      module: "AdmissionApplication",
+      context,
+      statusCode,
+      metadata: {
+        applicationId,
+        waitlistPosition: nextWaitListPosition,
+        waitlistReason,
+      },
+    });
+
+    await createAuditLog({
+      schoolId,
+      performedById: moderatorId,
+      action: "UPDATE",
+      module: "AdmissionApplication",
+      resourceId: applicationId,
+      resourceType: "AdmissionApplication",
+      oldValues: { status: admissionApplication.status },
+      newValues: {
+        status: "WAITLISTED",
+        waitlistPosition: nextWaitListPosition,
+        waitlistReason,
+      },
+      context,
+      isSuccessful: true,
+      statusCode,
+    });
+
+    await sendAdmissionApplicationWaitlistedEmailService({
+      studentFirstName: admissionApplication.firstName,
+      studentLastName: admissionApplication.lastName,
+      guardianFirstName: admissionApplication.guardianFirstName,
+      guardianLastName: admissionApplication.guardianLastName,
+      guardianEmail: admissionApplication.guardianEmail ?? "",
+      appliedForClass: admissionApplication.appliedForClass,
+      schoolName: school!.name,
+      applicationId,
+      waitlistPosition: nextWaitListPosition,
+      waitlistReason,
+    });
+  } catch (error) {
+    const err = error as Error;
+    log.error(
+      `Failed to waitlist admission application with ${applicationId}`,
+      {
+        error: err.message,
+        ipAddress: context.ipAddress,
+        applicationId,
+        schoolId,
+      },
+    );
     throw err;
   }
 }

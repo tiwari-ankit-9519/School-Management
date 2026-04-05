@@ -3,6 +3,8 @@ import { upload } from "../config/cloudinary.config";
 import {
   getAdmissionApplication,
   getAllAdmissionApplication,
+  rejectAdmissionnApplication,
+  resubmitAdmissionApplication,
   submitAdmissionApplication,
 } from "../controller/admission.controller";
 import { authenticate, authorize } from "../middlewares/auth.middleware";
@@ -32,5 +34,21 @@ router.get(
   authorize("MODERATOR", "ADMIN"),
   getAdmissionApplication,
 );
+
+router.patch(
+  "/:id/waitlist",
+  authenticate,
+  authorize("MODERATOR", "ADMIN"),
+  rejectAdmissionnApplication,
+);
+
+router.patch(
+  "/:id/reject",
+  authenticate,
+  authorize("MODERATOR", "ADMIN"),
+  rejectAdmissionnApplication,
+);
+
+router.patch("/:id/resubmit", resubmitAdmissionApplication);
 
 export default router;

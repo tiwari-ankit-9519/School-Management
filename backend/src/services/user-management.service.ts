@@ -20,6 +20,7 @@ import { createAuditLog, createSystemLog } from "../utils/audit.util";
 import {
   sendModeratorInformation,
   sendTeacherApplicationEmail,
+  sendTeacherApplicationRejectedEmailService,
   sendTeacherApplicationResubmissionEmail,
   sendTeacherApprovedEmailService,
 } from "./email.service";
@@ -1024,14 +1025,19 @@ export async function rejectTeacherApplicaitonService(
       },
     );
 
-    const teacherApplicationExists = await prisma.teacherApplication.findUnique(
-      {
+    const [teacherApplicationExists, school] = await Promise.all([
+      prisma.teacherApplication.findUnique({
         where: {
           schoolId,
           id: applicationId,
         },
-      },
-    );
+      }),
+      await prisma.school.findUnique({
+        where: {
+          id: schoolId,
+        },
+      }),
+    ]);
 
     if (!teacherApplicationExists) {
       log.warn(`No application found with applicationId ${applicationId}`);
@@ -1108,7 +1114,18 @@ export async function rejectTeacherApplicaitonService(
       },
     });
 
-    // Todo: Need to send email for rejected application
+    await sendTeacherApplicationRejectedEmailService({
+      firstName: teacherApplicationExists.firstName,
+      lastName: teacherApplicationExists.lastName,
+      email: teacherApplicationExists.email,
+      phone: teacherApplicationExists.phone,
+      qualification: teacherApplicationExists.qualification,
+      experience: teacherApplicationExists.experience,
+      specialization: teacherApplicationExists.specialization ?? undefined,
+      schoolName: school?.name ?? "",
+      applicationId: applicationId,
+      rejectionReason: rejectionReason,
+    });
   } catch (error) {
     const err = error as Error;
     log.error(
@@ -1148,6 +1165,12 @@ export async function resubmitTeacherApplicationService(
     const teacherApplication = await prisma.teacherApplication.findUnique({
       where: {
         id: applicationId,
+      },
+    });
+
+    const school = await prisma.school.findUnique({
+      where: {
+        id: teacherApplication?.schoolId,
       },
     });
 
@@ -1279,6 +1302,17 @@ export async function resubmitTeacherApplicationService(
       documentCount: uploadedFiles.length,
     });
 
+    await sendTeacherApplicationResubmissionEmail({
+      firstName: teacherApplication.firstName,
+      lastName: teacherApplication.lastName,
+      email: teacherApplication.email,
+      phone: teacherApplication.phone,
+      qualification: teacherApplication.qualification,
+      experience: teacherApplication.experience,
+      specialization: teacherApplication.specialization ?? "",
+      schoolName: school?.name ?? "",
+      applicationId,
+    });
     return updatedApplication;
   } catch (error) {
     if (uploadedFiles.length > 0) {

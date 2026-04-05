@@ -1422,6 +1422,160 @@ For any queries, please contact the school administration with your registration
   return { subject, html, text };
 }
 
+export function sendTeacherApplicationRejectedEmail(data: {
+  firstName: string;
+  lastName: string;
+  email: string;
+  phone: string;
+  qualification: string;
+  experience: number;
+  specialization?: string;
+  schoolName: string;
+  applicationId: string;
+  rejectionReason: string;
+}): { subject: string; html: string; text: string } {
+  const subject = `Application Rejected | ${data.schoolName}`;
+  const html = `
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Application Rejected</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background-color: #f4f6f9; color: #333; }
+    .wrapper { max-width: 600px; margin: 40px auto; background: #ffffff; border-radius: 12px; overflow: hidden; box-shadow: 0 4px 20px rgba(0,0,0,0.08); }
+    .header { background: linear-gradient(135deg, #7f1d1d 0%, #ef4444 100%); padding: 40px 32px; text-align: center; }
+    .header h1 { color: #ffffff; font-size: 26px; font-weight: 700; margin-bottom: 6px; }
+    .header p { color: rgba(255,255,255,0.85); font-size: 14px; }
+    .body { padding: 36px 32px; }
+    .greeting { font-size: 18px; font-weight: 600; margin-bottom: 12px; color: #7f1d1d; }
+    .text { font-size: 15px; line-height: 1.7; color: #555; margin-bottom: 24px; }
+    .status-box { background: #fef2f2; border: 2px solid #ef4444; border-radius: 10px; padding: 24px; margin-bottom: 28px; text-align: center; }
+    .status-box .icon { font-size: 36px; margin-bottom: 10px; }
+    .status-box p { font-size: 15px; color: #7f1d1d; font-weight: 600; }
+    .status-box span { display: inline-block; margin-top: 8px; background: #fecaca; color: #7f1d1d; font-size: 12px; font-weight: 700; padding: 4px 12px; border-radius: 20px; letter-spacing: 0.5px; text-transform: uppercase; }
+    .info-box { background: #f9fafb; border: 1px solid #e5e7eb; border-radius: 8px; padding: 20px 24px; margin-bottom: 28px; }
+    .info-box h3 { font-size: 13px; font-weight: 600; color: #374151; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 16px; }
+    .info-row { display: flex; justify-content: space-between; padding: 8px 0; border-bottom: 1px solid #f0f0f0; font-size: 14px; }
+    .info-row:last-child { border-bottom: none; }
+    .info-row .label { color: #6b7280; font-weight: 500; }
+    .info-row .value { color: #111827; font-weight: 600; text-align: right; max-width: 60%; word-break: break-word; }
+    .reason-box { background: #fef2f2; border-left: 4px solid #ef4444; border-radius: 4px; padding: 16px 20px; margin-bottom: 28px; }
+    .reason-box p { font-size: 14px; color: #7f1d1d; line-height: 1.6; }
+    .notice-box { background: #fff7ed; border-left: 4px solid #f97316; border-radius: 4px; padding: 16px 20px; margin-bottom: 28px; }
+    .notice-box p { font-size: 14px; color: #7c2d12; line-height: 1.6; }
+    .ref-box { background: #fafafa; border: 1px dashed #d1d5db; border-radius: 8px; padding: 16px 20px; margin-bottom: 28px; text-align: center; }
+    .ref-box p.label { font-size: 12px; color: #6b7280; margin-bottom: 6px; font-weight: 500; text-transform: uppercase; letter-spacing: 0.5px; }
+    .ref-box p.ref { font-size: 15px; font-weight: 700; color: #7f1d1d; font-family: 'Courier New', Courier, monospace; letter-spacing: 1px; }
+    .divider { border: none; border-top: 1px solid #eee; margin: 24px 0; }
+    .footer { background: #f9fafb; padding: 24px 32px; text-align: center; }
+    .footer p { font-size: 12px; color: #aaa; line-height: 1.8; }
+  </style>
+</head>
+<body>
+  <div class="wrapper">
+    <div class="header">
+      <h1>Application Rejected ❌</h1>
+      <p>${data.schoolName}</p>
+    </div>
+    <div class="body">
+      <p class="greeting">Dear ${data.firstName} ${data.lastName},</p>
+      <p class="text">
+        We regret to inform you that your teacher application at
+        <strong>${data.schoolName}</strong> has been reviewed and unfortunately rejected.
+      </p>
+      <div class="status-box">
+        <div class="icon">❌</div>
+        <p>Your teacher application has been rejected.</p>
+        <span>Rejected</span>
+      </div>
+      <div class="ref-box">
+        <p class="label">Application Reference ID</p>
+        <p class="ref">${data.applicationId}</p>
+      </div>
+      <div class="reason-box">
+        <p><strong>Reason for Rejection:</strong> ${data.rejectionReason}</p>
+      </div>
+      <div class="info-box">
+        <h3>Application Summary</h3>
+        <div class="info-row">
+          <span class="label">Full Name</span>
+          <span class="value">${data.firstName} ${data.lastName}</span>
+        </div>
+        <div class="info-row">
+          <span class="label">Email</span>
+          <span class="value">${data.email}</span>
+        </div>
+        <div class="info-row">
+          <span class="label">Phone</span>
+          <span class="value">${data.phone}</span>
+        </div>
+        <div class="info-row">
+          <span class="label">Qualification</span>
+          <span class="value">${data.qualification}</span>
+        </div>
+        <div class="info-row">
+          <span class="label">Experience</span>
+          <span class="value">${data.experience} ${data.experience === 1 ? "year" : "years"}</span>
+        </div>
+        ${
+          data.specialization
+            ? `
+        <div class="info-row">
+          <span class="label">Specialization</span>
+          <span class="value">${data.specialization}</span>
+        </div>`
+            : ""
+        }
+      </div>
+      <div class="notice-box">
+        <p>
+          <strong>Please note:</strong> You may resubmit your application with updated
+          information if you believe the rejection was made in error. Please contact
+          the school administration for further guidance.
+        </p>
+      </div>
+      <hr class="divider" />
+      <p class="text">
+        If you have any questions regarding this decision, please contact
+        the school administration with your reference ID.
+      </p>
+    </div>
+    <div class="footer">
+      <p>This is an automated email. Please do not reply directly to this message.</p>
+      <p>© ${new Date().getFullYear()} School Management System. All rights reserved.</p>
+    </div>
+  </div>
+</body>
+</html>
+  `;
+  const text = `
+Dear ${data.firstName} ${data.lastName},
+
+We regret to inform you that your teacher application at ${data.schoolName} has been rejected.
+
+APPLICATION REFERENCE ID: ${data.applicationId}
+
+REASON FOR REJECTION
+  ${data.rejectionReason}
+
+APPLICATION SUMMARY
+  Full Name      : ${data.firstName} ${data.lastName}
+  Email          : ${data.email}
+  Phone          : ${data.phone}
+  Qualification  : ${data.qualification}
+  Experience     : ${data.experience} ${data.experience === 1 ? "year" : "years"}
+  ${data.specialization ? `Specialization : ${data.specialization}` : ""}
+
+You may resubmit your application with updated information. Please contact the school administration for further guidance.
+
+© ${new Date().getFullYear()} School Management System
+  `.trim();
+  return { subject, html, text };
+}
+
 export function sendAdmissionApplicationSubmittedEmail(data: {
   studentFirstName: string;
   studentLastName: string;
@@ -1701,6 +1855,296 @@ GUARDIAN DETAILS
 Please note: Ensure all documents and information are accurate and complete to improve the chances of approval.
 
 For any queries, please contact the school administration with your reference ID.
+
+© ${new Date().getFullYear()} School Management System
+  `.trim();
+  return { subject, html, text };
+}
+
+export function sendAdmissionApplicationRejectedEmail(data: {
+  studentFirstName: string;
+  studentLastName: string;
+  guardianFirstName: string;
+  guardianLastName: string;
+  guardianEmail: string;
+  appliedForClass: string;
+  schoolName: string;
+  applicationId: string;
+  rejectionReason: string;
+}): { subject: string; html: string; text: string } {
+  const subject = `Admission Application Rejected | ${data.schoolName}`;
+  const html = `
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Admission Application Rejected</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background-color: #f4f6f9; color: #333; }
+    .wrapper { max-width: 600px; margin: 40px auto; background: #ffffff; border-radius: 12px; overflow: hidden; box-shadow: 0 4px 20px rgba(0,0,0,0.08); }
+    .header { background: linear-gradient(135deg, #7f1d1d 0%, #ef4444 100%); padding: 40px 32px; text-align: center; }
+    .header h1 { color: #ffffff; font-size: 26px; font-weight: 700; margin-bottom: 6px; }
+    .header p { color: rgba(255,255,255,0.85); font-size: 14px; }
+    .body { padding: 36px 32px; }
+    .greeting { font-size: 18px; font-weight: 600; margin-bottom: 12px; color: #7f1d1d; }
+    .text { font-size: 15px; line-height: 1.7; color: #555; margin-bottom: 24px; }
+    .status-box { background: #fef2f2; border: 2px solid #ef4444; border-radius: 10px; padding: 24px; margin-bottom: 28px; text-align: center; }
+    .status-box .icon { font-size: 36px; margin-bottom: 10px; }
+    .status-box p { font-size: 15px; color: #7f1d1d; font-weight: 600; }
+    .status-box span { display: inline-block; margin-top: 8px; background: #fecaca; color: #7f1d1d; font-size: 12px; font-weight: 700; padding: 4px 12px; border-radius: 20px; letter-spacing: 0.5px; text-transform: uppercase; }
+    .info-box { background: #f9fafb; border: 1px solid #e5e7eb; border-radius: 8px; padding: 20px 24px; margin-bottom: 28px; }
+    .info-box h3 { font-size: 13px; font-weight: 600; color: #374151; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 16px; }
+    .info-row { display: flex; justify-content: space-between; padding: 8px 0; border-bottom: 1px solid #f0f0f0; font-size: 14px; }
+    .info-row:last-child { border-bottom: none; }
+    .info-row .label { color: #6b7280; font-weight: 500; }
+    .info-row .value { color: #111827; font-weight: 600; text-align: right; max-width: 60%; word-break: break-word; }
+    .reason-box { background: #fef2f2; border-left: 4px solid #ef4444; border-radius: 4px; padding: 16px 20px; margin-bottom: 28px; }
+    .reason-box p { font-size: 14px; color: #7f1d1d; line-height: 1.6; }
+    .notice-box { background: #fff7ed; border-left: 4px solid #f97316; border-radius: 4px; padding: 16px 20px; margin-bottom: 28px; }
+    .notice-box p { font-size: 14px; color: #7c2d12; line-height: 1.6; }
+    .ref-box { background: #fafafa; border: 1px dashed #d1d5db; border-radius: 8px; padding: 16px 20px; margin-bottom: 28px; text-align: center; }
+    .ref-box p.label { font-size: 12px; color: #6b7280; margin-bottom: 6px; font-weight: 500; text-transform: uppercase; letter-spacing: 0.5px; }
+    .ref-box p.ref { font-size: 15px; font-weight: 700; color: #7f1d1d; font-family: 'Courier New', Courier, monospace; letter-spacing: 1px; }
+    .divider { border: none; border-top: 1px solid #eee; margin: 24px 0; }
+    .footer { background: #f9fafb; padding: 24px 32px; text-align: center; }
+    .footer p { font-size: 12px; color: #aaa; line-height: 1.8; }
+  </style>
+</head>
+<body>
+  <div class="wrapper">
+    <div class="header">
+      <h1>Application Rejected ❌</h1>
+      <p>${data.schoolName}</p>
+    </div>
+    <div class="body">
+      <p class="greeting">Dear ${data.guardianFirstName} ${data.guardianLastName},</p>
+      <p class="text">
+        We regret to inform you that the admission application for
+        <strong>${data.studentFirstName} ${data.studentLastName}</strong> at
+        <strong>${data.schoolName}</strong> has been reviewed and unfortunately rejected.
+      </p>
+      <div class="status-box">
+        <div class="icon">❌</div>
+        <p>The admission application has been rejected.</p>
+        <span>Rejected</span>
+      </div>
+      <div class="ref-box">
+        <p class="label">Application Reference ID</p>
+        <p class="ref">${data.applicationId}</p>
+      </div>
+      <div class="reason-box">
+        <p><strong>Reason for Rejection:</strong> ${data.rejectionReason}</p>
+      </div>
+      <div class="info-box">
+        <h3>Application Summary</h3>
+        <div class="info-row">
+          <span class="label">Student Name</span>
+          <span class="value">${data.studentFirstName} ${data.studentLastName}</span>
+        </div>
+        <div class="info-row">
+          <span class="label">Applied For Class</span>
+          <span class="value">${data.appliedForClass}</span>
+        </div>
+        <div class="info-row">
+          <span class="label">Guardian Name</span>
+          <span class="value">${data.guardianFirstName} ${data.guardianLastName}</span>
+        </div>
+        <div class="info-row">
+          <span class="label">Guardian Email</span>
+          <span class="value">${data.guardianEmail}</span>
+        </div>
+      </div>
+      <div class="notice-box">
+        <p>
+          <strong>Please note:</strong> You may resubmit your application with updated
+          information if you believe the rejection was made in error. Please contact
+          the school administration for further guidance.
+        </p>
+      </div>
+      <hr class="divider" />
+      <p class="text">
+        If you have any questions regarding this decision, please contact
+        the school administration with your reference ID.
+      </p>
+    </div>
+    <div class="footer">
+      <p>This is an automated email. Please do not reply directly to this message.</p>
+      <p>© ${new Date().getFullYear()} School Management System. All rights reserved.</p>
+    </div>
+  </div>
+</body>
+</html>
+  `;
+  const text = `
+Dear ${data.guardianFirstName} ${data.guardianLastName},
+
+We regret to inform you that the admission application for ${data.studentFirstName} ${data.studentLastName} at ${data.schoolName} has been rejected.
+
+APPLICATION REFERENCE ID: ${data.applicationId}
+
+REASON FOR REJECTION
+  ${data.rejectionReason}
+
+APPLICATION SUMMARY
+  Student Name      : ${data.studentFirstName} ${data.studentLastName}
+  Applied For Class : ${data.appliedForClass}
+  Guardian Name     : ${data.guardianFirstName} ${data.guardianLastName}
+  Guardian Email    : ${data.guardianEmail}
+
+You may resubmit your application with updated information. Please contact the school administration for further guidance.
+
+© ${new Date().getFullYear()} School Management System
+  `.trim();
+  return { subject, html, text };
+}
+
+export function sendAdmissionApplicationWaitlistedEmail(data: {
+  studentFirstName: string;
+  studentLastName: string;
+  guardianFirstName: string;
+  guardianLastName: string;
+  guardianEmail: string;
+  appliedForClass: string;
+  schoolName: string;
+  applicationId: string;
+  waitlistPosition: number;
+  waitlistReason: string;
+}): { subject: string; html: string; text: string } {
+  const subject = `Admission Application Waitlisted | ${data.schoolName}`;
+  const html = `
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Admission Application Waitlisted</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background-color: #f4f6f9; color: #333; }
+    .wrapper { max-width: 600px; margin: 40px auto; background: #ffffff; border-radius: 12px; overflow: hidden; box-shadow: 0 4px 20px rgba(0,0,0,0.08); }
+    .header { background: linear-gradient(135deg, #1e3a5f 0%, #6366f1 100%); padding: 40px 32px; text-align: center; }
+    .header h1 { color: #ffffff; font-size: 26px; font-weight: 700; margin-bottom: 6px; }
+    .header p { color: rgba(255,255,255,0.85); font-size: 14px; }
+    .body { padding: 36px 32px; }
+    .greeting { font-size: 18px; font-weight: 600; margin-bottom: 12px; color: #1e3a5f; }
+    .text { font-size: 15px; line-height: 1.7; color: #555; margin-bottom: 24px; }
+    .status-box { background: #eef2ff; border: 2px solid #6366f1; border-radius: 10px; padding: 24px; margin-bottom: 28px; text-align: center; }
+    .status-box .icon { font-size: 36px; margin-bottom: 10px; }
+    .status-box p { font-size: 15px; color: #1e3a5f; font-weight: 600; }
+    .status-box span { display: inline-block; margin-top: 8px; background: #c7d2fe; color: #1e3a5f; font-size: 12px; font-weight: 700; padding: 4px 12px; border-radius: 20px; letter-spacing: 0.5px; text-transform: uppercase; }
+    .position-box { background: #eef2ff; border: 2px solid #6366f1; border-radius: 10px; padding: 20px; margin-bottom: 28px; text-align: center; }
+    .position-box p.label { font-size: 12px; color: #6b7280; font-weight: 500; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 8px; }
+    .position-box p.position { font-size: 40px; font-weight: 700; color: #6366f1; }
+    .position-box p.sublabel { font-size: 13px; color: #6b7280; margin-top: 4px; }
+    .info-box { background: #f9fafb; border: 1px solid #e5e7eb; border-radius: 8px; padding: 20px 24px; margin-bottom: 28px; }
+    .info-box h3 { font-size: 13px; font-weight: 600; color: #374151; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 16px; }
+    .info-row { display: flex; justify-content: space-between; padding: 8px 0; border-bottom: 1px solid #f0f0f0; font-size: 14px; }
+    .info-row:last-child { border-bottom: none; }
+    .info-row .label { color: #6b7280; font-weight: 500; }
+    .info-row .value { color: #111827; font-weight: 600; text-align: right; max-width: 60%; word-break: break-word; }
+    .reason-box { background: #eef2ff; border-left: 4px solid #6366f1; border-radius: 4px; padding: 16px 20px; margin-bottom: 28px; }
+    .reason-box p { font-size: 14px; color: #1e3a5f; line-height: 1.6; }
+    .notice-box { background: #fff7ed; border-left: 4px solid #f97316; border-radius: 4px; padding: 16px 20px; margin-bottom: 28px; }
+    .notice-box p { font-size: 14px; color: #7c2d12; line-height: 1.6; }
+    .ref-box { background: #fafafa; border: 1px dashed #d1d5db; border-radius: 8px; padding: 16px 20px; margin-bottom: 28px; text-align: center; }
+    .ref-box p.label { font-size: 12px; color: #6b7280; margin-bottom: 6px; font-weight: 500; text-transform: uppercase; letter-spacing: 0.5px; }
+    .ref-box p.ref { font-size: 15px; font-weight: 700; color: #1e3a5f; font-family: 'Courier New', Courier, monospace; letter-spacing: 1px; }
+    .divider { border: none; border-top: 1px solid #eee; margin: 24px 0; }
+    .footer { background: #f9fafb; padding: 24px 32px; text-align: center; }
+    .footer p { font-size: 12px; color: #aaa; line-height: 1.8; }
+  </style>
+</head>
+<body>
+  <div class="wrapper">
+    <div class="header">
+      <h1>Application Waitlisted ⏳</h1>
+      <p>${data.schoolName}</p>
+    </div>
+    <div class="body">
+      <p class="greeting">Dear ${data.guardianFirstName} ${data.guardianLastName},</p>
+      <p class="text">
+        The admission application for <strong>${data.studentFirstName} ${data.studentLastName}</strong>
+        at <strong>${data.schoolName}</strong> has been reviewed. While your application meets our
+        requirements, we currently do not have an available seat in Class ${data.appliedForClass}.
+        Your application has been added to our waitlist.
+      </p>
+      <div class="status-box">
+        <div class="icon">⏳</div>
+        <p>Your application has been added to the waitlist.</p>
+        <span>Waitlisted</span>
+      </div>
+      <div class="position-box">
+        <p class="label">Your Waitlist Position</p>
+        <p class="position">#${data.waitlistPosition}</p>
+        <p class="sublabel">for Class ${data.appliedForClass}</p>
+      </div>
+      <div class="ref-box">
+        <p class="label">Application Reference ID</p>
+        <p class="ref">${data.applicationId}</p>
+      </div>
+      <div class="reason-box">
+        <p><strong>Reason:</strong> ${data.waitlistReason}</p>
+      </div>
+      <div class="info-box">
+        <h3>Application Summary</h3>
+        <div class="info-row">
+          <span class="label">Student Name</span>
+          <span class="value">${data.studentFirstName} ${data.studentLastName}</span>
+        </div>
+        <div class="info-row">
+          <span class="label">Applied For Class</span>
+          <span class="value">${data.appliedForClass}</span>
+        </div>
+        <div class="info-row">
+          <span class="label">Guardian Name</span>
+          <span class="value">${data.guardianFirstName} ${data.guardianLastName}</span>
+        </div>
+        <div class="info-row">
+          <span class="label">Guardian Email</span>
+          <span class="value">${data.guardianEmail}</span>
+        </div>
+      </div>
+      <div class="notice-box">
+        <p>
+          <strong>Please note:</strong> You will be automatically notified if a seat
+          becomes available and your application is promoted. Please keep an eye on
+          your email for further updates.
+        </p>
+      </div>
+      <hr class="divider" />
+      <p class="text">
+        If you have any questions, please contact the school administration with your reference ID.
+      </p>
+    </div>
+    <div class="footer">
+      <p>This is an automated email. Please do not reply directly to this message.</p>
+      <p>© ${new Date().getFullYear()} School Management System. All rights reserved.</p>
+    </div>
+  </div>
+</body>
+</html>
+  `;
+  const text = `
+Dear ${data.guardianFirstName} ${data.guardianLastName},
+
+The admission application for ${data.studentFirstName} ${data.studentLastName} at ${data.schoolName} has been added to the waitlist.
+
+WAITLIST POSITION: #${data.waitlistPosition} for Class ${data.appliedForClass}
+
+APPLICATION REFERENCE ID: ${data.applicationId}
+
+REASON
+  ${data.waitlistReason}
+
+APPLICATION SUMMARY
+  Student Name      : ${data.studentFirstName} ${data.studentLastName}
+  Applied For Class : ${data.appliedForClass}
+  Guardian Name     : ${data.guardianFirstName} ${data.guardianLastName}
+  Guardian Email    : ${data.guardianEmail}
+
+You will be automatically notified if a seat becomes available and your application is promoted.
 
 © ${new Date().getFullYear()} School Management System
   `.trim();

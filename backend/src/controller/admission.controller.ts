@@ -3,11 +3,17 @@ import {
   AuthenticatedRequest,
   buildAuditContext,
 } from "../middlewares/request-logger.middleware";
-import { AdmissionApplicationSchema } from "../validations/input.validations";
+import {
+  AdmissionApplicationSchema,
+  RejectAdmissionApplicationSchema,
+  ResubmitAdmissionApplicationSchema,
+} from "../validations/input.validations";
 import { HTTP_STATUS } from "../utils/constants";
 import {
   getAdmissionApplicationService,
   getAllAdmissionApplicationService,
+  rejectAdmissionnApplicationService,
+  resubmitAdmissionApplicationService,
   submitAdmissionApplicationService,
 } from "../services/admission.service";
 import { AdmissionStatus } from "@prisma/client";
@@ -130,5 +136,99 @@ export async function getAdmissionApplication(
     success: true,
     message: `Fetched admission application with applicationId ${applicationId}`,
     data: application,
+  });
+}
+
+export async function rejectAdmissionnApplication(
+  req: AuthenticatedRequest,
+  res: Response,
+): Promise<void> {
+  const auditContext = buildAuditContext(req);
+  const moderatorId = req.user?.id;
+  const schoolId = req.user?.schoolId;
+  const applicationId = req.params.id as string;
+  const parsed = RejectAdmissionApplicationSchema.safeParse(req.body);
+  if (!parsed.success) {
+    res.status(400).json({
+      success: false,
+      message: "Validation Failed",
+      errors: parsed.error.issues,
+    });
+    return;
+  }
+
+  if (!schoolId) {
+    throw new Error("School ID is required");
+  }
+  if (!applicationId) {
+    throw new Error("Application ID is required");
+  }
+  if (!moderatorId) {
+    throw new Error("Moderator ID is required");
+  }
+
+  res.status(HTTP_STATUS.OK);
+
+  await rejectAdmissionnApplicationService(
+    applicationId,
+    schoolId,
+    moderatorId,
+    parsed.data.rejectionReason,
+    auditContext,
+    res.statusCode,
+  );
+
+  res.json({
+    success: true,
+    message: `Application with applicationId ${applicationId} is rejected`,
+  });
+}
+
+export async function resubmitAdmissionApplication(
+  req: AuthenticatedRequest,
+  res: Response,
+): Promise<void> {
+  const auditContext = buildAuditContext(req);
+  const applicationId = req.params.id as string;
+  if (req.body.documents && typeof req.body.documents === "string") {
+    try {
+      req.body.documents = JSON.parse(req.body.documents);
+    } catch {
+      res.status(400).json({
+        success: false,
+        message: "Validation failed",
+        errors: [{ path: ["documents"], message: "Invalid documents format" }],
+      });
+      return;
+    }
+  }
+
+  const files = (req.files as Express.Multer.File[]) ?? [];
+
+  if (!applicationId) {
+    throw new Error("Application ID is required");
+  }
+  const parsed = ResubmitAdmissionApplicationSchema.safeParse(req.body);
+  if (!parsed.success) {
+    res.status(400).json({
+      success: false,
+      message: "Validation failed",
+      errors: parsed.error.issues,
+    });
+    return;
+  }
+  res.status(HTTP_STATUS.OK);
+  const updatedAdmissionApplication = await resubmitAdmissionApplicationService(
+    applicationId,
+    parsed.data,
+    files,
+    auditContext,
+    res.statusCode,
+  );
+
+  res.json({
+    success: true,
+    message: "Admission application resubmitted",
+    data: updatedAdmissionApplication,
   });
 }
