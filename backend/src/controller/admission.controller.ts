@@ -10,6 +10,7 @@ import {
 } from "../validations/input.validations";
 import { HTTP_STATUS } from "../utils/constants";
 import {
+  approveAdmissionApplicationService,
   getAdmissionApplicationService,
   getAllAdmissionApplicationService,
   rejectAdmissionnApplicationService,
@@ -230,5 +231,46 @@ export async function resubmitAdmissionApplication(
     success: true,
     message: "Admission application resubmitted",
     data: updatedAdmissionApplication,
+  });
+}
+
+export async function approveAdmissionApplication(
+  req: AuthenticatedRequest,
+  res: Response,
+): Promise<void> {
+  const applicationId = req.params.id as string;
+  const reviewerId = req.user?.id;
+  const schoolId = req.user?.schoolId;
+  const { classId } = req.body;
+  const auditContext = buildAuditContext(req);
+
+  if (!applicationId) {
+    throw new Error(`Applicaiton ID is required`);
+  }
+  if (!reviewerId) {
+    throw new Error(`Reviewer ID is required`);
+  }
+  if (!schoolId) {
+    throw new Error(`School ID is required`);
+  }
+  if (!classId) {
+    throw new Error(`Class ID is required`);
+  }
+
+  res.status(HTTP_STATUS.CREATED);
+
+  const newStudent = await approveAdmissionApplicationService(
+    applicationId,
+    reviewerId,
+    schoolId,
+    auditContext,
+    classId,
+    res.statusCode,
+  );
+
+  res.json({
+    success: true,
+    message: `Enrollment done for applicationId ${applicationId}`,
+    data: newStudent,
   });
 }

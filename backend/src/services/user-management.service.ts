@@ -49,13 +49,12 @@ export async function createModeratorService(
   statusCode: number,
 ): Promise<ModeratorWithDetails> {
   try {
-    log.info("Modeartor creation service start", {
+    log.info("Moderator creation service start", {
       ipAddress: context.ipAddress,
       schoolId,
       adminId,
       data,
     });
-
     const [moderatorExists, school] = await Promise.all([
       prisma.user.findFirst({
         where: {
@@ -67,37 +66,33 @@ export async function createModeratorService(
         select: { name: true },
       }),
     ]);
-
     if (moderatorExists) {
-      log.warn("Moderator already exists with the email address", {
+      log.warn("Moderator already exists with the same email or phone", {
         email: data.email,
       });
-      throw new Error("Moderator already exists with the email address");
+      throw new Error("Moderator already exists with the same email or phone");
     }
-
     const result = await prisma.$transaction(async (tx) => {
       const [{ generate_registration_number: regNumber }] = await tx.$queryRaw<
         [{ generate_registration_number: string }]
       >`
+      
   SELECT generate_registration_number(${schoolId}, ${Role.MODERATOR})
 `;
-
       const tempPassword = `Moderator@${Math.random().toString(36).slice(-8)}`;
-      const hasedPassword = await hashPassword(tempPassword);
-
+      const hashedPassword = await hashPassword(tempPassword);
       const user = await tx.user.create({
         data: {
           schoolId,
-          regNumber: regNumber,
+          regNumber,
           email: data.email,
           phone: data.phone,
-          passwordHash: hasedPassword,
+          passwordHash: hashedPassword,
           isActive: true,
           isVerified: false,
           role: "MODERATOR",
         },
       });
-
       const adminUser = await tx.admin.create({
         data: {
           userId: user.id,
@@ -122,12 +117,33 @@ export async function createModeratorService(
           },
         },
       });
-
-      log.info("User created successfully", {
+      log.info("Admin user created successfully", {
         userName: `${adminUser.firstName} ${adminUser.lastName}`,
         userRegNumber: user.regNumber,
       });
-
+      if (data.isTeacher) {
+        await tx.teacher.create({
+          data: {
+            userId: user.id,
+            firstName: data.firstName,
+            lastName: data.lastName,
+            gender: data.gender,
+            dateOfBirth: data.dateOfBirth,
+            address: data.address!,
+            city: data.city!,
+            state: data.state!,
+            pincode: data.pincode!,
+            qualification: data.qualification!,
+            experience: data.experience ?? 0,
+            specialization: data.specialization,
+            joiningDate: new Date(data.joiningDate!),
+          },
+        });
+        log.info("Teacher record created for moderator", {
+          userName: `${data.firstName} ${data.lastName}`,
+          userRegNumber: user.regNumber,
+        });
+      }
       return {
         moderator: await tx.admin.findUniqueOrThrow({
           where: { userId: user.id },
@@ -150,7 +166,6 @@ export async function createModeratorService(
         tempPassword,
       };
     });
-
     await createSystemLog({
       level: "INFO",
       module: "ModeratorCreation",
@@ -167,9 +182,9 @@ export async function createModeratorService(
         email: result.moderator.user.email,
         userDesignation: result.moderator.designation,
         userDepartment: result.moderator.department,
+        isTeacher: data.isTeacher,
       },
     });
-
     await createAuditLog({
       schoolId,
       performedById: adminId,
@@ -185,12 +200,12 @@ export async function createModeratorService(
         email: result.moderator.user.email,
         userDesignation: result.moderator.designation,
         userDepartment: result.moderator.department,
+        isTeacher: data.isTeacher,
       },
       context,
       isSuccessful: true,
       statusCode,
     });
-
     await sendModeratorInformation({
       firstName: data.firstName,
       lastName: data.lastName,
@@ -201,6 +216,10 @@ export async function createModeratorService(
       department: result.moderator.department ?? "",
       schoolName: school.name,
     });
+    log.info("Moderator created successfully", {
+      regNumber: result.moderator.user.regNumber,
+      isTeacher: data.isTeacher,
+    });
     return result.moderator;
   } catch (error) {
     const err = error as Error;
@@ -208,6 +227,7 @@ export async function createModeratorService(
       schoolId,
       adminId,
       ipAddress: context.ipAddress,
+      error: err.message,
     });
     throw err;
   }
@@ -963,7 +983,7 @@ export async function approveTeacherApplicationService(
     await createAuditLog({
       schoolId,
       performedById: adminId,
-      action: "CREATE",
+      action: "APPROVE",
       module: "User",
       resourceId: response.teacher.user.regNumber,
       resourceType: "TeacherCreation",

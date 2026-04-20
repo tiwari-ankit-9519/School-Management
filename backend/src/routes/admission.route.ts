@@ -1,6 +1,7 @@
 import { Router } from "express";
 import { upload } from "../config/cloudinary.config";
 import {
+  approveAdmissionApplication,
   getAdmissionApplication,
   getAllAdmissionApplication,
   rejectAdmissionnApplication,
@@ -49,6 +50,21 @@ router.patch(
   rejectAdmissionnApplication,
 );
 
-router.patch("/:id/resubmit", resubmitAdmissionApplication);
+router.patch(
+  "/:id/approve",
+  authenticate,
+  authorize("MODERATOR", "ADMIN"),
+  approveAdmissionApplication,
+);
+
+router.patch(
+  "/:id/resubmit",
+  upload.fields([
+    { name: "documents", maxCount: 5 },
+    { name: "photoUrl", maxCount: 1 },
+    { name: "guardianPhoto", maxCount: 1 },
+  ]),
+  resubmitAdmissionApplication,
+);
 
 export default router;

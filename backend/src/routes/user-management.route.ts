@@ -28,7 +28,7 @@ router.post(
 );
 
 router.patch(
-  "/teacher/:id/create",
+  "/teacher/:id/approve",
   authenticate,
   authorize("ADMIN"),
   approveTeacherApplication,
@@ -50,8 +50,7 @@ router.patch(
 
 router.patch(
   "/teacher/:id/resubmit",
-  authenticate,
-  authorize("MODERATOR"),
+  upload.array("documents", 5),
   resubmitTeacherApplication,
 );
 

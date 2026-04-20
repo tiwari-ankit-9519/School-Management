@@ -20,6 +20,7 @@ import {
   sendAdmissionApplicationResubmittedEmail,
   sendAdmissionApplicationRejectedEmail,
   sendAdmissionApplicationWaitlistedEmail,
+  sendAdmissionApprovedEmail,
 } from "@/src/template/email.template";
 
 const log = createModuleLogger("EmailService");
@@ -588,6 +589,39 @@ export async function sendAdmissionApplicationWaitlistedEmailService(data: {
     priority: 1,
   });
   log.info("Admission application waitlisted email queued successfully", {
+    email: data.guardianEmail,
+    schoolName: data.schoolName,
+  });
+}
+
+export async function sendAdmissionApprovedEmailService(data: {
+  studentFirstName: string;
+  studentLastName: string;
+  parentFirstName: string;
+  parentLastName: string;
+  guardianEmail: string;
+  guardianPhone: string;
+  studentRegNumber: string;
+  parentRegNumber: string;
+  studentTempPassword: string;
+  parentTempPassword: string;
+  schoolName: string;
+  applicationId: string;
+  appliedForClass: string;
+}): Promise<void> {
+  log.info("Queuing admission approved email", {
+    email: data.guardianEmail,
+    schoolName: data.schoolName,
+  });
+  const { subject, html, text } = sendAdmissionApprovedEmail(data);
+  await addEmailToQueue({
+    to: data.guardianEmail,
+    subject,
+    html,
+    text,
+    priority: 1,
+  });
+  log.info("Admission approved email queued successfully", {
     email: data.guardianEmail,
     schoolName: data.schoolName,
   });

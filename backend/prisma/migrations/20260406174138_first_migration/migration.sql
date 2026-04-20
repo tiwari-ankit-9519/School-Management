@@ -1860,6 +1860,7 @@ CREATE OR REPLACE FUNCTION trg_fn_assign_parent_reg()
 RETURNS TRIGGER AS $$
 DECLARE
   v_existing_reg TEXT;
+  v_current_reg  TEXT;
   v_school_id    TEXT;
 BEGIN
   SELECT u."regNumber"
@@ -1874,6 +1875,15 @@ BEGIN
     RAISE EXCEPTION
       'Student % already has a parent with a registration number. Only one parent can receive a registration number.',
       NEW."studentId";
+  END IF;
+
+  SELECT u."regNumber"
+  INTO v_current_reg
+  FROM "User" u
+  WHERE u.id = NEW."userId";
+
+  IF v_current_reg IS NOT NULL THEN
+    RETURN NEW;
   END IF;
 
   SELECT u."schoolId"

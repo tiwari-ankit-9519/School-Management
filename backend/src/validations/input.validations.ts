@@ -1,5 +1,6 @@
 import { email, z } from "zod";
 import {
+  AttendanceStatus,
   DocumentType,
   Gender,
   Module,
@@ -374,52 +375,103 @@ export const modulePermissionSchema = z.object({
   canExport: z.boolean().default(false),
 });
 
-export const ModeratorSchema = z.object({
-  firstName: z
-    .string()
-    .trim()
-    .min(2, { error: "First name should be of atleast 2 characters" })
-    .max(20, { error: "First name should be of atmost 20 characters" }),
-  lastName: z
-    .string()
-    .trim()
-    .min(2, { error: "Last name should be of atleast 2 characters" })
-    .max(20, { error: "Last name should be of atmost 20 characters" }),
-  gender: z.enum(Gender),
-  dateOfBirth: z.coerce
-    .date({ error: "Date is required" })
-    .refine((date) => date < new Date(), {
-      error: "Date of birth should be in past",
-    }),
-  email: z.email({ error: "Please provide a valid email address" }),
-  phone: z
-    .string({ error: "Phone number is required" })
-    .regex(/^\+?[0-9]{7,15}$/, {
-      error: "Phone number must be 7 to 15 digits and can start with +",
-    }),
-  designation: z
-    .string()
-    .trim()
-    .max(100, { error: "Designation must be of atmost 100 characters" })
-    .optional(),
-  department: z
-    .string()
-    .trim()
-    .max(100, { error: "Department must be of atmost 100 characters" })
-    .optional(),
-  permissions: z
-    .array(modulePermissionSchema)
-    .min(1, { error: "Atleast 1 module permission is required" })
-    .refine(
-      (perms) => {
-        const modules = perms.map((p) => p.module);
-        return new Set(modules).size === modules.length;
-      },
-      {
-        error: "Duplicate modules are not allowed",
-      },
-    ),
-});
+export const ModeratorSchema = z
+  .object({
+    firstName: z
+      .string()
+      .trim()
+      .min(2, { error: "First name should be of atleast 2 characters" })
+      .max(20, { error: "First name should be of atmost 20 characters" }),
+    lastName: z
+      .string()
+      .trim()
+      .min(2, { error: "Last name should be of atleast 2 characters" })
+      .max(20, { error: "Last name should be of atmost 20 characters" }),
+    gender: z.enum(Gender),
+    dateOfBirth: z.coerce
+      .date({ error: "Date is required" })
+      .refine((date) => date < new Date(), {
+        error: "Date of birth should be in past",
+      }),
+    email: z.email({ error: "Please provide a valid email address" }),
+    phone: z
+      .string({ error: "Phone number is required" })
+      .regex(/^\+?[0-9]{7,15}$/, {
+        error: "Phone number must be 7 to 15 digits and can start with +",
+      }),
+    designation: z
+      .string()
+      .trim()
+      .max(100, { error: "Designation must be of atmost 100 characters" })
+      .optional(),
+    department: z
+      .string()
+      .trim()
+      .max(100, { error: "Department must be of atmost 100 characters" })
+      .optional(),
+    permissions: z
+      .array(modulePermissionSchema)
+      .min(1, { error: "Atleast 1 module permission is required" })
+      .refine(
+        (perms) => {
+          const modules = perms.map((p) => p.module);
+          return new Set(modules).size === modules.length;
+        },
+        {
+          error: "Duplicate modules are not allowed",
+        },
+      ),
+    isTeacher: z.boolean().default(false),
+    address: z
+      .string()
+      .min(10, { error: "Address must be at least 10 characters" })
+      .max(200, { error: "Address must be at most 200 characters" })
+      .trim()
+      .optional(),
+    city: z
+      .string()
+      .min(2, { error: "City must be at least 2 characters" })
+      .max(50, { error: "City must be at most 50 characters" })
+      .trim()
+      .optional(),
+    state: z
+      .string()
+      .min(2, { error: "State must be at least 2 characters" })
+      .max(50, { error: "State must be at most 50 characters" })
+      .trim()
+      .optional(),
+    pincode: z
+      .string()
+      .regex(/^\d{4,10}$/, { error: "Pincode must be 4 to 10 digits" })
+      .optional(),
+    qualification: z
+      .string()
+      .trim()
+      .min(2, { error: "Qualification should be of atleast 2 characters" })
+      .max(40, { error: "Qualification should be of atmost 40 characters" })
+      .optional(),
+    experience: z.coerce.number().optional(),
+    specialization: z.string().optional(),
+    joiningDate: z.string().date().optional(),
+  })
+  .refine(
+    (data) => {
+      if (data.isTeacher) {
+        return (
+          data.address &&
+          data.city &&
+          data.state &&
+          data.pincode &&
+          data.qualification &&
+          data.joiningDate
+        );
+      }
+      return true;
+    },
+    {
+      error: "Teaching details are required when isTeacher is true",
+    },
+  );
 
 export const moderatorWithDetails = Prisma.validator<Prisma.AdminDefaultArgs>()(
   {
@@ -747,28 +799,126 @@ export const studentWithDetails = Prisma.validator<Prisma.StudentDefaultArgs>()(
         select: {
           id: true,
           userId: true,
+          studentId: true,
           firstName: true,
           lastName: true,
-          gender: true,
           parentType: true,
-          dateOfBirth: true,
-          occupation: true,
-          qualification: true,
-          annualIncome: true,
-          address: true,
-          city: true,
-          state: true,
-          pincode: true,
           alternatePhone: true,
           createdAt: true,
           updatedAt: true,
+        },
+      },
+      enrollments: {
+        select: {
+          id: true,
+          classId: true,
+          academicYearId: true,
+          rollNumber: true,
+          status: true,
+          enrolledAt: true,
         },
       },
     },
   },
 );
 
+export const AssignTeacherToSubjectSchema = z.object({
+  teacherId: z.string({ error: "Teacher ID is required" }),
+  classId: z.string({ error: "Class ID is required" }),
+});
+
+export const AssignClassTeacherSchema = z.object({
+  teacherId: z.string({ error: "Teacher ID is required" }),
+  classId: z.string({ error: "Class ID is required" }),
+});
+
+export const CreateTimeTableSchema = z.array(
+  z.object({
+    dayOfWeek: z.enum([
+      "MONDAY",
+      "TUESDAY",
+      "WEDNESDAY",
+      "THURSDAY",
+      "FRIDAY",
+      "SATURDAY",
+      "SUNDAY",
+    ]),
+    startTime: z.string().regex(/^([01]\d|2[0-3]):([0-5]\d)$/, {
+      message: "Start time must be in HH:MM format",
+    }),
+    endTime: z.string().regex(/^([01]\d|2[0-3]):([0-5]\d)$/, {
+      message: "End time must be in HH:MM format",
+    }),
+    periodNumber: z.coerce.number().int().min(1).max(10),
+    classId: z.string(),
+    subjectId: z.string(),
+    teacherId: z.string(),
+    room: z.string().optional(),
+  }),
+);
+
+export const StudentAttendanceSchema = z.object({
+  date: z.iso.date(),
+  attendance: z.array(
+    z.object({
+      studentId: z.string({ error: "Student ID is required" }),
+      status: z.enum(AttendanceStatus),
+    }),
+  ),
+});
+
+export const TeacherAttendanceSchema = z.object({
+  date: z.iso.date(),
+  attendance: z.array(
+    z.object({
+      teacherId: z.string({ error: "Teacher ID is required" }),
+      status: z.enum(AttendanceStatus),
+    }),
+  ),
+});
+
+export const UpdateTimeTableSchema = z.object({
+  startTime: z.string().regex(/^([01]\d|2[0-3]):([0-5]\d)$/, {
+    message: "Start time must be in HH:MM format",
+  }),
+  endTime: z.string().regex(/^([01]\d|2[0-3]):([0-5]\d)$/, {
+    message: "End time must be in HH:MM format",
+  }),
+  room: z.string().optional(),
+  teacherId: z.string().optional(),
+  subjectId: z.string().optional(),
+});
+
+export const ModeratorAttendanceSchema = z.object({
+  date: z.iso.date(),
+  attendance: z.array(
+    z.object({
+      moderatorId: z.string({ error: "Moderator ID is required" }),
+      status: z.enum(AttendanceStatus),
+    }),
+  ),
+});
+
 // Types export
+
+export type ModeratorAttendanceInput = z.infer<
+  typeof ModeratorAttendanceSchema
+>;
+
+export type CreateTimeTableInput = z.infer<
+  typeof CreateTimeTableSchema
+>[number];
+
+export type StudentAttendanceInput = z.infer<typeof StudentAttendanceSchema>;
+export type TeacherAttendanceInput = z.infer<typeof TeacherAttendanceSchema>;
+
+export type UpdateTimeTableInput = z.infer<typeof UpdateTimeTableSchema>;
+
+export type AssignTeacherToSubjectInput = z.infer<
+  typeof AssignTeacherToSubjectSchema
+>;
+export type AssignClassTeacher = z.infer<typeof AssignClassTeacherSchema>;
+
 export type ModeratorWithDetails = Prisma.AdminGetPayload<
   typeof moderatorWithDetails
 >;

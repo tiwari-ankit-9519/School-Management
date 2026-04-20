@@ -505,20 +505,21 @@ model AdminPermission {
 }
 
 model Admin {
-  id          String            @id @default(cuid())
-  userId      String            @unique
-  firstName   String
-  lastName    String
-  gender      Gender
-  dateOfBirth DateTime?
-  photoUrl    String?
-  designation String?
-  department  String?
-  joiningDate DateTime          @default(now())
-  createdAt   DateTime          @default(now())
-  updatedAt   DateTime          @updatedAt
-  user        User              @relation(fields: [userId], references: [id], onDelete: Cascade)
-  permissions AdminPermission[]
+  id              String            @id @default(cuid())
+  userId          String            @unique
+  firstName       String
+  lastName        String
+  gender          Gender
+  dateOfBirth     DateTime?
+  photoUrl        String?
+  designation     String?
+  department      String?
+  joiningDate     DateTime          @default(now())
+  createdAt       DateTime          @default(now())
+  updatedAt       DateTime          @updatedAt
+  user            User              @relation(fields: [userId], references: [id], onDelete: Cascade)
+  permissions     AdminPermission[]
+  adminAttendance AdminAttendance[]
 
   @@index([userId])
 }
@@ -730,20 +731,21 @@ model Enrollment {
 }
 
 model Timetable {
-  id        String    @id @default(cuid())
-  classId   String
-  subjectId String
-  teacherId String
-  dayOfWeek DayOfWeek
-  startTime String
-  endTime   String
-  room      String?
-  isActive  Boolean   @default(true)
-  createdAt DateTime  @default(now())
-  updatedAt DateTime  @updatedAt
-  class     Class     @relation(fields: [classId], references: [id], onDelete: Cascade)
-  subject   Subject   @relation(fields: [subjectId], references: [id], onDelete: Cascade)
-  teacher   Teacher   @relation(fields: [teacherId], references: [id], onDelete: Cascade)
+  id           String    @id @default(cuid())
+  classId      String
+  subjectId    String
+  teacherId    String
+  dayOfWeek    DayOfWeek
+  startTime    String
+  endTime      String
+  room         String?
+  periodNumber Int
+  isActive     Boolean   @default(true)
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+  class        Class     @relation(fields: [classId], references: [id], onDelete: Cascade)
+  subject      Subject   @relation(fields: [subjectId], references: [id], onDelete: Cascade)
+  teacher      Teacher   @relation(fields: [teacherId], references: [id], onDelete: Cascade)
 
   @@unique([classId, dayOfWeek, startTime])
   @@unique([teacherId, dayOfWeek, startTime])
@@ -789,6 +791,23 @@ model TeacherAttendance {
 
   @@unique([teacherId, date])
   @@index([teacherId])
+  @@index([date])
+  @@index([status])
+}
+
+model AdminAttendance {
+  id        String           @id @default(cuid())
+  adminId   String
+  date      DateTime         @db.Date
+  status    AttendanceStatus @default(PRESENT)
+  remarks   String?
+  markedBy  String?
+  createdAt DateTime         @default(now())
+  updatedAt DateTime         @updatedAt
+  admin     Admin            @relation(fields: [adminId], references: [id], onDelete: Cascade)
+
+  @@unique([adminId, date])
+  @@index([adminId])
   @@index([date])
   @@index([status])
 }

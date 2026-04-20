@@ -3,6 +3,7 @@ import { usePathname, useRouter } from "next/navigation";
 import { useState } from "react";
 import { motion, AnimatePresence } from "motion/react";
 import Image from "next/image";
+import Link from "next/link";
 import {
   Sidebar,
   SidebarContent,
@@ -106,7 +107,7 @@ function NavItemRow({ item }: { item: NavItem }) {
                             : "text-white/40 hover:text-white/70 hover:bg-white/5"
                         }`}
                       >
-                        <a href={child.href}>{child.label}</a>
+                        <Link href={child.href}>{child.label}</Link>
                       </SidebarMenuSubButton>
                     </SidebarMenuSubItem>
                   );
@@ -129,7 +130,7 @@ function NavItemRow({ item }: { item: NavItem }) {
             : "text-white/50 hover:text-white/80 hover:bg-white/5"
         }`}
       >
-        <a href={item.href}>
+        <Link href={item.href ?? "#"}>
           <item.icon
             className={`h-4 w-4 shrink-0 transition-colors ${
               isActive
@@ -144,7 +145,7 @@ function NavItemRow({ item }: { item: NavItem }) {
               className="ml-auto w-1.5 h-1.5 rounded-full bg-indigo-400"
             />
           )}
-        </a>
+        </Link>
       </SidebarMenuButton>
     </SidebarMenuItem>
   );

@@ -45,6 +45,9 @@ import classRoute from "@/src/routes/class.route.js";
 import subjectRoute from "@/src/routes/subject.route.js";
 import usersRoute from "@/src/routes/user-management.route.js";
 import admissionRoute from "@/src/routes/admission.route.js";
+import teacherRoute from "@/src/routes/teacher.route.js";
+import timetableRoute from "@/src/routes/timetable.route.js";
+import attendanceRoute from "@/src/routes/attendance.route.js";
 
 const log = createModuleLogger("Server");
 
@@ -166,6 +169,9 @@ app.use(`${API_PREFIX}/school/class`, classRoute);
 app.use(`${API_PREFIX}/school/subject`, subjectRoute);
 app.use(`${API_PREFIX}/school/users`, usersRoute);
 app.use(`${API_PREFIX}/school/admission`, admissionRoute);
+app.use(`${API_PREFIX}/school/teacher`, teacherRoute);
+app.use(`${API_PREFIX}/school/timetable`, timetableRoute);
+app.use(`${API_PREFIX}/school/attendance`, attendanceRoute);
 
 app.use((req: Request, res: Response, _next: NextFunction) => {
   const knownPaths = [
@@ -176,6 +182,9 @@ app.use((req: Request, res: Response, _next: NextFunction) => {
     `${API_PREFIX}/school/subject`,
     `${API_PREFIX}/school/users`,
     `${API_PREFIX}/school/admission`,
+    `${API_PREFIX}/school/teacher`,
+    `${API_PREFIX}/school/timetable`,
+    `${API_PREFIX}/school/attendance`,
     "/health",
     "/ping",
   ];

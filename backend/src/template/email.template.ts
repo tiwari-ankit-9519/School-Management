@@ -436,11 +436,11 @@ export function sendSchoolApplicationId(data: {
         </div>
         <div class="info-row">
           <span class="label">Applicant</span>
-          <span class="value">${data.firstName} ${data.lastName}</span>
+          <span class="value"> ${data.firstName} ${data.lastName}</span>
         </div>
         <div class="info-row">
           <span class="label">Submitted On</span>
-          <span class="value">${data.appliedAt}</span>
+          <span class="value"> ${data.appliedAt}</span>
         </div>
         <div class="info-row">
           <span class="label">Current Status</span>
@@ -2148,5 +2148,222 @@ You will be automatically notified if a seat becomes available and your applicat
 
 © ${new Date().getFullYear()} School Management System
   `.trim();
+  return { subject, html, text };
+}
+
+export function sendAdmissionApprovedEmail(data: {
+  studentFirstName: string;
+  studentLastName: string;
+  parentFirstName: string;
+  parentLastName: string;
+  guardianEmail: string;
+  guardianPhone: string;
+  studentRegNumber: string;
+  parentRegNumber: string;
+  studentTempPassword: string;
+  parentTempPassword: string;
+  schoolName: string;
+  applicationId: string;
+  appliedForClass: string;
+}): { subject: string; html: string; text: string } {
+  const subject = `Admission Approved! Welcome to ${data.schoolName}`;
+
+  const html = `
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Admission Approved</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background-color: #f4f6f9; color: #333; }
+    .wrapper { max-width: 600px; margin: 40px auto; background: #ffffff; border-radius: 12px; overflow: hidden; box-shadow: 0 4px 20px rgba(0,0,0,0.08); }
+    .header { background: linear-gradient(135deg, #1e3a8a 0%, #3b82f6 100%); padding: 40px 32px; text-align: center; }
+    .header h1 { color: #ffffff; font-size: 26px; font-weight: 700; margin-bottom: 6px; }
+    .header p { color: rgba(255,255,255,0.85); font-size: 14px; }
+    .body { padding: 36px 32px; }
+    .greeting { font-size: 18px; font-weight: 600; margin-bottom: 12px; color: #1e3a8a; }
+    .text { font-size: 15px; line-height: 1.7; color: #555; margin-bottom: 24px; }
+    .status-box { background: #eff6ff; border: 2px solid #3b82f6; border-radius: 10px; padding: 24px; margin-bottom: 28px; text-align: center; }
+    .status-box .icon { font-size: 36px; margin-bottom: 10px; }
+    .status-box p { font-size: 15px; color: #1e3a8a; font-weight: 600; }
+    .status-box span { display: inline-block; margin-top: 8px; background: #bfdbfe; color: #1e3a8a; font-size: 12px; font-weight: 700; padding: 4px 12px; border-radius: 20px; letter-spacing: 0.5px; text-transform: uppercase; }
+    .section-title { font-size: 16px; font-weight: 700; color: #1e3a8a; margin-bottom: 14px; padding-bottom: 8px; border-bottom: 2px solid #bfdbfe; display: flex; align-items: center; gap: 8px; }
+    .info-box { background: #f9fafb; border: 1px solid #e5e7eb; border-radius: 8px; padding: 20px 24px; margin-bottom: 28px; }
+    .info-box h3 { font-size: 13px; font-weight: 600; color: #374151; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 16px; }
+    .info-row { display: flex; justify-content: space-between; padding: 8px 0; border-bottom: 1px solid #f0f0f0; font-size: 14px; }
+    .info-row:last-child { border-bottom: none; }
+    .info-row .label { color: #6b7280; font-weight: 500; }
+    .info-row .value { color: #111827; font-weight: 600; text-align: right; max-width: 60%; word-break: break-word; }
+    .credentials-box { border-radius: 10px; padding: 24px; margin-bottom: 28px; }
+    .credentials-box.student { background: #eff6ff; border: 2px dashed #3b82f6; }
+    .credentials-box.parent { background: #f5f3ff; border: 2px dashed #8b5cf6; }
+    .credentials-box h3 { font-size: 13px; font-weight: 600; color: #374151; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 16px; text-align: center; }
+    .credential-row { display: flex; justify-content: space-between; padding: 10px 0; border-bottom: 1px solid #ddd6fe; font-size: 14px; }
+    .credentials-box.student .credential-row { border-bottom-color: #bfdbfe; }
+    .credential-row:last-child { border-bottom: none; }
+    .credential-row .label { color: #6b7280; font-weight: 500; }
+    .credentials-box.student .credential-row .value { color: #1e3a8a; font-weight: 700; font-family: 'Courier New', Courier, monospace; letter-spacing: 1px; }
+    .credentials-box.parent .credential-row .value { color: #5b21b6; font-weight: 700; font-family: 'Courier New', Courier, monospace; letter-spacing: 1px; }
+    .notice-box { background: #fff7ed; border-left: 4px solid #f97316; border-radius: 4px; padding: 16px 20px; margin-bottom: 28px; }
+    .notice-box p { font-size: 14px; color: #7c2d12; line-height: 1.6; }
+    .ref-box { background: #fafafa; border: 1px dashed #d1d5db; border-radius: 8px; padding: 16px 20px; margin-bottom: 28px; text-align: center; }
+    .ref-box p.label { font-size: 12px; color: #6b7280; margin-bottom: 6px; font-weight: 500; text-transform: uppercase; letter-spacing: 0.5px; }
+    .ref-box p.ref { font-size: 15px; font-weight: 700; color: #1e3a8a; font-family: 'Courier New', Courier, monospace; letter-spacing: 1px; }
+    .divider { border: none; border-top: 1px solid #eee; margin: 24px 0; }
+    .footer { background: #f9fafb; padding: 24px 32px; text-align: center; }
+    .footer p { font-size: 12px; color: #aaa; line-height: 1.8; }
+  </style>
+</head>
+<body>
+  <div class="wrapper">
+    <div class="header">
+      <h1>Admission Approved! 🎉</h1>
+      <p>${data.schoolName}</p>
+    </div>
+    <div class="body">
+      <p class="greeting">Dear ${data.parentFirstName} ${data.parentLastName},</p>
+      <p class="text">
+        We are delighted to inform you that the admission application for
+        <strong>${data.studentFirstName} ${data.studentLastName}</strong> at
+        <strong>${data.schoolName}</strong> has been reviewed and <strong>approved</strong>.
+        Two accounts have been created — one for the student and one for the parent/guardian.
+        Login credentials for both are provided below.
+      </p>
+
+      <div class="status-box">
+        <div class="icon">🏫</div>
+        <p>${data.studentFirstName} ${data.studentLastName} has been admitted to <strong>Class ${data.appliedForClass}</strong></p>
+        <span>Admitted</span>
+      </div>
+
+      <div class="credentials-box student">
+        <h3>🎒 Student Login Credentials</h3>
+        <div class="credential-row">
+          <span class="label">Registration Number</span>
+          <span class="value">${data.studentRegNumber}</span>
+        </div>
+        <div class="credential-row">
+          <span class="label">Temporary Password</span>
+          <span class="value">${data.studentTempPassword}</span>
+        </div>
+      </div>
+
+      <div class="credentials-box parent">
+        <h3>👨‍👩‍👧 Parent / Guardian Login Credentials</h3>
+        <div class="credential-row">
+          <span class="label">Registration Number</span>
+          <span class="value">${data.parentRegNumber}</span>
+        </div>
+        <div class="credential-row">
+          <span class="label">Email</span>
+          <span class="value">${data.guardianEmail}</span>
+        </div>
+        <div class="credential-row">
+          <span class="label">Temporary Password</span>
+          <span class="value">${data.parentTempPassword}</span>
+        </div>
+      </div>
+
+      <div class="notice-box">
+        <p>
+          <strong>Important:</strong> Please log in with both accounts and change the temporary
+          passwords immediately. Do not share your credentials with anyone.
+          These passwords are valid for the first login only.
+        </p>
+      </div>
+
+      <div class="info-box">
+        <h3>Student Summary</h3>
+        <div class="info-row">
+          <span class="label">Full Name</span>
+          <span class="value">${data.studentFirstName} ${data.studentLastName}</span>
+        </div>
+        <div class="info-row">
+          <span class="label">Class Admitted</span>
+          <span class="value">${data.appliedForClass}</span>
+        </div>
+        <div class="info-row">
+          <span class="label">Registration Number</span>
+          <span class="value">${data.studentRegNumber}</span>
+        </div>
+      </div>
+
+      <div class="info-box">
+        <h3>Parent / Guardian Summary</h3>
+        <div class="info-row">
+          <span class="label">Full Name</span>
+          <span class="value">${data.parentFirstName} ${data.parentLastName}</span>
+        </div>
+        <div class="info-row">
+          <span class="label">Email</span>
+          <span class="value">${data.guardianEmail}</span>
+        </div>
+        <div class="info-row">
+          <span class="label">Phone</span>
+          <span class="value">${data.guardianPhone}</span>
+        </div>
+        <div class="info-row">
+          <span class="label">Registration Number</span>
+          <span class="value">${data.parentRegNumber}</span>
+        </div>
+      </div>
+
+      <div class="ref-box">
+        <p class="label">Application Reference ID</p>
+        <p class="ref">${data.applicationId}</p>
+      </div>
+
+      <hr class="divider" />
+      <p class="text">
+        If you have any questions or need assistance, please contact the school administration
+        with your application reference ID or registration numbers.
+      </p>
+    </div>
+    <div class="footer">
+      <p>This is an automated email. Please do not reply directly to this message.</p>
+      <p>© ${new Date().getFullYear()} School Management System. All rights reserved.</p>
+    </div>
+  </div>
+</body>
+</html>
+  `;
+
+  const text = `
+Dear ${data.parentFirstName} ${data.parentLastName},
+
+Congratulations! The admission application for ${data.studentFirstName} ${data.studentLastName} at ${data.schoolName} has been approved.
+
+STUDENT LOGIN CREDENTIALS
+  Registration Number : ${data.studentRegNumber}
+  Temporary Password  : ${data.studentTempPassword}
+
+PARENT / GUARDIAN LOGIN CREDENTIALS
+  Registration Number : ${data.parentRegNumber}
+  Email               : ${data.guardianEmail}
+  Temporary Password  : ${data.parentTempPassword}
+
+Important: Please log in with both accounts and change the temporary passwords immediately.
+Do not share your credentials with anyone. These passwords are valid for the first login only.
+
+STUDENT SUMMARY
+  Full Name           : ${data.studentFirstName} ${data.studentLastName}
+  Class Admitted      : ${data.appliedForClass}
+  Registration Number : ${data.studentRegNumber}
+
+PARENT / GUARDIAN SUMMARY
+  Full Name           : ${data.parentFirstName} ${data.parentLastName}
+  Email               : ${data.guardianEmail}
+  Phone               : ${data.guardianPhone}
+  Registration Number : ${data.parentRegNumber}
+
+APPLICATION REFERENCE ID: ${data.applicationId}
+
+For any queries, please contact the school administration with your reference ID or registration numbers.
+
+© ${new Date().getFullYear()} School Management System
+  `.trim();
+
   return { subject, html, text };
 }
