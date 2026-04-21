@@ -1,6 +1,9 @@
 import { Router } from "express";
 import { authenticate, authorize } from "../middlewares/auth.middleware";
 import {
+  getAdminsAttendance,
+  getStudentAttendance,
+  getTeachersAttendance,
   markModeratorAttendance,
   markStudentAttendance,
   markTeacherAttendance,
@@ -23,10 +26,25 @@ router.post(
 );
 
 router.post(
-  "/moderator",
+  "/admins",
   authenticate,
   authorize("ADMIN"),
   markModeratorAttendance,
 );
+
+router.get(
+  "/students",
+  authenticate,
+  authorize("TEACHER"),
+  getStudentAttendance,
+);
+
+router.get(
+  "/teachers",
+  authenticate,
+  authorize("MODERATOR", "ADMIN"),
+  getTeachersAttendance,
+);
+router.get("/admins", authenticate, authorize("ADMIN"), getAdminsAttendance);
 
 export default router;

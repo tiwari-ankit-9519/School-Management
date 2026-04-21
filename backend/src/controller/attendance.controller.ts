@@ -9,11 +9,15 @@ import {
   TeacherAttendanceSchema,
 } from "../validations/input.validations";
 import {
+  getAdminsAttendanceService,
+  getStudentAttendanceService,
+  getTeachersAttendanceService,
   markModeratorAttendanceService,
   markStudentAttendanceService,
   markTeacherAttendanceService,
 } from "../services/attendance.service";
 import { HTTP_STATUS } from "../utils/constants";
+import { AttendanceStatus } from "@prisma/client";
 
 export async function markStudentAttendance(
   req: AuthenticatedRequest,
@@ -141,5 +145,126 @@ export async function markModeratorAttendance(
     success: true,
     message: "Moderators attendance marked successfully",
     data: moderatorAttendance,
+  });
+}
+
+export async function getStudentAttendance(
+  req: AuthenticatedRequest,
+  res: Response,
+): Promise<void> {
+  const page = parseInt(req.query.page as string) || 1;
+  const limit = parseInt(req.query.limit as string) || 10;
+  const date = req.query.date as string | undefined;
+  const status = req.query.status as AttendanceStatus | undefined;
+  const schoolId = req.user?.schoolId;
+  const classId = req.params.id as string;
+  const classTeacherId = req.user?.id;
+  if (!schoolId) {
+    throw new Error("School ID is required");
+  }
+  if (!classTeacherId) {
+    throw new Error("Teacher ID is required");
+  }
+  if (!classId) {
+    throw new Error("Class ID is required");
+  }
+  const filters = {
+    date,
+    status,
+  };
+
+  const auditContext = buildAuditContext(req);
+
+  res.status(HTTP_STATUS.OK);
+
+  const allStudentsAttendance = await getStudentAttendanceService(
+    classId,
+    classTeacherId,
+    auditContext,
+    res.statusCode,
+    schoolId,
+    page,
+    limit,
+    filters,
+  );
+
+  res.json({
+    success: true,
+    message: "Fetched attendance of all students",
+    data: allStudentsAttendance,
+  });
+}
+
+export async function getTeachersAttendance(
+  req: AuthenticatedRequest,
+  res: Response,
+): Promise<void> {
+  const schoolId = req.user?.schoolId;
+  if (!schoolId) {
+    throw new Error("School ID is required");
+  }
+
+  const date = req.query.date as string | undefined;
+  const status = req.query.status as AttendanceStatus | undefined;
+
+  const filters = {
+    date,
+    status,
+  };
+
+  const page = parseInt(req.query.page as string) || 1;
+  const limit = parseInt(req.query.limit as string) || 10;
+  const auditContext = buildAuditContext(req);
+  res.status(HTTP_STATUS.OK);
+  const allTeachersAttendance = await getTeachersAttendanceService(
+    auditContext,
+    res.statusCode,
+    schoolId,
+    page,
+    limit,
+    filters,
+  );
+
+  res.json({
+    success: true,
+    message: "Fetched all teachers attendance",
+    data: allTeachersAttendance,
+  });
+}
+
+export async function getAdminsAttendance(
+  req: AuthenticatedRequest,
+  res: Response,
+): Promise<void> {
+  const schoolId = req.user?.schoolId;
+  if (!schoolId) {
+    throw new Error("School ID is required");
+  }
+
+  const date = req.query.date as string | undefined;
+  const status = req.query.status as AttendanceStatus | undefined;
+
+  const filters = {
+    date,
+    status,
+  };
+
+  const page = parseInt(req.query.page as string) || 1;
+  const limit = parseInt(req.query.limit as string) || 10;
+  const auditContext = buildAuditContext(req);
+  res.status(HTTP_STATUS.OK);
+  const allAdminsAttendance = await getAdminsAttendanceService(
+    auditContext,
+    res.statusCode,
+    schoolId,
+    page,
+    limit,
+    filters,
+  );
+
+  res.json({
+    success: true,
+    message: "Fetched all admins attendance",
+    data: allAdminsAttendance,
   });
 }

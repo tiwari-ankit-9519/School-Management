@@ -100,7 +100,32 @@ export const CACHE_KEYS = {
     dayOfWeek: DayOfWeek | "ALL",
     page: number,
     limit: number,
-  ) => `class:${classId}`,
+  ) =>
+    `class:${classId}:school:${schoolId}:${dayOfWeek}:page:${page}:limit:${limit}`,
+  studentAttendance: (
+    classId: string,
+    classTeacherId: string,
+    schoolId: string,
+    page: number,
+    limit: number,
+  ) =>
+    `class:${classId}:classTeacher:${classTeacherId}:page:${page}:limit:${limit}:school:${schoolId}`,
+  teacherAttendance: (
+    schoolId: string,
+    page: number,
+    limit: number,
+    status: string,
+    date: string,
+  ) =>
+    `teacher:attendance:school:${schoolId}:page:${page}:limit:${limit}:status:${status}:date:${date}`,
+  moderatorAttendance: (
+    schoolId: string,
+    page: number,
+    limit: number,
+    status: string,
+    date: string,
+  ) =>
+    `moderator:attendance:school:${schoolId}:page:${page}:limit:${limit}:status:${status}:date:${date}`,
 } as const;
 
 export const CACHE_TTL = {
