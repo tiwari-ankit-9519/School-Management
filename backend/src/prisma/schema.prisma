@@ -834,6 +834,7 @@ model ExamSchedule {
   subject        Subject      @relation(fields: [subjectId], references: [id], onDelete: Cascade)
   teacher        Teacher      @relation(fields: [teacherId], references: [id], onDelete: Cascade)
   marks          Mark[]
+  weightage      Float        @default(0)
 
   @@index([academicYearId])
   @@index([classId])

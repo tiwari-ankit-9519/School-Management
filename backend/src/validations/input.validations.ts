@@ -2,6 +2,7 @@ import { email, z } from "zod";
 import {
   AttendanceStatus,
   DocumentType,
+  ExamType,
   Gender,
   Module,
   ParentType,
@@ -899,10 +900,81 @@ export const ModeratorAttendanceSchema = z.object({
   ),
 });
 
-// Types export
+export const studentWithClassDetails =
+  Prisma.validator<Prisma.EnrollmentDefaultArgs>()({
+    include: {
+      student: {
+        include: {
+          user: {
+            select: {
+              id: true,
+              regNumber: true,
+              email: true,
+              phone: true,
+              role: true,
+              isActive: true,
+              isVerified: true,
+              createdAt: true,
+            },
+          },
+          parent: true,
+          documents: true,
+        },
+      },
+      class: {
+        select: {
+          id: true,
+          name: true,
+          section: true,
+          roomNumber: true,
+          capacity: true,
+        },
+      },
+      academicYear: {
+        select: {
+          id: true,
+          name: true,
+          startDate: true,
+          endDate: true,
+          isCurrent: true,
+        },
+      },
+    },
+  });
+
+export const ExamScheduleSchema = z.object({
+  academicYearId: z.string({ error: "Academic Year Id is required" }),
+  examType: z.enum(ExamType),
+  title: z.string({ error: "Title is required" }),
+  date: z.iso.date(),
+  startTime: z.string().regex(/^([01]\d|2[0-3]):([0-5]\d)$/, {
+    message: "Start time must be in HH:MM format",
+  }),
+  endTime: z.string().regex(/^([01]\d|2[0-3]):([0-5]\d)$/, {
+    message: "End time must be in HH:MM format",
+  }),
+  totalMarks: z.coerce.number().min(1),
+  passingMarks: z.coerce.number().min(1),
+  weightage: z.coerce.number().min(0).max(100),
+  instructions: z.string().optional(),
+  entries: z
+    .array(
+      z.object({
+        subjectId: z.string({ error: "Subject Id is required" }),
+        teacherId: z.string({ error: "Teacher Id is required" }),
+      }),
+    )
+    .min(1, { message: "At least one subject entry is required" }),
+});
+
+export type ExamScheduleInput = z.infer<typeof ExamScheduleSchema>;
 
 export type ModeratorAttendanceInput = z.infer<
   typeof ModeratorAttendanceSchema
+>;
+
+export type StudentWithClassDetailsReturn = Prisma.EnrollmentGetPayload<
+  typeof studentWithClassDetails
 >;
 
 export type CreateTimeTableInput = z.infer<

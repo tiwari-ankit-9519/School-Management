@@ -31,7 +31,7 @@ export async function login(
   token: string;
 }> {
   try {
-    log.info("Starting user login attempt", {
+    log.info("Starting service to login user", {
       email: data.email,
       ipAddress: context.ipAddress,
     });
@@ -170,7 +170,7 @@ export async function login(
     };
   } catch (error) {
     const err = error as Error;
-    log.error("Failed to login", {
+    log.error("Internal Server Error. Failed to login", {
       error: err.message,
       email: data.email,
     });
@@ -220,7 +220,13 @@ export async function logout(
       },
       userId,
     });
-  } catch (error) {}
+  } catch (error) {
+    const err = error as Error;
+    log.error("Internal Server Error. Failed to logout", {
+      error: err.message,
+      ipAddress: context.ipAddress,
+    });
+  }
 }
 
 export async function changePasswordService(
@@ -321,7 +327,7 @@ export async function changePasswordService(
     });
   } catch (error) {
     const err = error as Error;
-    log.error("Failed to reset password", {
+    log.error("Internal Server Error. Failed to reset password", {
       ipAddress: context.ipAddress,
     });
     throw err;
@@ -402,7 +408,7 @@ export async function sendResetPasswordService(
     });
   } catch (error) {
     const err = error as Error;
-    log.error("Failed to send reset password email", {
+    log.error("Internal Server Error. Failed to send reset password email", {
       userEmail: data.email,
       userRegNumber: data.regNumber,
       userPhone: data.phone,
@@ -507,7 +513,7 @@ export async function resetPasswordService(
     });
   } catch (error) {
     const err = error as Error;
-    log.error("Failed to reset password", {
+    log.error("Internal Server Error. Failed to reset password", {
       userEmail: data.email,
       userRegNumber: data.regNumber,
       ipAddress: context.ipAddress,

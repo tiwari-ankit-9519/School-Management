@@ -1,6 +1,6 @@
 import { redis } from "@/src/config/redis.config";
 import { createModuleLogger } from "@/src/config/logger.config";
-import { DayOfWeek } from "@prisma/client";
+import { DayOfWeek, EnrollmentStatus, ExamType, Gender } from "@prisma/client";
 
 const log = createModuleLogger("CacheService");
 
@@ -126,6 +126,56 @@ export const CACHE_KEYS = {
     date: string,
   ) =>
     `moderator:attendance:school:${schoolId}:page:${page}:limit:${limit}:status:${status}:date:${date}`,
+  allStudents: (
+    schoolId: string,
+    page: number,
+    limit: number,
+    classId: string,
+    academicYearId: string,
+    status: string,
+    gender: string,
+  ) =>
+    `school:${schoolId}:page:${page}:limit:${limit}:class:${classId}:academicYear:${academicYearId}:status:${status}:gender:${gender}`,
+  allExamSchedule: (
+    schoolId: string,
+    moderatorId: string,
+    classId: string,
+    academicYearId: string,
+    examType: string,
+    subjectId: string,
+    teacherId: string,
+    fromDate: string,
+    toDate: string,
+    page: number,
+    limit: number,
+    sortBy: string,
+    sortOrder: string,
+  ) =>
+    `school:${schoolId}:page:${page}:limit:${limit}:moderator:${moderatorId}:classId:${classId}:academicYear:${academicYearId}:exam:${examType}:subject:${subjectId}:teacher:${teacherId}:from:${fromDate}:to:${toDate}:sort:${sortBy}:order:${sortOrder}`,
+  teacherExamSchedule: (
+    schoolId: string,
+    teacherId: string,
+    classId: string,
+    examType: string,
+    subjectId: string,
+    fromDate: string,
+    toDate: string,
+    sortBy: string,
+    sortOrder: string,
+    page: number,
+    limit: number,
+  ) =>
+    `school"${schoolId}:teacher"${teacherId}:subject:${subjectId}:from:${fromDate}:to:${toDate}:class:${classId}:type:${examType}`,
+  studentExamSchedule: (
+    schoolId: string,
+    studentId: string,
+    examType: string,
+    fromDate: string,
+    toDate: string,
+    sortBy: string,
+    sortOrder: string,
+  ) =>
+    `school"${schoolId}:student"${studentId}:type:${examType}:from:${fromDate}:to:${toDate}`,
 } as const;
 
 export const CACHE_TTL = {

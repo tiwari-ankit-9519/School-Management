@@ -141,11 +141,9 @@ export function logSecurityEvent(
 }
 
 export function logSystemStartup(): void {
-  logger.info("System Starting Up", {
-    serviceName,
-    nodeId,
-    nodeVersion: process.version,
-  });
+  logger.info(
+    `System Starting Up | serviceName=${serviceName} nodeId=${nodeId} nodeVersion=${process.version}`,
+  );
 }
 
 export function logSystemShutdown(reason: string): void {

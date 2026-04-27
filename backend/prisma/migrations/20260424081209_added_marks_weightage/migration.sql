@@ -1,0 +1,2 @@
+-- AlterTable
+ALTER TABLE "ExamSchedule" ADD COLUMN     "weightage" DOUBLE PRECISION NOT NULL DEFAULT 0;

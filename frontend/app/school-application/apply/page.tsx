@@ -172,7 +172,7 @@ const SchoolApplicationForm = () => {
   };
 
   return (
-    <div className="relative min-h-screen w-full bg-[#050810] overflow-x-hidden">
+    <div className="relative min-h-screen w-full bg-[#050810] overflow-x-hidden top-10">
       <div className="absolute inset-0 overflow-hidden pointer-events-none select-none">
         <div
           className="absolute inset-0"
@@ -378,7 +378,7 @@ const SchoolApplicationForm = () => {
               <div className="inline-flex items-center gap-2 bg-indigo-500/10 border border-indigo-400/20 rounded-full px-3 py-1 mb-2.5">
                 <div className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
                 <span className="text-indigo-300 text-xs font-manrope">
-                  Applications open · 2025–26
+                  Applications open · 2026–27
                 </span>
               </div>
               <h1 className="text-xl sm:text-2xl md:text-3xl font-extrabold font-jakarta text-white leading-tight mb-1">
