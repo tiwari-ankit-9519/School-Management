@@ -53,15 +53,10 @@ export async function createExamScheduleService(
       );
     }
 
-    const academicYearExists = await prisma.academicYear.count({
-      where: { id: data.academicYearId, schoolId },
+    const academicYear = await prisma.academicYear.findFirst({
+      where: { schoolId, isCurrent: true },
+      select: { id: true },
     });
-    if (!academicYearExists) {
-      log.warn(`Academic year not found with id ${data.academicYearId}`);
-      throw new Error(
-        `Academic year does not exist or doesn't belong to this school`,
-      );
-    }
 
     const subjectIds = data.entries.map((entry) => entry.subjectId);
     const subjectCount = await prisma.subject.count({
@@ -136,7 +131,7 @@ export async function createExamScheduleService(
       const allExamSchedule = await tx.examSchedule.createManyAndReturn({
         data: data.entries.map((entry) => ({
           classId,
-          academicYearId: data.academicYearId,
+          academicYearId: academicYear!.id,
           subjectId: entry.subjectId,
           teacherId: entry.teacherId,
           examType: data.examType,
@@ -384,7 +379,7 @@ export async function getExamScheduleForTeacherService(
       return cached;
     }
     const activeAcademicYear = await prisma.academicYear.findFirst({
-      where: { schoolId, isActive: true },
+      where: { schoolId, isCurrent: true },
       select: { id: true },
     });
 
@@ -510,7 +505,7 @@ export async function getExamScheduleForStudentService(
     }
 
     const activeAcademicYear = await prisma.academicYear.findFirst({
-      where: { schoolId, isActive: true },
+      where: { schoolId, isCurrent: true },
       select: { id: true },
     });
 

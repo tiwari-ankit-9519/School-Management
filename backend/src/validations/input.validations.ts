@@ -4,6 +4,7 @@ import {
   DocumentType,
   ExamType,
   Gender,
+  LeaveStatus,
   Module,
   ParentType,
   Prisma,
@@ -943,7 +944,6 @@ export const studentWithClassDetails =
   });
 
 export const ExamScheduleSchema = z.object({
-  academicYearId: z.string({ error: "Academic Year Id is required" }),
   examType: z.enum(ExamType),
   title: z.string({ error: "Title is required" }),
   date: z.iso.date(),
@@ -966,6 +966,98 @@ export const ExamScheduleSchema = z.object({
     )
     .min(1, { message: "At least one subject entry is required" }),
 });
+
+export const MarksSchema = z
+  .object({
+    examScheduleId: z.string({ error: "Exam ID is required" }),
+    entries: z
+      .array(
+        z.object({
+          studentId: z.string({ error: "Student ID is required" }),
+          marksObtained: z.coerce.number().min(0),
+          remarks: z.string().optional(),
+          isAbsent: z.boolean().optional(),
+          grade: z.enum(["A", "B", "C", "D", "E", "F"]).optional(),
+        }),
+      )
+      .min(1, { message: "At least one entry is required" }),
+  })
+  .superRefine((data, ctx) => {
+    data.entries.forEach((entry, index) => {
+      if (entry.isAbsent && entry.marksObtained > 0) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: "Marks obtained must be 0 if student is absent",
+          path: ["entries", index, "marksObtained"],
+        });
+      }
+    });
+  });
+
+export const updateMarkSchema = z
+  .object({
+    marksObtained: z.number().min(0).optional(),
+    grade: z.string().trim().optional(),
+    remarks: z.string().trim().optional(),
+    isAbsent: z.boolean().optional(),
+  })
+  .refine((data) => Object.keys(data).length > 0, {
+    message: "At least one field must be provided to update",
+  })
+  .refine(
+    (data) =>
+      !(
+        data.isAbsent === true &&
+        data.marksObtained !== undefined &&
+        data.marksObtained > 0
+      ),
+    { message: "Marks obtained cannot be greater than 0 if student is absent" },
+  );
+
+export const createLeaveRequestSchema = z
+  .object({
+    fromDate: z.iso.date("Invalid date format, expected YYYY-MM-DD"),
+    toDate: z.iso.date("Invalid date format, expected YYYY-MM-DD"),
+    reason: z
+      .string()
+      .trim()
+      .min(10, "Reason must be at least 10 characters")
+      .max(500, "Reason must be at most 500 characters"),
+  })
+  .refine((data) => new Date(data.toDate) >= new Date(data.fromDate), {
+    message: "toDate must be greater than or equal to fromDate",
+    path: ["toDate"],
+  });
+
+export const reviewLeaveRequestSchema = z
+  .object({
+    status: z.enum(LeaveStatus),
+    remarks: z
+      .string()
+      .trim()
+      .min(5, "Remarks must be at least 5 characters")
+      .max(500, "Remarks must be at most 500 characters")
+      .optional(),
+  })
+  .refine((data) => !(data.status === "REJECTED" && !data.remarks), {
+    message: "Remarks are required when rejecting a leave request",
+    path: ["remarks"],
+  });
+
+export const CreateHolidaySchema = z.object({
+  name: z.string({ error: "Name is required" }),
+  date: z.iso.date({ error: "Date is required" }),
+});
+
+export type CreateHolidayInput = z.infer<typeof CreateHolidaySchema>;
+
+export type ReviewLeaveRequestInput = z.infer<typeof reviewLeaveRequestSchema>;
+
+export type CreateLeaveRequestInput = z.infer<typeof createLeaveRequestSchema>;
+
+export type UpdateMarkInput = z.infer<typeof updateMarkSchema>;
+
+export type MarksInput = z.infer<typeof MarksSchema>;
 
 export type ExamScheduleInput = z.infer<typeof ExamScheduleSchema>;
 

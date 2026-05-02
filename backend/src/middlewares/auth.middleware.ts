@@ -6,7 +6,7 @@ import {
   logSecurityEvent,
 } from "@/src/config/logger.config";
 import type { AuthenticatedRequest } from "@/src/middlewares/request-logger.middleware";
-import type { Role } from "@prisma/client";
+import type { Module, Role } from "@prisma/client";
 
 const log = createModuleLogger("AuthMiddleware");
 const ACCESS_TOKEN_COOKIE = "access_token";
@@ -336,7 +336,7 @@ export function requireVerified(
     });
 }
 
-export function checkPermission(module: string, action: PermissionAction) {
+export function checkPermission(module: Module, action: PermissionAction) {
   return async (
     req: AuthenticatedRequest,
     res: Response,

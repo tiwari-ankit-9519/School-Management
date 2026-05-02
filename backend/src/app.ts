@@ -50,6 +50,12 @@ import timetableRoute from "@/src/routes/timetable.route.js";
 import attendanceRoute from "@/src/routes/attendance.route.js";
 import studentsRoute from "@/src/routes/students.route.js";
 import examRoute from "@/src/routes/exam.route.js";
+import marksRoute from "@/src/routes/marks.route.js";
+import leaveRoute from "@/src/routes/leave.route.js";
+import holidayRoute from "@/src/routes/holiday.route.js";
+import notificationRoute from "@/src/routes/notification.route.js";
+import announcementRoute from "@/src/routes/announcement.route.js";
+import profileRoute from "@/src/routes/profile.route.js";
 
 const log = createModuleLogger("Server");
 
@@ -176,6 +182,12 @@ app.use(`${API_PREFIX}/school/timetable`, timetableRoute);
 app.use(`${API_PREFIX}/school/attendance`, attendanceRoute);
 app.use(`${API_PREFIX}/school/students`, studentsRoute);
 app.use(`${API_PREFIX}/school/exam`, examRoute);
+app.use(`${API_PREFIX}/school/marks`, marksRoute);
+app.use(`${API_PREFIX}/school/leave`, leaveRoute);
+app.use(`${API_PREFIX}/school/holiday`, holidayRoute);
+app.use(`${API_PREFIX}/school/notification`, notificationRoute);
+app.use(`${API_PREFIX}/school/announcement`, announcementRoute);
+app.use(`${API_PREFIX}/school/profile`, profileRoute);
 
 app.use((req: Request, res: Response, _next: NextFunction) => {
   const knownPaths = [
@@ -191,6 +203,9 @@ app.use((req: Request, res: Response, _next: NextFunction) => {
     `${API_PREFIX}/school/attendance`,
     `${API_PREFIX}/school/students`,
     `${API_PREFIX}/school/exam`,
+    `${API_PREFIX}/school/marks`,
+    `${API_PREFIX}/school/leave`,
+    `${API_PREFIX}/school/holiday`,
     "/health",
     "/ping",
   ];
