@@ -8,6 +8,7 @@ import {
   RejectTeacherApplicationSchema,
   ResubmitApplicationSchema,
   TeacherApplicationSchema,
+  UpdateUserPermissionSchema,
 } from "../validations/input.validations";
 import { HTTP_STATUS } from "../utils/constants";
 import {
@@ -19,6 +20,7 @@ import {
   resubmitTeacherApplicationService,
   shortlistApplicationService,
   teacherApplicationService,
+  updateUserPermissionsService,
 } from "../services/user-management.service";
 import { ApplicationStatus } from "@prisma/client";
 
@@ -321,5 +323,46 @@ export async function resubmitTeacherApplication(
     success: true,
     message: "Teacher Application resubmitted",
     data: application,
+  });
+}
+
+export async function updateUserPermissions(
+  req: AuthenticatedRequest,
+  res: Response,
+): Promise<void> {
+  const auditContext = buildAuditContext(req);
+  const userId = req.params.userId as string;
+
+  const parsed = UpdateUserPermissionSchema.safeParse({
+    userId,
+    permissions: req.body.permissions,
+  });
+
+  if (!parsed.success) {
+    res.status(400).json({
+      success: false,
+      message: "Validation Failed",
+      errors: parsed.error.issues,
+    });
+    return;
+  }
+
+  const schoolId = req.user?.schoolId as string;
+  const adminId = req.user?.id as string;
+
+  res.status(HTTP_STATUS.OK);
+
+  const result = await updateUserPermissionsService(
+    parsed.data,
+    schoolId,
+    adminId,
+    auditContext,
+    res.statusCode,
+  );
+
+  res.json({
+    success: true,
+    message: "User permissions updated successfully",
+    data: result,
   });
 }

@@ -1638,12 +1638,11 @@ DECLARE
   v_words      TEXT[];
   v_prefix     TEXT := '';
   v_word       TEXT;
-  v_counter    INT := 1;
+  v_next       INT;
   v_candidate  TEXT;
-  v_exists     BOOLEAN;
 BEGIN
+  -- Build prefix from school name initials
   v_words := regexp_split_to_array(trim(p_school_name), '\s+');
-
   FOREACH v_word IN ARRAY v_words LOOP
     v_word := regexp_replace(v_word, '[^a-zA-Z]', '', 'g');
     IF length(v_word) > 0 THEN
@@ -1656,18 +1655,27 @@ BEGIN
     v_prefix := upper(left(regexp_replace(p_school_name, '[^a-zA-Z]', '', 'g'), 4));
   END IF;
 
-  LOOP
-    v_candidate := v_prefix || LPAD(v_counter::TEXT, 3, '0');
-    SELECT EXISTS (
-      SELECT 1 FROM "School" WHERE code = v_candidate
-    ) INTO v_exists;
-    EXIT WHEN NOT v_exists;
-    v_counter := v_counter + 1;
-  END LOOP;
+  -- Single query to find next available counter
+  SELECT COALESCE(
+    MAX(
+      CAST(
+        NULLIF(regexp_replace(code, '^' || v_prefix, ''), '') AS INTEGER
+      )
+    ) + 1,
+    1
+  )
+  INTO v_next
+  FROM "School"
+  WHERE code LIKE v_prefix || '%'
+    AND code ~ ('^' || v_prefix || '[0-9]{3}$');
+
+  v_candidate := v_prefix || LPAD(v_next::TEXT, 3, '0');
 
   RETURN v_candidate;
 END;
 $$ LANGUAGE plpgsql;
+
+CREATE INDEX IF NOT EXISTS school_code_pattern_idx ON "School" (code varchar_pattern_ops);
 
 CREATE OR REPLACE FUNCTION generate_registration_number(
   p_school_id TEXT,
@@ -1955,8 +1963,7 @@ CREATE UNIQUE INDEX IF NOT EXISTS "TeacherSubject_teacherId_subjectId_no_class_k
 WHERE
     "classId" IS NULL;
 
-ALTER TABLE "Timetable"
-ADD COLUMN "periodNumber" INTEGER NOT NULL;
+ALTER TABLE "Timetable" ADD COLUMN "periodNumber" INTEGER NOT NULL;
 
 -- CreateTable
 CREATE TABLE "AdminAttendance" (

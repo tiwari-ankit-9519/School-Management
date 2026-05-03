@@ -488,14 +488,14 @@ export const moderatorWithDetails = Prisma.validator<Prisma.AdminDefaultArgs>()(
           isActive: true,
           isVerified: true,
           createdAt: true,
+          userPermission: true,
         },
       },
-      permissions: true,
     },
   },
 );
 
-export const teacherWithDeatils = Prisma.validator<Prisma.TeacherDefaultArgs>()(
+export const teacherWithDetails = Prisma.validator<Prisma.TeacherDefaultArgs>()(
   {
     include: {
       user: {
@@ -508,6 +508,7 @@ export const teacherWithDeatils = Prisma.validator<Prisma.TeacherDefaultArgs>()(
           isActive: true,
           isVerified: true,
           createdAt: true,
+          userPermission: true,
         },
       },
     },
@@ -967,6 +968,19 @@ export const ExamScheduleSchema = z.object({
     .min(1, { message: "At least one subject entry is required" }),
 });
 
+export const userPermissionWithDetails =
+  Prisma.validator<Prisma.UserDefaultArgs>()({
+    select: {
+      id: true,
+      regNumber: true,
+      role: true,
+      email: true,
+      phone: true,
+      isActive: true,
+      userPermission: true,
+    },
+  });
+
 export const MarksSchema = z
   .object({
     examScheduleId: z.string({ error: "Exam ID is required" }),
@@ -1049,6 +1063,28 @@ export const CreateHolidaySchema = z.object({
   date: z.iso.date({ error: "Date is required" }),
 });
 
+export const UpdateUserPermissionSchema = z.object({
+  userId: z.string().min(1, { error: "User ID is required" }),
+  permissions: z
+    .array(modulePermissionSchema)
+    .min(1, { error: "At least 1 module permission is required" })
+    .refine(
+      (perms) => {
+        const modules = perms.map((p) => p.module);
+        return new Set(modules).size === modules.length;
+      },
+      { error: "Duplicate modules are not allowed" },
+    ),
+});
+
+export type UpdateUserPermissionInput = z.infer<
+  typeof UpdateUserPermissionSchema
+>;
+
+export type UserPermissionWithDetails = Prisma.UserGetPayload<
+  typeof userPermissionWithDetails
+>;
+
 export type CreateHolidayInput = z.infer<typeof CreateHolidaySchema>;
 
 export type ReviewLeaveRequestInput = z.infer<typeof reviewLeaveRequestSchema>;
@@ -1092,7 +1128,7 @@ export type StudentWithDetails = Prisma.StudentGetPayload<
 >;
 
 export type TeacherWithDetails = Prisma.TeacherGetPayload<
-  typeof teacherWithDeatils
+  typeof teacherWithDetails
 >;
 
 export type ResubmitAdmissionApplicationInput = z.infer<

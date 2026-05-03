@@ -1,6 +1,7 @@
 import {
   DocumentOwnerType,
   DocumentType,
+  Role,
   School,
   SchoolApplication,
   SchoolApplicationStatus,
@@ -26,6 +27,9 @@ import {
   sendRejectionEmail,
   sendWelcomeEmail,
 } from "./email.service";
+import { DEFAULT_ADMIN_PERMISSIONS } from "../utils/permission.util";
+import { generateSchoolCode } from "../utils/schoolcode.util";
+import { generateRegistrationNumber } from "../utils/registration.util";
 
 const log = createModuleLogger("SchoolApplicationServiceLogger");
 
@@ -612,14 +616,12 @@ export async function approveApplication(
     }
 
     const result = await prisma.$transaction(async (tx) => {
-      const schoolCode = await tx.$queryRaw<[{ generate_school_code: string }]>`
-        SELECT generate_school_code(${application.schoolName})
-      `;
+      const code = await generateSchoolCode(application.schoolName);
 
       const school = await tx.school.create({
         data: {
           name: application.schoolName,
-          code: schoolCode[0].generate_school_code,
+          code,
           address: application.address,
           city: application.city,
           state: application.state,
@@ -644,6 +646,12 @@ export async function approveApplication(
       const tempPassword = `Admin@${Math.random().toString(36).slice(-8)}`;
       const passwordHash = await hashPassword(tempPassword);
 
+      const regNumber = await generateRegistrationNumber(
+        school.id,
+        Role.ADMIN,
+        tx,
+      );
+
       const user = await tx.user.create({
         data: {
           schoolId: school.id,
@@ -651,20 +659,15 @@ export async function approveApplication(
           email: application.adminEmail,
           phone: application.adminPhone,
           passwordHash,
-          regNumber: "PENDING",
+          regNumber,
           isActive: true,
           isVerified: false,
         },
       });
 
-      const userWithRegNumber = await tx.user.findUnique({
-        where: { id: user.id },
-        select: { id: true, regNumber: true },
-      });
-
       log.info("Admin user created", {
         userId: user.id,
-        regNumber: userWithRegNumber?.regNumber,
+        regNumber: user.regNumber,
         schoolId: school.id,
       });
 
@@ -678,6 +681,13 @@ export async function approveApplication(
         },
       });
 
+      await tx.userPermission.createMany({
+        data: DEFAULT_ADMIN_PERMISSIONS.map((p) => ({
+          ...p,
+          userId: user.id,
+        })),
+      });
+
       await tx.schoolApplication.update({
         where: { id: applicationId },
         data: {
@@ -687,7 +697,7 @@ export async function approveApplication(
         },
       });
 
-      return { school, user, userWithRegNumber, tempPassword };
+      return { school, user, tempPassword };
     });
 
     await createAuditLog({
@@ -701,7 +711,7 @@ export async function approveApplication(
         schoolId: result.school.id,
         schoolCode: result.school.code,
         adminUserId: result.user.id,
-        adminRegNumber: result.userWithRegNumber?.regNumber,
+        adminRegNumber: result.user?.regNumber,
         status: "APPROVED",
       },
       statusCode,
@@ -719,7 +729,7 @@ export async function approveApplication(
         schoolId: result.school.id,
         schoolCode: result.school.code,
         adminUserId: result.user.id,
-        adminRegNumber: result.userWithRegNumber?.regNumber,
+        adminRegNumber: result.user?.regNumber,
       },
       statusCode,
     });
@@ -729,7 +739,7 @@ export async function approveApplication(
       schoolId: result.school.id,
       schoolCode: result.school.code,
       adminUserId: result.user.id,
-      adminRegNumber: result.userWithRegNumber?.regNumber,
+      adminRegNumber: result.user?.regNumber,
     });
 
     await sendWelcomeEmail({
@@ -739,7 +749,7 @@ export async function approveApplication(
       tempPassword: result.tempPassword,
       schoolName: application.schoolName,
       schoolCode: result.school.code,
-      regNumber: result.userWithRegNumber?.regNumber ?? "",
+      regNumber: result.user?.regNumber ?? "",
     });
 
     return result.school;

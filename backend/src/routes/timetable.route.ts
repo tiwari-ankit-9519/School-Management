@@ -1,39 +1,48 @@
 import { Router } from "express";
-import { authenticate, authorize } from "../middlewares/auth.middleware";
+import {
+  authenticate,
+  authorize,
+  checkPermission,
+} from "../middlewares/auth.middleware";
 import {
   createTimeTable,
   getTimeTableForClass,
   swapTimeTableForClass,
   updatedTimeTable,
 } from "../controller/timetable.controller";
+import { Module } from "@prisma/client";
 
 const router: Router = Router();
 
 router.post(
   "/create",
   authenticate,
-  authorize("MODERATOR", "ADMIN"),
+  authorize("ADMIN", "MODERATOR"),
+  checkPermission(Module.TIMETABLE, "canCreate"),
   createTimeTable,
 );
 
 router.patch(
   "/:id/update",
   authenticate,
-  authorize("MODERATOR", "ADMIN"),
+  authorize("ADMIN", "MODERATOR"),
+  checkPermission(Module.TIMETABLE, "canUpdate"),
   updatedTimeTable,
 );
 
 router.patch(
   "/swap-class",
   authenticate,
-  authorize("MODERATOR", "ADMIN"),
+  authorize("ADMIN", "MODERATOR"),
+  checkPermission(Module.TIMETABLE, "canUpdate"),
   swapTimeTableForClass,
 );
 
 router.get(
   "/:id/time-table",
   authenticate,
-  authorize("MODERATOR", "ADMIN"),
+  authorize("ADMIN", "MODERATOR"),
+  checkPermission(Module.TIMETABLE, "canRead"),
   getTimeTableForClass,
 );
 

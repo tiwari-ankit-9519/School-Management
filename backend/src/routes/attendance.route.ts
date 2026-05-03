@@ -1,5 +1,9 @@
 import { Router } from "express";
-import { authenticate, authorize } from "../middlewares/auth.middleware";
+import {
+  authenticate,
+  authorize,
+  checkPermission,
+} from "../middlewares/auth.middleware";
 import {
   getAdminsAttendance,
   getStudentAttendance,
@@ -8,6 +12,7 @@ import {
   markStudentAttendance,
   markTeacherAttendance,
 } from "../controller/attendance.controller";
+import { Module } from "@prisma/client";
 
 const router: Router = Router();
 
@@ -21,7 +26,8 @@ router.post(
 router.post(
   "/teacher",
   authenticate,
-  authorize("MODERATOR", "ADMIN"),
+  authorize("ADMIN", "MODERATOR"),
+  checkPermission(Module.TEACHER_ATTENDANCE, "canCreate"),
   markTeacherAttendance,
 );
 
@@ -29,6 +35,7 @@ router.post(
   "/admins",
   authenticate,
   authorize("ADMIN"),
+  checkPermission(Module.TEACHER_ATTENDANCE, "canCreate"),
   markModeratorAttendance,
 );
 
@@ -42,9 +49,17 @@ router.get(
 router.get(
   "/teachers",
   authenticate,
-  authorize("MODERATOR", "ADMIN"),
+  authorize("ADMIN", "MODERATOR"),
+  checkPermission(Module.TEACHER_ATTENDANCE, "canRead"),
   getTeachersAttendance,
 );
-router.get("/admins", authenticate, authorize("ADMIN"), getAdminsAttendance);
+
+router.get(
+  "/admins",
+  authenticate,
+  authorize("ADMIN"),
+  checkPermission(Module.TEACHER_ATTENDANCE, "canRead"),
+  getAdminsAttendance,
+);
 
 export default router;

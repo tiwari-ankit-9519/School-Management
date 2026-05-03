@@ -336,6 +336,8 @@ export function requireVerified(
     });
 }
 
+const IMPLICIT_ACCESS_ROLES: Role[] = ["STUDENT", "PARENT"];
+
 export function checkPermission(module: Module, action: PermissionAction) {
   return async (
     req: AuthenticatedRequest,
@@ -351,43 +353,21 @@ export function checkPermission(module: Module, action: PermissionAction) {
         return;
       }
 
-      if (req.user.role === "SUPER_ADMIN") {
+      const { role, id: userId } = req.user;
+
+      if (role === "SUPER_ADMIN") {
         next();
         return;
       }
 
-      const admin = await prisma.admin.findUnique({
-        where: { userId: req.user.id },
-        select: { id: true },
-      });
-
-      if (!admin) {
-        logSecurityEvent(
-          "PERMISSION_DENIED_NO_ADMIN_PROFILE",
-          req.context?.ip ?? "unknown",
-          req.user.id,
-          {
-            requestId: req.requestId,
-            path: req.path,
-            method: req.method,
-            userRole: req.user.role,
-            module,
-            action,
-          },
-        );
-        res.status(403).json({
-          success: false,
-          message: "You do not have permission to access this resource",
-        });
+      if (IMPLICIT_ACCESS_ROLES.includes(role as Role)) {
+        next();
         return;
       }
 
-      const permission = await prisma.adminPermission.findUnique({
+      const permission = await prisma.userPermission.findUnique({
         where: {
-          adminId_module: {
-            adminId: admin.id,
-            module,
-          },
+          userId_module: { userId, module },
         },
         select: {
           canCreate: true,
@@ -399,63 +379,35 @@ export function checkPermission(module: Module, action: PermissionAction) {
         },
       });
 
-      if (!permission) {
-        logSecurityEvent(
-          "PERMISSION_NOT_FOUND",
-          req.context?.ip ?? "unknown",
-          req.user.id,
-          {
-            requestId: req.requestId,
-            path: req.path,
-            adminId: admin.id,
-            module,
-            action,
-          },
-        );
-        res.status(403).json({
-          success: false,
-          message: `You do not have access to the ${module} module`,
-        });
+      if (permission?.[action]) {
+        next();
         return;
       }
 
-      if (!permission[action]) {
-        logSecurityEvent(
-          "PERMISSION_CHECK_DENIED",
-          req.context?.ip ?? "unknown",
-          req.user.id,
-          {
-            requestId: req.requestId,
-            path: req.path,
-            method: req.method,
-            adminId: admin.id,
-            module,
-            action,
-            permissions: permission,
-          },
-        );
-        res.status(403).json({
-          success: false,
-          message: "You do not have permission to perform this action",
-        });
-        return;
-      }
+      logSecurityEvent(
+        "PERMISSION_CHECK_DENIED",
+        req.context?.ip ?? "unknown",
+        userId,
+        {
+          requestId: req.requestId,
+          path: req.path,
+          method: req.method,
+          userRole: role,
+          module,
+          action,
+          hadPermissionRow: !!permission,
+        },
+      );
 
-      log.debug("Permission check passed", {
-        userId: req.user.id,
-        adminId: admin.id,
-        module,
-        action,
-        requestId: req.requestId,
+      res.status(403).json({
+        success: false,
+        message: "You do not have permission to perform this action",
       });
-
-      next();
     } catch (error) {
       const err = error as Error;
       log.error("Permission check middleware error", {
         error: err.message,
         requestId: req.requestId,
-        path: req.path,
         module,
         action,
       });

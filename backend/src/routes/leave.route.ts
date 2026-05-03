@@ -1,5 +1,9 @@
 import { Router } from "express";
-import { authenticate, authorize } from "../middlewares/auth.middleware";
+import {
+  authenticate,
+  authorize,
+  checkPermission,
+} from "../middlewares/auth.middleware";
 import {
   applyLeaveRequestByModerator,
   applyLeaveRequestByTeacher,
@@ -12,6 +16,7 @@ import {
   reviewLeaveRequestOfStudentByClassTeacher,
   reviewLeaveRequestOfTeacherForModerator,
 } from "../controller/leave.controller";
+import { Module } from "@prisma/client";
 
 const router: Router = Router();
 
@@ -21,16 +26,19 @@ router.post(
   authorize("STUDENT"),
   applyLeaveRequestForStudent,
 );
+
 router.post(
   "/teacher",
   authenticate,
   authorize("TEACHER"),
   applyLeaveRequestByTeacher,
 );
+
 router.post(
   "/mod",
   authenticate,
   authorize("MODERATOR"),
+  checkPermission(Module.LEAVE_REQUEST, "canCreate"),
   applyLeaveRequestByModerator,
 );
 
@@ -40,16 +48,20 @@ router.get(
   authorize("TEACHER"),
   getLeaveRequestsOfStudentForClassTeacher,
 );
+
 router.get(
   "/teacher",
   authenticate,
   authorize("MODERATOR"),
+  checkPermission(Module.LEAVE_REQUEST, "canRead"),
   getLeaveRequestsOfTeacherForModerator,
 );
+
 router.get(
   "/mod",
   authenticate,
   authorize("ADMIN"),
+  checkPermission(Module.LEAVE_REQUEST, "canRead"),
   getLeaveRequestsOfModeratorForAdmin,
 );
 
@@ -66,16 +78,20 @@ router.patch(
   authorize("TEACHER"),
   reviewLeaveRequestOfStudentByClassTeacher,
 );
+
 router.patch(
   "/:leaveId/teacher",
   authenticate,
   authorize("MODERATOR"),
+  checkPermission(Module.LEAVE_REQUEST, "canApprove"),
   reviewLeaveRequestOfTeacherForModerator,
 );
+
 router.patch(
   "/:leaveId/mod",
   authenticate,
   authorize("ADMIN"),
+  checkPermission(Module.LEAVE_REQUEST, "canApprove"),
   reviewLeaveRequestOfModeratorForAdmin,
 );
 

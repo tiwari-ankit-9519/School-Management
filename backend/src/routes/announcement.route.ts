@@ -1,5 +1,9 @@
 import { Router } from "express";
-import { authenticate, authorize } from "../middlewares/auth.middleware";
+import {
+  authenticate,
+  authorize,
+  checkPermission,
+} from "../middlewares/auth.middleware";
 import {
   createAnnouncement,
   getAnnouncementsForAdmin,
@@ -8,6 +12,7 @@ import {
   updateAnnouncement,
   deleteAnnouncement,
 } from "../controller/announcement.controller";
+import { Module } from "@prisma/client";
 
 const router: Router = Router();
 
@@ -15,6 +20,7 @@ router.post(
   "/create",
   authenticate,
   authorize("ADMIN", "MODERATOR"),
+  checkPermission(Module.ANNOUNCEMENT, "canCreate"),
   createAnnouncement,
 );
 
@@ -22,6 +28,7 @@ router.get(
   "/admin",
   authenticate,
   authorize("ADMIN", "MODERATOR"),
+  checkPermission(Module.ANNOUNCEMENT, "canRead"),
   getAnnouncementsForAdmin,
 );
 
@@ -43,6 +50,7 @@ router.patch(
   "/:announcementId",
   authenticate,
   authorize("ADMIN", "MODERATOR"),
+  checkPermission(Module.ANNOUNCEMENT, "canUpdate"),
   updateAnnouncement,
 );
 
@@ -50,6 +58,7 @@ router.delete(
   "/:announcementId",
   authenticate,
   authorize("ADMIN", "MODERATOR"),
+  checkPermission(Module.ANNOUNCEMENT, "canDelete"),
   deleteAnnouncement,
 );
 

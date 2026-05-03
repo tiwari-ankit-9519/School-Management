@@ -1,11 +1,16 @@
 import { Router } from "express";
-import { authenticate, authorize } from "../middlewares/auth.middleware";
+import {
+  authenticate,
+  authorize,
+  checkPermission,
+} from "../middlewares/auth.middleware";
 import {
   createExamSchedule,
   getExamScheduleForAdmin,
   getExamScheduleForStudent,
   getExamScheduleForTeacher,
 } from "../controller/exam.controller";
+import { Module } from "@prisma/client";
 
 const router: Router = Router();
 
@@ -13,6 +18,7 @@ router.post(
   "/:classId/create",
   authenticate,
   authorize("ADMIN", "MODERATOR"),
+  checkPermission(Module.EXAM_SCHEDULE, "canCreate"),
   createExamSchedule,
 );
 
@@ -20,6 +26,7 @@ router.get(
   "/admin",
   authenticate,
   authorize("ADMIN", "MODERATOR"),
+  checkPermission(Module.EXAM_SCHEDULE, "canRead"),
   getExamScheduleForAdmin,
 );
 

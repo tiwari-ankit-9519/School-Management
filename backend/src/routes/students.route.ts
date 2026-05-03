@@ -1,9 +1,14 @@
 import { Router } from "express";
-import { authenticate, authorize } from "../middlewares/auth.middleware";
+import {
+  authenticate,
+  authorize,
+  checkPermission,
+} from "../middlewares/auth.middleware";
 import {
   getAllStudentsList,
   getSingleStudentDetail,
 } from "../controller/students.controller";
+import { Module } from "@prisma/client";
 
 const router: Router = Router();
 
@@ -11,6 +16,7 @@ router.get(
   "/all",
   authenticate,
   authorize("ADMIN", "MODERATOR"),
+  checkPermission(Module.STUDENT, "canRead"),
   getAllStudentsList,
 );
 
@@ -18,6 +24,7 @@ router.get(
   "/:id",
   authenticate,
   authorize("ADMIN", "MODERATOR"),
+  checkPermission(Module.STUDENT, "canRead"),
   getSingleStudentDetail,
 );
 

@@ -8,7 +8,12 @@ import {
   resubmitAdmissionApplication,
   submitAdmissionApplication,
 } from "../controller/admission.controller";
-import { authenticate, authorize } from "../middlewares/auth.middleware";
+import {
+  authenticate,
+  authorize,
+  checkPermission,
+} from "../middlewares/auth.middleware";
+import { Module } from "@prisma/client";
 
 const router: Router = Router();
 
@@ -26,34 +31,39 @@ router.get(
   "/all",
   authenticate,
   authorize("ADMIN", "MODERATOR"),
+  checkPermission(Module.ADMISSION_APPLICATION, "canRead"),
   getAllAdmissionApplication,
 );
 
 router.get(
   "/:id",
   authenticate,
-  authorize("MODERATOR", "ADMIN"),
+  authorize("ADMIN", "MODERATOR"),
+  checkPermission(Module.ADMISSION_APPLICATION, "canRead"),
   getAdmissionApplication,
 );
 
 router.patch(
   "/:id/waitlist",
   authenticate,
-  authorize("MODERATOR", "ADMIN"),
+  authorize("ADMIN", "MODERATOR"),
+  checkPermission(Module.ADMISSION_APPLICATION, "canApprove"),
   rejectAdmissionnApplication,
 );
 
 router.patch(
   "/:id/reject",
   authenticate,
-  authorize("MODERATOR", "ADMIN"),
+  authorize("ADMIN", "MODERATOR"),
+  checkPermission(Module.ADMISSION_APPLICATION, "canApprove"),
   rejectAdmissionnApplication,
 );
 
 router.patch(
   "/:id/approve",
   authenticate,
-  authorize("MODERATOR", "ADMIN"),
+  authorize("ADMIN", "MODERATOR"),
+  checkPermission(Module.ADMISSION_APPLICATION, "canApprove"),
   approveAdmissionApplication,
 );
 

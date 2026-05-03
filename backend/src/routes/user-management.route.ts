@@ -9,8 +9,11 @@ import {
   shortlistTeacherApplication,
   viewAllTeacherApplications,
   viewTeacherApplication,
+  updateUserPermissions,
 } from "../controller/user-management.controller";
 import { upload } from "../config/cloudinary.config";
+import { checkPermission } from "../middlewares/auth.middleware";
+import { Module } from "@prisma/client";
 
 const router: Router = Router();
 
@@ -19,6 +22,14 @@ router.post(
   authenticate,
   authorize("ADMIN", "MODERATOR"),
   createModerator,
+);
+
+router.patch(
+  "/:userId/permissions",
+  authenticate,
+  authorize("ADMIN", "MODERATOR"),
+  checkPermission(Module.ADMIN, "canUpdate"),
+  updateUserPermissions,
 );
 
 router.post(

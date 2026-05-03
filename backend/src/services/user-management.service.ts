@@ -13,6 +13,8 @@ import {
   ResubmitTeacherApplicationInput,
   TeacherApplicationInput,
   TeacherWithDetails,
+  UpdateUserPermissionInput,
+  UserPermissionWithDetails,
 } from "../validations/input.validations";
 import { prisma } from "../config/database.config";
 import { hashPassword } from "../utils/password";
@@ -36,11 +38,13 @@ import {
   getCache,
   setCache,
 } from "../utils/cache.util";
-import { application } from "express";
+import {
+  DEFAULT_TEACHER_PERMISSIONS,
+  mergePermissions,
+} from "../utils/permission.util";
 
 const log = createModuleLogger("UserManagement");
 
-// Moderator Creation
 export async function createModeratorService(
   data: CreateModeratorInput,
   schoolId: string,
@@ -55,6 +59,7 @@ export async function createModeratorService(
       adminId,
       data,
     });
+
     const [moderatorExists, school] = await Promise.all([
       prisma.user.findFirst({
         where: {
@@ -66,21 +71,24 @@ export async function createModeratorService(
         select: { name: true },
       }),
     ]);
+
     if (moderatorExists) {
       log.warn("Moderator already exists with the same email or phone", {
         email: data.email,
       });
       throw new Error("Moderator already exists with the same email or phone");
     }
+
     const result = await prisma.$transaction(async (tx) => {
       const [{ generate_registration_number: regNumber }] = await tx.$queryRaw<
         [{ generate_registration_number: string }]
       >`
-      
-  SELECT generate_registration_number(${schoolId}, ${Role.MODERATOR})
-`;
+        SELECT generate_registration_number(${schoolId}, ${Role.MODERATOR})
+      `;
+
       const tempPassword = `Moderator@${Math.random().toString(36).slice(-8)}`;
       const hashedPassword = await hashPassword(tempPassword);
+
       const user = await tx.user.create({
         data: {
           schoolId,
@@ -93,6 +101,7 @@ export async function createModeratorService(
           role: "MODERATOR",
         },
       });
+
       const adminUser = await tx.admin.create({
         data: {
           userId: user.id,
@@ -102,25 +111,9 @@ export async function createModeratorService(
           gender: data.gender,
           department: data.department,
           designation: data.designation,
-          permissions: {
-            createMany: {
-              data: data.permissions.map((p) => ({
-                module: p.module,
-                canCreate: p.canCreate,
-                canRead: p.canRead,
-                canUpdate: p.canUpdate,
-                canDelete: p.canDelete,
-                canApprove: p.canApprove,
-                canExport: p.canExport,
-              })),
-            },
-          },
         },
       });
-      log.info("Admin user created successfully", {
-        userName: `${adminUser.firstName} ${adminUser.lastName}`,
-        userRegNumber: user.regNumber,
-      });
+
       if (data.isTeacher) {
         await tx.teacher.create({
           data: {
@@ -139,11 +132,35 @@ export async function createModeratorService(
             joiningDate: new Date(data.joiningDate!),
           },
         });
+
         log.info("Teacher record created for moderator", {
           userName: `${data.firstName} ${data.lastName}`,
           userRegNumber: user.regNumber,
         });
+
+        await tx.userPermission.createMany({
+          data: mergePermissions(
+            DEFAULT_TEACHER_PERMISSIONS,
+            data.permissions,
+          ).map((p) => ({
+            ...p,
+            userId: user.id,
+          })),
+        });
+      } else {
+        await tx.userPermission.createMany({
+          data: data.permissions.map((p) => ({
+            ...p,
+            userId: user.id,
+          })),
+        });
       }
+
+      log.info("Admin user created successfully", {
+        userName: `${adminUser.firstName} ${adminUser.lastName}`,
+        userRegNumber: user.regNumber,
+      });
+
       return {
         moderator: await tx.admin.findUniqueOrThrow({
           where: { userId: user.id },
@@ -158,14 +175,15 @@ export async function createModeratorService(
                 isActive: true,
                 isVerified: true,
                 createdAt: true,
+                userPermission: true,
               },
             },
-            permissions: true,
           },
         }),
         tempPassword,
       };
     });
+
     await createSystemLog({
       level: "INFO",
       module: "ModeratorCreation",
@@ -185,6 +203,7 @@ export async function createModeratorService(
         isTeacher: data.isTeacher,
       },
     });
+
     await createAuditLog({
       schoolId,
       performedById: adminId,
@@ -206,6 +225,7 @@ export async function createModeratorService(
       isSuccessful: true,
       statusCode,
     });
+
     await sendModeratorInformation({
       firstName: data.firstName,
       lastName: data.lastName,
@@ -216,10 +236,12 @@ export async function createModeratorService(
       department: result.moderator.department ?? "",
       schoolName: school.name,
     });
+
     log.info("Moderator created successfully", {
       regNumber: result.moderator.user.regNumber,
       isTeacher: data.isTeacher,
     });
+
     return result.moderator;
   } catch (error) {
     const err = error as Error;
@@ -233,7 +255,6 @@ export async function createModeratorService(
   }
 }
 
-// Teacher application
 export async function teacherApplicationService(
   data: TeacherApplicationInput,
   schoolId: string,
@@ -565,7 +586,6 @@ export async function teacherApplicationService(
   }
 }
 
-// Getting all teacher application
 export async function getAllTeachersApplicationService(
   context: AuditContext,
   statusCode: number,
@@ -670,7 +690,6 @@ export async function getAllTeachersApplicationService(
   }
 }
 
-// Getting single teacher application
 export async function getTeacherApplicationService(
   applicationId: string,
   schoolId: string,
@@ -737,7 +756,6 @@ export async function getTeacherApplicationService(
   }
 }
 
-// Moderator changing the status to shortlisted
 export async function shortlistApplicationService(
   applicationId: string,
   moderatorId: string,
@@ -840,7 +858,6 @@ export async function shortlistApplicationService(
   }
 }
 
-// Admin approving teacher application and creating teacher reg number
 export async function approveTeacherApplicationService(
   applicationId: string,
   schoolId: string,
@@ -856,13 +873,13 @@ export async function approveTeacherApplicationService(
     });
 
     const [application, school] = await Promise.all([
-      await prisma.teacherApplication.findUnique({
+      prisma.teacherApplication.findUnique({
         where: {
           schoolId,
           id: applicationId,
         },
       }),
-      await prisma.school.findUnique({
+      prisma.school.findUnique({
         where: {
           id: schoolId,
         },
@@ -894,8 +911,8 @@ export async function approveTeacherApplicationService(
       const [{ generate_registration_number: regNumber }] = await tx.$queryRaw<
         [{ generate_registration_number: string }]
       >`
-  SELECT generate_registration_number(${schoolId}, ${Role.TEACHER})
-`;
+        SELECT generate_registration_number(${schoolId}, ${Role.TEACHER})
+      `;
 
       const tempPassword = `Teacher@${Math.random().toString(36).slice(-8)}`;
       const hashedPassword = await hashPassword(tempPassword);
@@ -913,7 +930,7 @@ export async function approveTeacherApplicationService(
         },
       });
 
-      const teacher = await tx.teacher.create({
+      await tx.teacher.create({
         data: {
           userId: user.id,
           firstName: application.firstName,
@@ -929,6 +946,13 @@ export async function approveTeacherApplicationService(
           specialization: application.specialization,
           joiningDate: new Date(),
         },
+      });
+
+      await tx.userPermission.createMany({
+        data: DEFAULT_TEACHER_PERMISSIONS.map((p) => ({
+          ...p,
+          userId: user.id,
+        })),
       });
 
       log.info("Teacher created successfully", {
@@ -950,6 +974,7 @@ export async function approveTeacherApplicationService(
                 isActive: true,
                 isVerified: true,
                 createdAt: true,
+                userPermission: true,
               },
             },
           },
@@ -1009,7 +1034,7 @@ export async function approveTeacherApplicationService(
       phone: application.phone,
       regNumber: response.teacher.user.regNumber,
       tempPassword: response.tempPassword,
-      applicationId: applicationId,
+      applicationId,
       schoolName: school?.name ?? "",
     });
 
@@ -1026,7 +1051,6 @@ export async function approveTeacherApplicationService(
   }
 }
 
-// Admin moderator rejecting the teacher applicaiton
 export async function rejectTeacherApplicaitonService(
   applicationId: string,
   schoolId: string,
@@ -1161,7 +1185,6 @@ export async function rejectTeacherApplicaitonService(
   }
 }
 
-// Teacher resubmitting the application
 export async function resubmitTeacherApplicationService(
   applicationId: string,
   data: ResubmitTeacherApplicationInput,
@@ -1353,6 +1376,150 @@ export async function resubmitTeacherApplicationService(
       ipAddress: context.ipAddress,
     });
 
+    throw err;
+  }
+}
+
+export async function updateUserPermissionsService(
+  data: UpdateUserPermissionInput,
+  schoolId: string,
+  adminId: string,
+  context: AuditContext,
+  statusCode: number,
+): Promise<UserPermissionWithDetails> {
+  try {
+    log.info("Starting update user permissions service", {
+      ipAddress: context.ipAddress,
+      schoolId,
+      adminId,
+      targetUserId: data.userId,
+    });
+
+    const targetUser = await prisma.user.findUnique({
+      where: {
+        id: data.userId,
+        schoolId,
+      },
+      select: {
+        id: true,
+        role: true,
+        regNumber: true,
+        permissions: true,
+      },
+    });
+
+    if (!targetUser) {
+      log.warn("Target user not found", { userId: data.userId, schoolId });
+      throw new Error("User not found");
+    }
+
+    if (!["ADMIN", "MODERATOR", "TEACHER"].includes(targetUser.role)) {
+      log.warn("Permission update not allowed for this role", {
+        userId: data.userId,
+        role: targetUser.role,
+      });
+      throw new Error(
+        `Permissions cannot be assigned to a user with role ${targetUser.role}`,
+      );
+    }
+
+    const duplicateModules = data.permissions
+      .map((p) => p.module)
+      .filter((module, index, arr) => arr.indexOf(module) !== index);
+
+    if (duplicateModules.length > 0) {
+      log.warn("Duplicate modules in permission update request", {
+        duplicateModules,
+      });
+      throw new Error(
+        `Duplicate modules are not allowed: ${duplicateModules.join(", ")}`,
+      );
+    }
+
+    const oldPermissions = targetUser.permissions;
+
+    const result = await prisma.$transaction(async (tx) => {
+      await tx.userPermission.deleteMany({
+        where: { userId: data.userId },
+      });
+
+      await tx.userPermission.createMany({
+        data: data.permissions.map((p) => ({
+          userId: data.userId,
+          module: p.module,
+          canCreate: p.canCreate,
+          canRead: p.canRead,
+          canUpdate: p.canUpdate,
+          canDelete: p.canDelete,
+          canApprove: p.canApprove,
+          canExport: p.canExport,
+        })),
+      });
+
+      return await tx.user.findUniqueOrThrow({
+        where: { id: data.userId },
+        select: {
+          id: true,
+          regNumber: true,
+          role: true,
+          email: true,
+          phone: true,
+          isActive: true,
+          userPermission: true,
+        },
+      });
+    });
+
+    await createAuditLog({
+      schoolId,
+      performedById: adminId,
+      action: "PERMISSION_CHANGE",
+      module: "UserPermission",
+      resourceId: targetUser.regNumber,
+      resourceType: "UserPermission",
+      oldValues: {
+        permissions: oldPermissions,
+      },
+      newValues: {
+        permissions: result.userPermission,
+      },
+      context,
+      isSuccessful: true,
+      statusCode,
+    });
+
+    await createSystemLog({
+      level: "INFO",
+      message: "User permissions updated",
+      module: "UserPermission",
+      context,
+      metadata: {
+        schoolId,
+        adminId,
+        targetUserId: data.userId,
+        targetUserRegNumber: targetUser.regNumber,
+        targetUserRole: targetUser.role,
+        modulesUpdated: data.permissions.map((p) => p.module),
+      },
+      statusCode,
+    });
+
+    log.info("User permissions updated successfully", {
+      targetUserId: data.userId,
+      targetUserRegNumber: targetUser.regNumber,
+      modulesUpdated: data.permissions.map((p) => p.module),
+    });
+
+    return result;
+  } catch (error) {
+    const err = error as Error;
+    log.error("Failed to update user permissions", {
+      error: err.message,
+      schoolId,
+      adminId,
+      targetUserId: data.userId,
+      ipAddress: context.ipAddress,
+    });
     throw err;
   }
 }
