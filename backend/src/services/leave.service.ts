@@ -12,7 +12,6 @@ import { createModuleLogger } from "../config/logger.config";
 const log = createModuleLogger("LeaveService");
 
 export async function applyLeaveRequestByStudentService(
-  schoolId: string,
   requesterId: string,
   role: Role,
   context: AuditContext,
@@ -24,7 +23,6 @@ export async function applyLeaveRequestByStudentService(
       `Starting service to apply for leave for requesterId ${requesterId}`,
       {
         ipAddress: context.ipAddress,
-        schoolId,
       },
     );
 
@@ -111,7 +109,6 @@ export async function applyLeaveRequestByStudentService(
       context,
       statusCode,
       metadata: {
-        schoolId,
         requesterId,
         role,
         classId: enrollment.classId,
@@ -119,7 +116,6 @@ export async function applyLeaveRequestByStudentService(
     });
 
     await createAuditLog({
-      schoolId,
       performedById: requesterId,
       action: "CREATE",
       module: "LeaveRequestModule",
@@ -146,7 +142,6 @@ export async function applyLeaveRequestByStudentService(
     log.error("Internal Server Error. Failed to apply for leaves", {
       error: err.message,
       ipAddress: context.ipAddress,
-      schoolId,
       requesterId,
     });
     throw err;
@@ -154,7 +149,6 @@ export async function applyLeaveRequestByStudentService(
 }
 
 export async function getLeaveRequestsOfStudentForClassTeacherService(
-  schoolId: string,
   reviewerId: string,
   classId: string,
   context: AuditContext,
@@ -177,7 +171,6 @@ export async function getLeaveRequestsOfStudentForClassTeacherService(
       `Starting service to fetch student leave requests for class teacher`,
       {
         ipAddress: context.ipAddress,
-        schoolId,
         reviewerId,
       },
     );
@@ -194,7 +187,6 @@ export async function getLeaveRequestsOfStudentForClassTeacherService(
         {
           reviewerId,
           classId,
-          schoolId,
         },
       );
       throw new Error(
@@ -205,7 +197,6 @@ export async function getLeaveRequestsOfStudentForClassTeacherService(
     log.info(`Class teacher verified, checking cache`, { reviewerId, classId });
 
     const cacheKey = CACHE_KEYS.studentLeaveRequest(
-      schoolId,
       reviewerId,
       classId,
       page,
@@ -236,7 +227,6 @@ export async function getLeaveRequestsOfStudentForClassTeacherService(
     const where: Prisma.LeaveRequestWhereInput = {
       classId,
       requesterRole: "STUDENT",
-      class: { schoolId },
     };
     if (filters?.status) where.status = filters.status;
     if (filters?.studentId) where.studentId = filters.studentId;
@@ -261,7 +251,7 @@ export async function getLeaveRequestsOfStudentForClassTeacherService(
       totalPages: Math.ceil(total / limit),
     };
 
-    await setCache(cacheKey, response, CACHE_TTL.SCHOOL_APPLICATIONS_LIST);
+    await setCache(cacheKey, response, CACHE_TTL.ADMISSION_APPLICATIONS_LIST);
     log.info(`Leave requests cached successfully`, { cacheKey });
 
     await createSystemLog({
@@ -270,7 +260,7 @@ export async function getLeaveRequestsOfStudentForClassTeacherService(
       message: "Fetched student leave requests for class teacher",
       context,
       statusCode,
-      metadata: { schoolId, reviewerId, classId, filters },
+      metadata: { reviewerId, classId, filters },
     });
 
     log.info(`Fetched student leave requests successfully`, {
@@ -284,7 +274,6 @@ export async function getLeaveRequestsOfStudentForClassTeacherService(
     log.error(`Internal Server Error. Failed to fetch student leave requests`, {
       error: err.message,
       ipAddress: context.ipAddress,
-      schoolId,
       reviewerId,
     });
     throw err;
@@ -292,7 +281,6 @@ export async function getLeaveRequestsOfStudentForClassTeacherService(
 }
 
 export async function reviewLeaveRequestOfStudentByClassTeacherService(
-  schoolId: string,
   leaveId: string,
   reviewerId: string,
   context: AuditContext,
@@ -304,7 +292,6 @@ export async function reviewLeaveRequestOfStudentByClassTeacherService(
       `Starting service to review student leave request for leave id ${leaveId}`,
       {
         ipAddress: context.ipAddress,
-        schoolId,
         reviewerId,
       },
     );
@@ -313,13 +300,11 @@ export async function reviewLeaveRequestOfStudentByClassTeacherService(
       where: {
         id: leaveId,
         requesterRole: "STUDENT",
-        class: { schoolId },
       },
     });
     if (!appliedLeave) {
       log.warn(`Student leave request not found with id ${leaveId}`, {
         leaveId,
-        schoolId,
       });
       throw new Error(`Leave request not found`);
     }
@@ -347,7 +332,7 @@ export async function reviewLeaveRequestOfStudentByClassTeacherService(
     if (!classTeacher) {
       log.warn(
         `Teacher ${reviewerId} is not the class teacher for class ${appliedLeave.classId}`,
-        { reviewerId, classId: appliedLeave.classId, schoolId },
+        { reviewerId, classId: appliedLeave.classId },
       );
       throw new Error(
         `You are not authorized to review leave requests for this class`,
@@ -389,7 +374,6 @@ export async function reviewLeaveRequestOfStudentByClassTeacherService(
       context,
       statusCode,
       metadata: {
-        schoolId,
         reviewerId,
         leaveId,
         classId: appliedLeave.classId,
@@ -398,7 +382,6 @@ export async function reviewLeaveRequestOfStudentByClassTeacherService(
     });
 
     await createAuditLog({
-      schoolId,
       performedById: reviewerId,
       action: "UPDATE",
       module: "LeaveRequestModule",
@@ -426,7 +409,6 @@ export async function reviewLeaveRequestOfStudentByClassTeacherService(
     log.error("Internal Server Error. Failed to review student leave request", {
       error: err.message,
       ipAddress: context.ipAddress,
-      schoolId,
       leaveId,
       reviewerId,
     });
@@ -435,7 +417,6 @@ export async function reviewLeaveRequestOfStudentByClassTeacherService(
 }
 
 export async function applyLeaveRequestByTeacherService(
-  schoolId: string,
   requesterId: string,
   role: Role,
   context: AuditContext,
@@ -447,12 +428,11 @@ export async function applyLeaveRequestByTeacherService(
       `Starting service to apply leaves for teacher with id ${requesterId}`,
       {
         ipAddress: context.ipAddress,
-        schoolId,
       },
     );
 
     const teacherExists = await prisma.teacher.findFirst({
-      where: { userId: requesterId, user: { schoolId } },
+      where: { userId: requesterId },
     });
     if (!teacherExists) {
       log.warn(`Teacher profile not found for user ${requesterId}`);
@@ -522,7 +502,6 @@ export async function applyLeaveRequestByTeacherService(
       context,
       statusCode,
       metadata: {
-        schoolId,
         requesterId,
         role,
         teacherId: teacherExists.id,
@@ -530,7 +509,6 @@ export async function applyLeaveRequestByTeacherService(
     });
 
     await createAuditLog({
-      schoolId,
       performedById: requesterId,
       action: "CREATE",
       module: "LeaveRequestModule",
@@ -557,7 +535,6 @@ export async function applyLeaveRequestByTeacherService(
     log.error(`Internal Server Error. Failed to apply for leave`, {
       error: err.message,
       ipAddress: context.ipAddress,
-      schoolId,
       requesterId,
     });
     throw err;
@@ -565,7 +542,6 @@ export async function applyLeaveRequestByTeacherService(
 }
 
 export async function getLeaveRequestsOfTeacherForModeratorService(
-  schoolId: string,
   adminId: string,
   context: AuditContext,
   statusCode: number,
@@ -585,12 +561,10 @@ export async function getLeaveRequestsOfTeacherForModeratorService(
   try {
     log.info(`Starting service to fetch teacher leave requests for admin`, {
       ipAddress: context.ipAddress,
-      schoolId,
       adminId,
     });
 
     const cacheKey = CACHE_KEYS.teacherLeaveRequest(
-      schoolId,
       adminId,
       page,
       limit,
@@ -614,7 +588,6 @@ export async function getLeaveRequestsOfTeacherForModeratorService(
 
     const where: Prisma.LeaveRequestWhereInput = {
       requesterRole: "TEACHER",
-      teacher: { user: { schoolId } },
     };
     if (filters?.status) where.status = filters.status;
     if (filters?.teacherId) where.teacherId = filters.teacherId;
@@ -629,7 +602,7 @@ export async function getLeaveRequestsOfTeacherForModeratorService(
       prisma.leaveRequest.count({ where }),
     ]);
 
-    log.info(`Database query successful`, { total, page, limit, schoolId });
+    log.info(`Database query successful`, { total, page, limit });
 
     const response = {
       data: leaveRequests,
@@ -639,7 +612,7 @@ export async function getLeaveRequestsOfTeacherForModeratorService(
       totalPages: Math.ceil(total / limit),
     };
 
-    await setCache(cacheKey, response, CACHE_TTL.SCHOOL_APPLICATIONS_LIST);
+    await setCache(cacheKey, response, CACHE_TTL.ADMISSION_APPLICATIONS_LIST);
     log.info(`Leave requests cached successfully`, { cacheKey });
 
     await createSystemLog({
@@ -648,7 +621,7 @@ export async function getLeaveRequestsOfTeacherForModeratorService(
       message: "Fetched all teacher leave requests for admin",
       context,
       statusCode,
-      metadata: { schoolId, adminId, filters },
+      metadata: { adminId, filters },
     });
 
     log.info(`Fetched teacher leave requests successfully`, { adminId, total });
@@ -658,7 +631,6 @@ export async function getLeaveRequestsOfTeacherForModeratorService(
     log.error(`Internal Server Error. Failed to fetch teacher leave requests`, {
       error: err.message,
       ipAddress: context.ipAddress,
-      schoolId,
       adminId,
     });
     throw err;
@@ -666,7 +638,6 @@ export async function getLeaveRequestsOfTeacherForModeratorService(
 }
 
 export async function reviewLeaveRequestOfTeacherForModeratorService(
-  schoolId: string,
   leaveId: string,
   reviewerId: string,
   context: AuditContext,
@@ -678,7 +649,6 @@ export async function reviewLeaveRequestOfTeacherForModeratorService(
       `Starting service to review teacher leave request for leave id ${leaveId}`,
       {
         ipAddress: context.ipAddress,
-        schoolId,
         reviewerId,
       },
     );
@@ -687,13 +657,11 @@ export async function reviewLeaveRequestOfTeacherForModeratorService(
       where: {
         id: leaveId,
         requesterRole: "TEACHER",
-        teacher: { user: { schoolId } },
       },
     });
     if (!appliedLeave) {
       log.warn(`Teacher leave request not found with id ${leaveId}`, {
         leaveId,
-        schoolId,
       });
       throw new Error(`Leave request not found`);
     }
@@ -745,7 +713,6 @@ export async function reviewLeaveRequestOfTeacherForModeratorService(
       context,
       statusCode,
       metadata: {
-        schoolId,
         reviewerId,
         leaveId,
         status: data.status,
@@ -753,7 +720,6 @@ export async function reviewLeaveRequestOfTeacherForModeratorService(
     });
 
     await createAuditLog({
-      schoolId,
       performedById: reviewerId,
       action: "UPDATE",
       module: "LeaveRequestModule",
@@ -781,7 +747,6 @@ export async function reviewLeaveRequestOfTeacherForModeratorService(
     log.error("Internal Server Error. Failed to review teacher leave request", {
       error: err.message,
       ipAddress: context.ipAddress,
-      schoolId,
       leaveId,
       reviewerId,
     });
@@ -790,7 +755,6 @@ export async function reviewLeaveRequestOfTeacherForModeratorService(
 }
 
 export async function applyLeaveRequestByModeratorService(
-  schoolId: string,
   requesterId: string,
   role: Role,
   context: AuditContext,
@@ -802,12 +766,11 @@ export async function applyLeaveRequestByModeratorService(
       `Starting service to apply leaves for moderator with id ${requesterId}`,
       {
         ipAddress: context.ipAddress,
-        schoolId,
       },
     );
 
     const moderatorExists = await prisma.admin.findFirst({
-      where: { userId: requesterId, user: { schoolId } },
+      where: { userId: requesterId },
     });
     if (!moderatorExists) {
       log.warn(`Moderator profile not found for user ${requesterId}`);
@@ -876,7 +839,6 @@ export async function applyLeaveRequestByModeratorService(
       context,
       statusCode,
       metadata: {
-        schoolId,
         requesterId,
         role,
         moderatorId: moderatorExists.id,
@@ -884,7 +846,6 @@ export async function applyLeaveRequestByModeratorService(
     });
 
     await createAuditLog({
-      schoolId,
       performedById: requesterId,
       action: "CREATE",
       module: "LeaveRequestModule",
@@ -911,7 +872,6 @@ export async function applyLeaveRequestByModeratorService(
     log.error(`Internal Server Error. Failed to apply for leave`, {
       error: err.message,
       ipAddress: context.ipAddress,
-      schoolId,
       requesterId,
     });
     throw err;
@@ -919,7 +879,6 @@ export async function applyLeaveRequestByModeratorService(
 }
 
 export async function getLeaveRequestsOfModeratorForAdminService(
-  schoolId: string,
   adminId: string,
   context: AuditContext,
   statusCode: number,
@@ -939,12 +898,10 @@ export async function getLeaveRequestsOfModeratorForAdminService(
   try {
     log.info(`Starting service to fetch moderator leave requests for admin`, {
       ipAddress: context.ipAddress,
-      schoolId,
       adminId,
     });
 
     const cacheKey = CACHE_KEYS.moderatorLeaveRequest(
-      schoolId,
       adminId,
       page,
       limit,
@@ -971,7 +928,7 @@ export async function getLeaveRequestsOfModeratorForAdminService(
       requesterId: {
         in: await prisma.user
           .findMany({
-            where: { schoolId, role: "MODERATOR" },
+            where: { role: "MODERATOR" },
             select: { id: true },
           })
           .then((users) => users.map((u) => u.id)),
@@ -990,7 +947,7 @@ export async function getLeaveRequestsOfModeratorForAdminService(
       prisma.leaveRequest.count({ where }),
     ]);
 
-    log.info(`Database query successful`, { total, page, limit, schoolId });
+    log.info(`Database query successful`, { total, page, limit });
 
     const response = {
       data: leaveRequests,
@@ -1000,7 +957,7 @@ export async function getLeaveRequestsOfModeratorForAdminService(
       totalPages: Math.ceil(total / limit),
     };
 
-    await setCache(cacheKey, response, CACHE_TTL.SCHOOL_APPLICATIONS_LIST);
+    await setCache(cacheKey, response, CACHE_TTL.ADMISSION_APPLICATIONS_LIST);
     log.info(`Leave requests cached successfully`, { cacheKey });
 
     await createSystemLog({
@@ -1009,7 +966,7 @@ export async function getLeaveRequestsOfModeratorForAdminService(
       message: "Fetched all moderator leave requests for admin",
       context,
       statusCode,
-      metadata: { schoolId, adminId, filters },
+      metadata: { adminId, filters },
     });
 
     log.info(`Fetched moderator leave requests successfully`, {
@@ -1024,7 +981,6 @@ export async function getLeaveRequestsOfModeratorForAdminService(
       {
         error: err.message,
         ipAddress: context.ipAddress,
-        schoolId,
         adminId,
       },
     );
@@ -1033,7 +989,6 @@ export async function getLeaveRequestsOfModeratorForAdminService(
 }
 
 export async function reviewLeaveRequestOfModeratorForAdminService(
-  schoolId: string,
   leaveId: string,
   reviewerId: string,
   context: AuditContext,
@@ -1045,7 +1000,6 @@ export async function reviewLeaveRequestOfModeratorForAdminService(
       `Starting service to review moderator leave request for leave id ${leaveId}`,
       {
         ipAddress: context.ipAddress,
-        schoolId,
         reviewerId,
       },
     );
@@ -1054,13 +1008,11 @@ export async function reviewLeaveRequestOfModeratorForAdminService(
       where: {
         id: leaveId,
         requesterRole: "MODERATOR",
-        requester: { schoolId },
       },
     });
     if (!appliedLeave) {
       log.warn(`Moderator leave request not found with id ${leaveId}`, {
         leaveId,
-        schoolId,
       });
       throw new Error(`Leave request not found`);
     }
@@ -1112,7 +1064,6 @@ export async function reviewLeaveRequestOfModeratorForAdminService(
       context,
       statusCode,
       metadata: {
-        schoolId,
         reviewerId,
         leaveId,
         status: data.status,
@@ -1120,7 +1071,6 @@ export async function reviewLeaveRequestOfModeratorForAdminService(
     });
 
     await createAuditLog({
-      schoolId,
       performedById: reviewerId,
       action: "UPDATE",
       module: "LeaveRequestModule",
@@ -1150,7 +1100,6 @@ export async function reviewLeaveRequestOfModeratorForAdminService(
       {
         error: err.message,
         ipAddress: context.ipAddress,
-        schoolId,
         leaveId,
         reviewerId,
       },
@@ -1160,7 +1109,6 @@ export async function reviewLeaveRequestOfModeratorForAdminService(
 }
 
 export async function getMyLeaveRequestsService(
-  schoolId: string,
   requesterId: string,
   context: AuditContext,
   statusCode: number,
@@ -1181,13 +1129,11 @@ export async function getMyLeaveRequestsService(
       `Starting service to fetch leave requests for requester ${requesterId}`,
       {
         ipAddress: context.ipAddress,
-        schoolId,
         requesterId,
       },
     );
 
     const cacheKey = CACHE_KEYS.myLeaveRequests(
-      schoolId,
       requesterId,
       page,
       limit,
@@ -1233,7 +1179,7 @@ export async function getMyLeaveRequestsService(
       totalPages: Math.ceil(total / limit),
     };
 
-    await setCache(cacheKey, response, CACHE_TTL.SCHOOL_APPLICATIONS_LIST);
+    await setCache(cacheKey, response, CACHE_TTL.ADMISSION_APPLICATIONS_LIST);
     log.info(`Leave requests cached successfully`, { cacheKey });
 
     await createSystemLog({
@@ -1242,7 +1188,7 @@ export async function getMyLeaveRequestsService(
       message: "Fetched own leave requests successfully",
       context,
       statusCode,
-      metadata: { schoolId, requesterId, filters },
+      metadata: { requesterId, filters },
     });
 
     log.info(`Fetched own leave requests successfully`, { requesterId, total });
@@ -1252,7 +1198,6 @@ export async function getMyLeaveRequestsService(
     log.error(`Internal Server Error. Failed to fetch own leave requests`, {
       error: err.message,
       ipAddress: context.ipAddress,
-      schoolId,
       requesterId,
     });
     throw err;

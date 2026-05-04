@@ -2,7 +2,7 @@ export interface User {
   id: string;
   schoolId: string;
   regNumber: string;
-  role: "SUPER_ADMIN" | "ADMIN" | "STUDENT" | "TEACHER" | "PARENT";
+  role: "ADMIN" | "STUDENT" | "TEACHER" | "PARENT";
   email: string;
   phone: string;
   isActive: boolean;
@@ -19,110 +19,64 @@ export interface LoginFormData {
   password: string;
 }
 
-export interface SchoolApplicationInput {
-  schoolName: string;
+export interface AdmissionApplicationInput {
+  firstName: string;
+  lastName: string;
+  gender: string;
+  dateOfBirth: string;
   address: string;
   city: string;
   state: string;
-  country: string;
   pincode: string;
-  phone: string;
-  email: string;
-  website?: string;
-  establishedYear: number;
-  affiliationNumber?: string;
-  boardType: string;
-  adminFirstName: string;
-  adminLastName: string;
-  adminEmail: string;
-  adminPhone: string;
-  adminGender: Gender;
-  documents?: { documentType: DocumentType; title: string }[];
-}
-
-export interface SchoolApplication {
-  id: string;
-  schoolName: string;
-  address: string;
-  city: string;
-  state: string;
-  country: string;
-  pincode: string;
-  phone: string;
-  email: string;
-  website?: string | null;
-  establishedYear: number;
-  affiliationNumber?: string | null;
-  boardType: string;
-  adminFirstName: string;
-  adminLastName: string;
-  adminEmail: string;
-  adminPhone: string;
-  adminGender: "MALE" | "FEMALE" | "OTHER";
-  status: "PENDING" | "APPROVED" | "REJECTED" | "MORE_INFO_REQUIRED";
-  appliedAt: string;
-  reviewedAt: string | null;
-  reviewedBy: string | null;
-  rejectionReason: string | null;
-  notes: string | null;
-  moreInfoFields: string[];
-  createdAt: string;
-  updatedAt: string;
+  previousSchool?: string;
+  previousClass?: string;
+  appliedForClass: string;
+  guardianFirstName: string;
+  guardianLastName: string;
+  guardianPhone: string;
+  guardianRelation: ParentType;
+  guardianEmail?: string;
   documents?: ApplicationDocument[];
 }
 
-export interface PaginatedApplications {
-  data: SchoolApplication[];
-  total: number;
-  page: number;
-  limit: number;
-  totalPages: number;
-}
-
-export interface ResubmitSchoolApplication {
-  website?: string;
-  affiliationNumber?: string;
-  phone?: string;
-  address?: string;
-  pincode?: string;
-  adminPhone?: string;
-  documents?: File[];
-  schoolName?: string;
-  city?: string;
-  state?: string;
-  country?: string;
-  moreInfoFields: string[];
-}
-
-export interface SchoolApplicationStatus {
-  status: "PENDING" | "APPROVED" | "REJECTED" | "MORE_INFO_REQUIRED";
-}
-
-export interface School {
+export interface AdmissionApplication {
   id: string;
-  name: string;
-  code: string;
-  addres: string;
+  firstName: string;
+  lastName: string;
+  gender: string;
+  dateOfBirth: string;
+  address: string;
   city: string;
   state: string;
-  country: string;
   pincode: string;
-  phone: string;
-  email: string;
-  website: string | null;
-  logoUrl: string | null;
-  establishedYear: string;
-  affiliationNumber: string | null;
-  boardType: string;
-  isActive: boolean;
-  createdAt: string;
-  updatedAt: string;
+  previousSchool?: string;
+  previousClass?: string;
+  appliedForClass: string;
+  guardianFirstName: string;
+  guardianLastName: string;
+  guardianPhone: string;
+  guardianRelation: ParentType;
+  guardianEmail?: string;
+  documents?: ApplicationDocument[];
+}
+
+export interface ResubmitAdmissionApplicationInput {
+  previousSchool?: string;
+  previousClass?: string;
+  guardianEmail?: string;
+  documents?: ApplicationDocument[];
 }
 
 export enum Gender {
   MALE = "MALE",
   FEMALE = "FEMALE",
   OTHER = "OTHER",
+}
+
+export enum ParentType {
+  FATHER = "FATHER",
+  MOTHER = "MOTHER",
+  GUARDIAN = "GUARDIAN",
 }
 
 export enum DocumentType {
@@ -141,6 +95,21 @@ export enum DocumentType {
   OTHER = "OTHER",
 }
 
+export interface PaginatedAdmissionApplications {
+  data: AdmissionApplicationInput[];
+  total: number;
+  page: number;
+  limit: number;
+  totalPages: number;
+}
+
+export enum AdmissionStatus {
+  PENDING = "PENDING",
+  APPROVED = "APPROVED",
+  REJECTED = "REJECTED",
+  WAITLISTED = "WAITLISTED",
+}
+
 export interface ApplicationDocument {
   id: string;
   title: string;
@@ -152,4 +121,58 @@ export interface ApplicationDocument {
   createdAt: string;
 }
 
-export type SchoolApplicationStatusValue = SchoolApplicationStatus["status"];
+export interface StudentUser {
+  id: string;
+  regNumber: string;
+  email: string | null;
+  phone: string | null;
+  role: "ADMIN" | "STUDENT" | "TEACHER" | "PARENT";
+  isActive: boolean;
+  isVerified: boolean;
+  createdAt: string;
+}
+
+export interface StudentParent {
+  id: string;
+  userId: string;
+  studentId: string;
+  firstName: string;
+  lastName: string;
+  parentType: ParentType;
+  alternatePhone: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface StudentEnrollment {
+  id: string;
+  classId: string;
+  academicYearId: string;
+  rollNumber: string | null;
+  status: AdmissionStatus;
+  enrolledAt: string;
+}
+
+export interface StudentWithDetails {
+  id: string;
+  userId: string;
+  admissionId: string | null;
+  firstName: string;
+  lastName: string;
+  gender: Gender;
+  dateOfBirth: string;
+  address: string;
+  city: string;
+  state: string;
+  pincode: string;
+  bloodGroup: string | null;
+  medicalConditions: string | null;
+  emergencyContact: string | null;
+  enrollmentStatus: AdmissionStatus;
+  admissionDate: string;
+  createdAt: string;
+  updatedAt: string;
+  user: StudentUser;
+  parent: StudentParent | null;
+  enrollments: StudentEnrollment[];
+}

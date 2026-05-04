@@ -8,8 +8,10 @@ import AnimatedInput from "@/components/smoothui/animated-input";
 import { motion } from "motion/react";
 import Image from "next/image";
 import { LoginFormValue, loginSchema } from "@/validations/validations";
+import { useTranslations } from "@/hooks/useTranslations";
 
 const LoginPage = () => {
+  const t = useTranslations("login");
   const { mutate: login, isPending } = useLogin();
   const {
     handleSubmit,
@@ -65,10 +67,10 @@ const LoginPage = () => {
             <div className="flex items-start justify-between">
               <div>
                 <div className="text-white/30 text-xs font-manrope uppercase tracking-widest mb-1">
-                  Platform Preview
+                  {t("platformPreview")}
                 </div>
                 <div className="text-white text-lg font-bold font-jakarta">
-                  School Dashboard
+                  {t("schoolDashboard")}
                 </div>
               </div>
               <div className="flex gap-1.5">
@@ -83,20 +85,30 @@ const LoginPage = () => {
               <div className="grid grid-cols-3 gap-3">
                 {[
                   {
-                    label: "Students",
+                    labelKey: "students",
                     value: "12,840",
                     delta: "+4.2%",
                     up: true,
                   },
-                  { label: "Schools", value: "340", delta: "+12%", up: true },
-                  { label: "Staff", value: "2,910", delta: "+1.8%", up: true },
+                  {
+                    labelKey: "schools",
+                    value: "340",
+                    delta: "+12%",
+                    up: true,
+                  },
+                  {
+                    labelKey: "staff",
+                    value: "2,910",
+                    delta: "+1.8%",
+                    up: true,
+                  },
                 ].map((s) => (
                   <div
-                    key={s.label}
+                    key={s.labelKey}
                     className="bg-white/5 border border-white/10 rounded-2xl p-3.5 backdrop-blur-sm"
                   >
                     <div className="text-white/40 text-xs font-manrope mb-1.5">
-                      {s.label}
+                      {t(s.labelKey as Parameters<typeof t>[0])}
                     </div>
                     <div className="text-white text-lg font-bold font-jakarta leading-none mb-1">
                       {s.value}
@@ -104,7 +116,7 @@ const LoginPage = () => {
                     <div
                       className={`text-xs font-manrope ${s.up ? "text-emerald-400" : "text-red-400"}`}
                     >
-                      {s.delta} this month
+                      {s.delta} {t("thisMonth")}
                     </div>
                   </div>
                 ))}
@@ -112,10 +124,10 @@ const LoginPage = () => {
               <div className="bg-white/5 border border-white/10 rounded-2xl p-4 backdrop-blur-sm">
                 <div className="flex items-center justify-between mb-3">
                   <span className="text-white/40 text-xs font-manrope uppercase tracking-wider">
-                    Attendance Rate · Today
+                    {t("attendanceRate")}
                   </span>
                   <span className="text-emerald-400 text-xs font-manrope font-medium">
-                    Live
+                    {t("live")}
                   </span>
                 </div>
                 <div className="flex items-end gap-1 h-10">
@@ -142,37 +154,37 @@ const LoginPage = () => {
                     91.4%
                   </span>
                   <span className="text-white/30 text-xs font-manrope">
-                    Across 340 schools
+                    {t("acrossSchools")}
                   </span>
                 </div>
               </div>
               <div className="grid grid-cols-2 gap-3">
                 {[
                   {
-                    label: "Fee Collection",
+                    labelKey: "feeCollection",
                     value: "₹4.2Cr",
-                    sub: "This month",
+                    subKey: "thisMonth",
                     color: "from-indigo-500/20 to-indigo-600/5",
                   },
                   {
-                    label: "Avg. Performance",
+                    labelKey: "avgPerformance",
                     value: "78.3%",
-                    sub: "Board exams 2025",
+                    subKey: "boardExams",
                     color: "from-sky-500/20 to-sky-600/5",
                   },
                 ].map((c) => (
                   <div
-                    key={c.label}
+                    key={c.labelKey}
                     className={`bg-linear-to-br ${c.color} border border-white/10 rounded-2xl p-3.5 backdrop-blur-sm`}
                   >
                     <div className="text-white/40 text-xs font-manrope mb-1">
-                      {c.label}
+                      {t(c.labelKey as Parameters<typeof t>[0])}
                     </div>
                     <div className="text-white text-xl font-bold font-jakarta">
                       {c.value}
                     </div>
                     <div className="text-white/30 text-xs font-manrope mt-0.5">
-                      {c.sub}
+                      {t(c.subKey as Parameters<typeof t>[0])}
                     </div>
                   </div>
                 ))}
@@ -186,26 +198,24 @@ const LoginPage = () => {
 
         {/* Bottom Footer */}
         <div className="absolute bottom-6 right-6 hidden xl:flex flex-col gap-2">
-          {[
-            "Springfield Academy",
-            "Greenwood High",
-            "Sunrise Public School",
-          ].map((name, i) => (
+          {(["springfield", "greenwood", "sunrise"] as const).map((key, i) => (
             <motion.div
-              key={name}
+              key={key}
               initial={{ opacity: 0, x: 20 }}
               animate={{ opacity: 1, x: 0 }}
               transition={{ delay: 0.8 + i * 0.12, duration: 0.5 }}
               className="flex items-center gap-2.5 bg-white/5 border border-white/10 rounded-full px-3 py-1.5 backdrop-blur-sm"
             >
               <div className="w-4 h-4 rounded-full bg-indigo-500/40 border border-indigo-400/30 shrink-0" />
-              <span className="text-white/50 text-xs font-manrope">{name}</span>
+              <span className="text-white/50 text-xs font-manrope">
+                {t(key)}
+              </span>
             </motion.div>
           ))}
         </div>
       </div>
 
-      {/* Form Section*/}
+      {/* Form Section */}
       <motion.div
         initial={{ opacity: 0, y: 32 }}
         animate={{ opacity: 1, y: 0 }}
@@ -218,37 +228,40 @@ const LoginPage = () => {
             <div className="absolute inset-x-0 bottom-0 h-px bg-linear-to-r from-transparent via-white/5 to-transparent" />
           </div>
           <div className="mb-8">
-            <div className="flex items-center gap-3 mb-8">
-              <div className="w-9 h-9 rounded-xl bg-indigo-500/20 border border-indigo-400/30 flex items-center justify-center shrink-0">
-                <Image
-                  src="/logo.png"
-                  alt="EduSphere Logo"
-                  width={24}
-                  height={24}
-                  className="object-contain"
-                />
-              </div>
-              <div>
-                <span className="text-white text-sm font-bold font-jakarta tracking-tight block leading-none">
-                  EduSphere
-                </span>
-                <span className="text-white/30 text-xs font-manrope">
-                  School Management SaaS
-                </span>
+            {/* Logo row + toggle */}
+            <div className="flex items-center justify-between mb-8">
+              <div className="flex items-center gap-3">
+                <div className="w-9 h-9 rounded-xl bg-indigo-500/20 border border-indigo-400/30 flex items-center justify-center shrink-0">
+                  <Image
+                    src="/logo.png"
+                    alt="EduSphere Logo"
+                    width={24}
+                    height={24}
+                    className="object-contain"
+                  />
+                </div>
+                <div>
+                  <span className="text-white text-sm font-bold font-jakarta tracking-tight block leading-none">
+                    EduSphere
+                  </span>
+                  <span className="text-white/30 text-xs font-manrope">
+                    {t("saasTagline")}
+                  </span>
+                </div>
               </div>
             </div>
             <h1 className="text-2xl sm:text-3xl font-extrabold font-jakarta text-white leading-tight mb-1.5">
-              Sign in to your portal
+              {t("signIn")}
             </h1>
             <p className="text-sm text-white/40 font-manrope">
-              Access your school&apos;s management dashboard
+              {t("signInSub")}
             </p>
           </div>
 
           <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
             <div className="space-y-1.5">
               <AnimatedInput
-                label="Email or Registration Number"
+                label={t("emailOrReg")}
                 icon={<User className="h-4 w-4 text-indigo-400" />}
                 value={identifierValue}
                 onChange={(val) =>
@@ -269,7 +282,7 @@ const LoginPage = () => {
             </div>
             <div className="space-y-1.5">
               <AnimatedInput
-                label="Password"
+                label={t("password")}
                 icon={<Lock className="h-4 w-4 text-indigo-400" />}
                 type="password"
                 value={passwordValue}
@@ -294,7 +307,7 @@ const LoginPage = () => {
                 href="#"
                 className="text-xs text-indigo-400 font-manrope hover:text-indigo-300 transition-colors"
               >
-                Forgot password?
+                {t("forgotPassword")}
               </a>
             </div>
             <Button
@@ -323,11 +336,11 @@ const LoginPage = () => {
                       d="M4 12a8 8 0 018-8v8H4z"
                     />
                   </svg>
-                  Signing in...
+                  {t("signingIn")}
                 </span>
               ) : (
                 <span className="flex items-center gap-2">
-                  Sign In
+                  {t("signInBtn")}
                   <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-1" />
                 </span>
               )}
@@ -336,30 +349,30 @@ const LoginPage = () => {
 
           <div className="mt-6 pt-6 border-t border-white/6">
             <p className="text-center text-xs text-white/30 font-manrope">
-              Need access?{" "}
+              {t("needAccess")}{" "}
               <a
                 href="#"
                 className="text-indigo-400 hover:text-indigo-300 transition-colors font-medium"
               >
-                Contact your administrator
+                {t("contactAdmin")}
               </a>
             </p>
           </div>
           <div className="mt-5 flex items-center justify-center gap-1.5">
-            {["Springfield Academy", "Greenwood High", "+338 more"].map(
-              (name, i) => (
+            {(["trustedBy1", "trustedBy2", "trustedBy3"] as const).map(
+              (key, i) => (
                 <span
                   key={i}
                   className="text-[10px] text-white/20 font-manrope px-2 py-0.5 rounded-full border border-white/6 bg-white/2"
                 >
-                  {name}
+                  {t(key)}
                 </span>
               ),
             )}
           </div>
         </div>
         <p className="text-center text-[11px] text-white/20 font-manrope mt-5">
-          © 2025 EduSphere · Trusted by 340+ schools across India
+          {t("footer")}
         </p>
       </motion.div>
     </div>

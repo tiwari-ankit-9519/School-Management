@@ -14,7 +14,6 @@ export async function getAllTeachers(
   req: AuthenticatedRequest,
   res: Response,
 ): Promise<void> {
-  const schoolId = req.user?.schoolId;
   const status = req.query.status as EmploymentStatus | undefined;
   const gender = req.query.gender as Gender | undefined;
   const city = req.query.city as string | undefined;
@@ -23,10 +22,6 @@ export async function getAllTeachers(
   const experience = req.query.experience
     ? parseInt(req.query.experience as string)
     : undefined;
-
-  if (!schoolId) {
-    throw new Error("School ID is required");
-  }
 
   const filters = {
     status,
@@ -44,7 +39,6 @@ export async function getAllTeachers(
   res.status(HTTP_STATUS.OK);
 
   const allTeachers = await getAllTeachersService(
-    schoolId,
     page,
     limit,
     auditContext,
@@ -54,7 +48,7 @@ export async function getAllTeachers(
 
   res.json({
     success: true,
-    message: `All teachers fetched for school with id ${schoolId}`,
+    message: `All teachers fetched for school`,
     data: allTeachers,
   });
 }
@@ -63,11 +57,7 @@ export async function getSingleTeacher(
   req: AuthenticatedRequest,
   res: Response,
 ): Promise<void> {
-  const schoolId = req.user?.schoolId;
-  const teacherId = req.params.id as string;
-  if (!schoolId) {
-    throw new Error("School ID is required");
-  }
+  const teacherId = req.params.teacherId as string;
   if (!teacherId) {
     throw new Error("Teacher ID is required");
   }
@@ -77,7 +67,6 @@ export async function getSingleTeacher(
   res.status(HTTP_STATUS.OK);
 
   const teacher = await getSingleTeacherService(
-    schoolId,
     teacherId,
     auditContext,
     res.statusCode,
@@ -85,7 +74,7 @@ export async function getSingleTeacher(
 
   res.json({
     success: true,
-    message: `Fetched teacher with id ${teacherId} for school ${schoolId}`,
+    message: `Fetched teacher with id ${teacherId}`,
     data: teacher,
   });
 }

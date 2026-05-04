@@ -10,7 +10,6 @@ import { CACHE_KEYS, CACHE_TTL, getCache, setCache } from "../utils/cache.util";
 const log = createModuleLogger("ExamScheduleModule");
 
 export async function createExamScheduleService(
-  schoolId: string,
   moderatorId: string,
   classId: string,
   data: ExamScheduleInput,
@@ -22,13 +21,12 @@ export async function createExamScheduleService(
       `Starting service to create exam schedule for class with id ${classId}`,
       {
         ipAddress: context.ipAddress,
-        schoolId,
         moderatorId,
       },
     );
 
     const classExists = await prisma.class.findUnique({
-      where: { id: classId, schoolId },
+      where: { id: classId },
     });
     if (!classExists) {
       log.warn(`Class not found with id ${classId}`);
@@ -44,7 +42,7 @@ export async function createExamScheduleService(
     }
 
     const isHoliday = await prisma.holiday.findFirst({
-      where: { schoolId, date: new Date(data.date) },
+      where: { date: new Date(data.date) },
     });
     if (isHoliday) {
       log.warn(`Cannot schedule exam on holiday: ${isHoliday.name}`);
@@ -54,13 +52,13 @@ export async function createExamScheduleService(
     }
 
     const academicYear = await prisma.academicYear.findFirst({
-      where: { schoolId, isCurrent: true },
+      where: { isCurrent: true },
       select: { id: true },
     });
 
     const subjectIds = data.entries.map((entry) => entry.subjectId);
     const subjectCount = await prisma.subject.count({
-      where: { schoolId, id: { in: subjectIds } },
+      where: { id: { in: subjectIds } },
     });
     if (subjectCount !== subjectIds.length) {
       log.warn(`One or more subjects do not exist`);
@@ -73,7 +71,6 @@ export async function createExamScheduleService(
     const teacherCount = await prisma.teacher.count({
       where: {
         id: { in: teacherIds },
-        user: { schoolId },
       },
     });
     if (teacherCount !== teacherIds.length) {
@@ -155,14 +152,12 @@ export async function createExamScheduleService(
       context,
       statusCode,
       metadata: {
-        schoolId,
         classId,
         moderatorId,
       },
     });
 
     await createAuditLog({
-      schoolId,
       context,
       module: "ExamScheduleModule",
       statusCode,
@@ -186,7 +181,6 @@ export async function createExamScheduleService(
     log.error(`Internal Server Error. Failed to create exam schedule`, {
       error: err.message,
       ipAddress: context.ipAddress,
-      schoolId,
       moderatorId,
       classId,
     });
@@ -195,7 +189,6 @@ export async function createExamScheduleService(
 }
 
 export async function getExamScheduleForAdminService(
-  schoolId: string,
   moderatorId: string,
   filters: {
     classId?: string;
@@ -222,7 +215,6 @@ export async function getExamScheduleForAdminService(
   try {
     log.info(`Starting service to fetch exam schedule`, {
       ipAddress: context.ipAddress,
-      schoolId,
       moderatorId,
     });
 
@@ -230,7 +222,6 @@ export async function getExamScheduleForAdminService(
     const sortOrder = filters?.sortOrder ?? "asc";
 
     const cacheKey = CACHE_KEYS.allExamSchedule(
-      schoolId,
       moderatorId,
       filters?.classId || "ALL",
       filters?.academicYearId || "ALL",
@@ -258,7 +249,7 @@ export async function getExamScheduleForAdminService(
       return cached;
     }
 
-    const where: Prisma.ExamScheduleWhereInput = { schoolId };
+    const where: Prisma.ExamScheduleWhereInput = {};
     if (filters?.academicYearId) where.academicYearId = filters.academicYearId;
     if (filters?.classId) where.classId = filters.classId;
     if (filters?.examType) where.examType = filters.examType;
@@ -291,7 +282,7 @@ export async function getExamScheduleForAdminService(
     };
 
     log.info(`Fetched exam schedule`);
-    await setCache(cacheKey, response, CACHE_TTL.SCHOOL_APPLICATIONS_LIST);
+    await setCache(cacheKey, response, CACHE_TTL.ADMISSION_APPLICATIONS_LIST);
 
     await createSystemLog({
       level: "INFO",
@@ -300,7 +291,6 @@ export async function getExamScheduleForAdminService(
       context,
       statusCode,
       metadata: {
-        schoolId,
         moderatorId,
         filters,
       },
@@ -312,7 +302,6 @@ export async function getExamScheduleForAdminService(
     log.error(`Internal Server Error. Failed to fetch the exam schedule`, {
       ipAddress: context.ipAddress,
       error: err.message,
-      schoolId,
       moderatorId,
     });
     throw err;
@@ -320,7 +309,6 @@ export async function getExamScheduleForAdminService(
 }
 
 export async function getExamScheduleForTeacherService(
-  schoolId: string,
   teacherId: string,
   context: AuditContext,
   statusCode: number,
@@ -345,7 +333,6 @@ export async function getExamScheduleForTeacherService(
   try {
     log.info(`Starting service to fetch exam schedule for teacher`, {
       ipAddress: context.ipAddress,
-      schoolId,
       teacherId,
     });
 
@@ -353,7 +340,6 @@ export async function getExamScheduleForTeacherService(
     const sortOrder = filters?.sortOrder ?? "asc";
 
     const cacheKey = CACHE_KEYS.teacherExamSchedule(
-      schoolId,
       teacherId,
       filters?.classId || "ALL",
       filters?.examType || "ALL",
@@ -379,12 +365,11 @@ export async function getExamScheduleForTeacherService(
       return cached;
     }
     const activeAcademicYear = await prisma.academicYear.findFirst({
-      where: { schoolId, isCurrent: true },
+      where: { isCurrent: true },
       select: { id: true },
     });
 
     const where: Prisma.ExamScheduleWhereInput = {
-      schoolId,
       teacherId,
       academicYearId: activeAcademicYear!.id,
     };
@@ -419,7 +404,7 @@ export async function getExamScheduleForTeacherService(
     };
 
     log.info(`Fetched exam schedule for teacher`);
-    await setCache(cacheKey, response, CACHE_TTL.SCHOOL_APPLICATIONS_LIST);
+    await setCache(cacheKey, response, CACHE_TTL.ADMISSION_APPLICATIONS_LIST);
 
     await createSystemLog({
       level: "INFO",
@@ -428,7 +413,6 @@ export async function getExamScheduleForTeacherService(
       context,
       statusCode,
       metadata: {
-        schoolId,
         teacherId,
         filters,
       },
@@ -442,7 +426,6 @@ export async function getExamScheduleForTeacherService(
       {
         error: err.message,
         ipAddress: context.ipAddress,
-        schoolId,
         teacherId,
       },
     );
@@ -451,7 +434,6 @@ export async function getExamScheduleForTeacherService(
 }
 
 export async function getExamScheduleForStudentService(
-  schoolId: string,
   studentId: string,
   context: AuditContext,
   statusCode: number,
@@ -474,7 +456,6 @@ export async function getExamScheduleForStudentService(
   try {
     log.info(`Starting service to fetch exam schedule for student`, {
       ipAddress: context.ipAddress,
-      schoolId,
       studentId,
     });
 
@@ -482,7 +463,6 @@ export async function getExamScheduleForStudentService(
     const sortOrder = filters?.sortOrder ?? "asc";
 
     const cacheKey = CACHE_KEYS.studentExamSchedule(
-      schoolId,
       studentId,
       filters?.examType || "ALL",
       filters?.fromDate || "ALL",
@@ -505,12 +485,11 @@ export async function getExamScheduleForStudentService(
     }
 
     const activeAcademicYear = await prisma.academicYear.findFirst({
-      where: { schoolId, isCurrent: true },
+      where: { isCurrent: true },
       select: { id: true },
     });
 
     const where: Prisma.ExamScheduleWhereInput = {
-      schoolId,
       academicYearId: activeAcademicYear!.id,
       class: { enrollments: { some: { studentId } } },
     };
@@ -550,7 +529,7 @@ export async function getExamScheduleForStudentService(
     };
 
     log.info(`Fetched exam schedule for student`);
-    await setCache(cacheKey, response, CACHE_TTL.SCHOOL_APPLICATIONS_LIST);
+    await setCache(cacheKey, response, CACHE_TTL.ADMISSION_APPLICATIONS_LIST);
 
     await createSystemLog({
       level: "INFO",
@@ -559,7 +538,6 @@ export async function getExamScheduleForStudentService(
       context,
       statusCode,
       metadata: {
-        schoolId,
         studentId,
         filters,
       },
@@ -573,7 +551,6 @@ export async function getExamScheduleForStudentService(
       {
         error: err.message,
         ipAddress: context.ipAddress,
-        schoolId,
         studentId,
       },
     );

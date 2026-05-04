@@ -10,13 +10,11 @@ const log = createModuleLogger("AcademicYearService");
 export async function createAcademicYearService(
   data: AcademicYearInput,
   adminId: string,
-  schoolId: string,
   context: AuditContext,
   statusCode: number,
 ): Promise<AcademicYear> {
   try {
     log.info("Starting academic year creation service", {
-      schoolId,
       ipAddress: context.ipAddress,
       academicYearName: data.name,
       academicStartDate: data.startDate,
@@ -26,7 +24,6 @@ export async function createAcademicYearService(
     const academicYearExists = await prisma.academicYear.findFirst({
       where: {
         name: data.name,
-        schoolId,
       },
     });
 
@@ -41,7 +38,6 @@ export async function createAcademicYearService(
       if (data.isCurrent) {
         await tx.academicYear.updateMany({
           where: {
-            schoolId,
             isCurrent: true,
           },
           data: {
@@ -56,7 +52,6 @@ export async function createAcademicYearService(
           startDate: data.startDate,
           endDate: data.endDate,
           isCurrent: data.isCurrent,
-          schoolId,
         },
       });
 
@@ -69,7 +64,6 @@ export async function createAcademicYearService(
       module: "AcademicYear",
       context,
       metadata: {
-        schoolId,
         newAcademicYearName: result.newAcademicYear.name,
         newAcademicYearStartDate: result.newAcademicYear.startDate,
         newAcademicYearEndDate: result.newAcademicYear.endDate,
@@ -78,14 +72,12 @@ export async function createAcademicYearService(
     });
 
     await createAuditLog({
-      schoolId,
       performedById: adminId,
       action: "CREATE",
       module: "AcademicYear",
       resourceId: result.newAcademicYear.id,
       resourceType: "AcademicYear",
       newValues: {
-        schoolId,
         newAcademicYearName: result.newAcademicYear.name,
         newAcademicYearStartDate: result.newAcademicYear.startDate,
         newAcademicYearEndDate: result.newAcademicYear.endDate,
@@ -105,7 +97,6 @@ export async function createAcademicYearService(
     log.error("Failed to create academic year", {
       error: err.message,
       ipAddress: context.ipAddress,
-      schoolId,
     });
     throw err;
   }

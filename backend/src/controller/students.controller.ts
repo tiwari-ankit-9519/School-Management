@@ -14,7 +14,6 @@ export async function getAllStudentsList(
   req: AuthenticatedRequest,
   res: Response,
 ): Promise<void> {
-  const schoolId = req.user?.schoolId;
   const moderatorId = req.user?.id;
   const auditContext = buildAuditContext(req);
   const page = parseInt(req.query.page as string) || 1;
@@ -31,15 +30,11 @@ export async function getAllStudentsList(
     gender,
   };
 
-  if (!schoolId) {
-    throw new Error("School ID is required");
-  }
   if (!moderatorId) {
     throw new Error("Moderator ID is required");
   }
   res.status(HTTP_STATUS.OK);
   const allStudents = await getAllStudentsListService(
-    schoolId,
     moderatorId,
     auditContext,
     res.statusCode,
@@ -59,15 +54,11 @@ export async function getSingleStudentDetail(
   req: AuthenticatedRequest,
   res: Response,
 ): Promise<void> {
-  const studentId = req.params.id as string;
-  const schoolId = req.user?.schoolId;
+  const studentId = req.params.studentId as string;
   const academicYearId = req.query.academicYearId as string | undefined;
 
   if (!studentId) {
     throw new Error("Student ID is required");
-  }
-  if (!schoolId) {
-    throw new Error("School ID is required");
   }
 
   const filters = {
@@ -80,7 +71,6 @@ export async function getSingleStudentDetail(
 
   const studentDetail = await getSingleStudentDetailService(
     studentId,
-    schoolId,
     auditContext,
     res.statusCode,
     filters,

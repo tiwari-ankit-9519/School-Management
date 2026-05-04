@@ -24,7 +24,7 @@ router.post(
 );
 
 router.post(
-  "/:id/assign-teacher",
+  "/:subjectId/assign-teacher",
   authenticate,
   authorize("ADMIN", "MODERATOR"),
   checkPermission(Module.TEACHER_SUBJECT, "canCreate"),
@@ -32,7 +32,7 @@ router.post(
 );
 
 router.delete(
-  "/:id/unassign-teacher",
+  "/:subjectId/unassign-teacher",
   authenticate,
   authorize("ADMIN", "MODERATOR"),
   checkPermission(Module.TEACHER_SUBJECT, "canDelete"),

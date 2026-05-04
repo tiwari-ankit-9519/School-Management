@@ -10,7 +10,6 @@ import { CreateHolidayInput } from "../validations/input.validations";
 const log = createModuleLogger("HolidayModule");
 
 export async function createHolidayService(
-  schoolId: string,
   moderatorId: string,
   data: CreateHolidayInput,
   context: AuditContext,
@@ -19,7 +18,6 @@ export async function createHolidayService(
   try {
     log.info("Starting service to create holiday", {
       ipAddress: context.ipAddress,
-      schoolId,
       moderatorId,
     });
 
@@ -28,7 +26,6 @@ export async function createHolidayService(
     if (isSunday(holidayDate)) {
       log.warn(`Cannot create holiday on Sunday as it is already a day off`, {
         date: data.date,
-        schoolId,
       });
       throw new Error(
         `Cannot create holiday on Sunday as it is already a day off`,
@@ -37,21 +34,16 @@ export async function createHolidayService(
 
     log.info(`Sunday check passed, checking if date is already a holiday`, {
       date: data.date,
-      schoolId,
     });
 
     const existingHoliday = await prisma.holiday.findUnique({
       where: {
-        schoolId_date: {
-          schoolId,
-          date: holidayDate,
-        },
+        date: holidayDate,
       },
     });
     if (existingHoliday) {
       log.warn(`Date ${data.date} is already marked as a holiday`, {
         date: data.date,
-        schoolId,
         existingHoliday: existingHoliday.name,
       });
       throw new Error(
@@ -61,13 +53,11 @@ export async function createHolidayService(
 
     log.info(`All checks passed, creating holiday`, {
       date: data.date,
-      schoolId,
     });
 
     const newHoliday = await prisma.holiday.create({
       data: {
         name: data.name,
-        schoolId,
         date: holidayDate,
       },
     });
@@ -75,7 +65,6 @@ export async function createHolidayService(
     log.info(`Holiday created successfully`, {
       holidayId: newHoliday.id,
       date: data.date,
-      schoolId,
     });
 
     await createSystemLog({
@@ -85,7 +74,6 @@ export async function createHolidayService(
       context,
       statusCode,
       metadata: {
-        schoolId,
         moderatorId,
         holidayId: newHoliday.id,
         date: data.date,
@@ -93,7 +81,6 @@ export async function createHolidayService(
     });
 
     await createAuditLog({
-      schoolId,
       performedById: moderatorId,
       action: "CREATE",
       module: "HolidayModule",
@@ -111,7 +98,6 @@ export async function createHolidayService(
 
     log.info(`Create holiday service completed successfully`, {
       holidayId: newHoliday.id,
-      schoolId,
     });
     return newHoliday;
   } catch (error) {
@@ -119,7 +105,6 @@ export async function createHolidayService(
     log.error("Internal Server Error. Failed to create holiday", {
       error: err.message,
       ipAddress: context.ipAddress,
-      schoolId,
       moderatorId,
       date: data.date,
     });
@@ -128,7 +113,6 @@ export async function createHolidayService(
 }
 
 export async function getAllHolidaysService(
-  schoolId: string,
   moderatorId: string,
   context: AuditContext,
   statusCode: number,
@@ -148,12 +132,10 @@ export async function getAllHolidaysService(
   try {
     log.info("Starting service to fetch all holidays", {
       ipAddress: context.ipAddress,
-      schoolId,
       moderatorId,
     });
 
     const cacheKey = CACHE_KEYS.allHolidays(
-      schoolId,
       page,
       limit,
       filters?.month || "ALL",
@@ -172,9 +154,9 @@ export async function getAllHolidaysService(
       return cached;
     }
 
-    log.info(`Cache miss, querying database`, { schoolId, page, limit });
+    log.info(`Cache miss, querying database`, { page, limit });
 
-    const where: Prisma.HolidayWhereInput = { schoolId };
+    const where: Prisma.HolidayWhereInput = {};
 
     if (filters?.month !== undefined && filters?.year !== undefined) {
       const startOfMonth = new Date(filters.year, filters.month - 1, 1);
@@ -201,7 +183,7 @@ export async function getAllHolidaysService(
       prisma.holiday.count({ where }),
     ]);
 
-    log.info(`Database query successful`, { total, page, limit, schoolId });
+    log.info(`Database query successful`, { total, page, limit });
 
     const response = {
       data: holidays,
@@ -211,7 +193,7 @@ export async function getAllHolidaysService(
       totalPages: Math.ceil(total / limit),
     };
 
-    await setCache(cacheKey, response, CACHE_TTL.SCHOOL_APPLICATIONS_LIST);
+    await setCache(cacheKey, response, CACHE_TTL.ADMISSION_APPLICATIONS_LIST);
     log.info(`Holidays cached successfully`, { cacheKey });
 
     await createSystemLog({
@@ -221,20 +203,18 @@ export async function getAllHolidaysService(
       context,
       statusCode,
       metadata: {
-        schoolId,
         moderatorId,
         filters,
       },
     });
 
-    log.info(`Fetched all holidays successfully`, { schoolId, total });
+    log.info(`Fetched all holidays successfully`, { total });
     return response;
   } catch (error) {
     const err = error as Error;
     log.error("Internal Server Error. Failed to fetch holidays", {
       error: err.message,
       ipAddress: context.ipAddress,
-      schoolId,
       moderatorId,
     });
     throw err;
@@ -242,7 +222,6 @@ export async function getAllHolidaysService(
 }
 
 export async function deleteHolidayService(
-  schoolId: string,
   moderatorId: string,
   holidayId: string,
   context: AuditContext,
@@ -251,28 +230,26 @@ export async function deleteHolidayService(
   try {
     log.info(`Starting service to delete holiday with id ${holidayId}`, {
       ipAddress: context.ipAddress,
-      schoolId,
       moderatorId,
     });
 
     const holiday = await prisma.holiday.findUnique({
-      where: { id: holidayId, schoolId },
+      where: { id: holidayId },
     });
     if (!holiday) {
       log.warn(`Holiday not found with id ${holidayId}`, {
         holidayId,
-        schoolId,
       });
       throw new Error(`Holiday not found`);
     }
 
-    log.info(`Holiday found, deleting`, { holidayId, schoolId });
+    log.info(`Holiday found, deleting`, { holidayId });
 
     await prisma.holiday.delete({
       where: { id: holidayId },
     });
 
-    log.info(`Holiday deleted successfully`, { holidayId, schoolId });
+    log.info(`Holiday deleted successfully`, { holidayId });
 
     await createSystemLog({
       level: "INFO",
@@ -281,14 +258,12 @@ export async function deleteHolidayService(
       context,
       statusCode,
       metadata: {
-        schoolId,
         moderatorId,
         holidayId,
       },
     });
 
     await createAuditLog({
-      schoolId,
       performedById: moderatorId,
       action: "DELETE",
       module: "HolidayModule",
@@ -306,14 +281,12 @@ export async function deleteHolidayService(
 
     log.info(`Delete holiday service completed successfully`, {
       holidayId,
-      schoolId,
     });
   } catch (error) {
     const err = error as Error;
     log.error("Internal Server Error. Failed to delete holiday", {
       error: err.message,
       ipAddress: context.ipAddress,
-      schoolId,
       moderatorId,
       holidayId,
     });

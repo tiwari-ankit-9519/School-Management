@@ -31,7 +31,7 @@ router.post(
 );
 
 router.get(
-  "/:id/all-classes",
+  "/:academicYearId/all-classes",
   authenticate,
   authorize("ADMIN", "MODERATOR"),
   checkPermission(Module.CLASS, "canRead"),
@@ -39,7 +39,7 @@ router.get(
 );
 
 router.get(
-  "/:id",
+  "/:classId",
   authenticate,
   authorize("ADMIN", "MODERATOR"),
   checkPermission(Module.CLASS, "canRead"),

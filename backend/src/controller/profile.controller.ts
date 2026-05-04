@@ -11,7 +11,6 @@ import {
   updateTeacherProfileService,
   updateParentProfileService,
   updateAdminProfileService,
-  updateSuperAdminProfileService,
 } from "../services/profile.service";
 
 export async function getMyProfile(
@@ -46,7 +45,6 @@ export async function updateMyProfile(
   res: Response,
 ): Promise<void> {
   const userId = req.user?.id;
-  const schoolId = req.user?.schoolId;
   const role = req.user?.role as Role;
 
   if (!userId) throw new Error("User ID is required");
@@ -57,8 +55,6 @@ export async function updateMyProfile(
 
   switch (role) {
     case Role.STUDENT: {
-      if (!schoolId) throw new Error("School ID is required");
-
       const {
         email,
         phone,
@@ -72,7 +68,6 @@ export async function updateMyProfile(
       } = req.body;
 
       const updated = await updateStudentProfileService(
-        schoolId,
         userId,
         {
           email,
@@ -98,8 +93,6 @@ export async function updateMyProfile(
     }
 
     case Role.TEACHER: {
-      if (!schoolId) throw new Error("School ID is required");
-
       const {
         email,
         phone,
@@ -114,7 +107,6 @@ export async function updateMyProfile(
       } = req.body;
 
       const updated = await updateTeacherProfileService(
-        schoolId,
         userId,
         {
           email,
@@ -141,12 +133,9 @@ export async function updateMyProfile(
     }
 
     case Role.PARENT: {
-      if (!schoolId) throw new Error("School ID is required");
-
       const { email, phone, alternatePhone } = req.body;
 
       const updated = await updateParentProfileService(
-        schoolId,
         userId,
         { email, phone, alternatePhone },
         auditContext,
@@ -163,32 +152,11 @@ export async function updateMyProfile(
 
     case Role.ADMIN:
     case Role.MODERATOR: {
-      if (!schoolId) throw new Error("School ID is required");
-
       const { email, phone, designation, department, photoUrl } = req.body;
 
       const updated = await updateAdminProfileService(
-        schoolId,
         userId,
         { email, phone, designation, department, photoUrl },
-        auditContext,
-        res.statusCode,
-      );
-
-      res.json({
-        success: true,
-        message: "Profile updated successfully",
-        data: updated,
-      });
-      break;
-    }
-
-    case Role.SUPER_ADMIN: {
-      const { email, phone, photoUrl } = req.body;
-
-      const updated = await updateSuperAdminProfileService(
-        userId,
-        { email, phone, photoUrl },
         auditContext,
         res.statusCode,
       );

@@ -31,18 +31,13 @@ export async function createTimeTable(
     return;
   }
 
-  const schoolId = req.user?.schoolId;
   const moderatorId = req.user?.id;
-  if (!schoolId) {
-    throw new Error("School ID is required");
-  }
   if (!moderatorId) {
     throw new Error("Moderator ID is required");
   }
   res.status(HTTP_STATUS.CREATED);
   const newTimetable = await createTimeTableService(
     parsed.data,
-    schoolId,
     moderatorId,
     auditContext,
     res.statusCode,
@@ -62,21 +57,16 @@ export async function getTimeTableForClass(
   const page = parseInt(req.query.page as string) || 1;
   const limit = parseInt(req.query.limit as string) || 10;
   const auditContext = buildAuditContext(req);
-  const classId = req.params.id as string;
-  const schoolId = req.user?.schoolId;
+  const classId = req.params.classId as string;
   const dayOfWeek = req.query.dayOfWeek as DayOfWeek | undefined;
   if (!classId) {
     throw new Error("Class ID is required");
-  }
-  if (!schoolId) {
-    throw new Error("School ID is required");
   }
 
   res.status(HTTP_STATUS.OK);
 
   const allTimeTable = await getTimeTableForClassService(
     classId,
-    schoolId,
     page,
     limit,
     auditContext,
@@ -95,13 +85,9 @@ export async function updatedTimeTable(
   req: AuthenticatedRequest,
   res: Response,
 ): Promise<void> {
-  const timeTableId = req.params.id as string;
+  const timeTableId = req.params.timeTableId as string;
   const moderatorId = req.user?.id;
-  const schoolId = req.user?.schoolId;
   const auditContext = buildAuditContext(req);
-  if (!schoolId) {
-    throw new Error("School ID is required");
-  }
   if (!moderatorId) {
     throw new Error("Moderator ID is required");
   }
@@ -123,7 +109,6 @@ export async function updatedTimeTable(
     moderatorId,
     auditContext,
     res.statusCode,
-    schoolId,
   );
 
   res.json({
@@ -138,12 +123,8 @@ export async function swapTimeTableForClass(
   res: Response,
 ): Promise<void> {
   const { timetableId1, timetableId2 } = req.body;
-  const schoolId = req.user?.schoolId;
   const moderatorId = req.user?.id;
   const auditContext = buildAuditContext(req);
-  if (!schoolId) {
-    throw new Error("School ID is required");
-  }
   if (!moderatorId) {
     throw new Error("Moderator ID is required");
   }
@@ -154,7 +135,6 @@ export async function swapTimeTableForClass(
     timetableId1,
     timetableId2,
     moderatorId,
-    schoolId,
     auditContext,
     res.statusCode,
   );

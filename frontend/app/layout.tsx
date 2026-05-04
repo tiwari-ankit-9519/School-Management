@@ -5,6 +5,7 @@ import { Toaster } from "sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { LayoutShell } from "@/components/layout-shell";
 import "./globals.css";
+import { LocaleProvider } from "@/lib/locale-context";
 
 export const manrope = Manrope({
   subsets: ["latin"],
@@ -25,9 +26,7 @@ export const metadata: Metadata = {
 
 export default function RootLayout({
   children,
-}: Readonly<{
-  children: React.ReactNode;
-}>) {
+}: Readonly<{ children: React.ReactNode }>) {
   return (
     <html
       lang="en"
@@ -35,12 +34,14 @@ export default function RootLayout({
       className={`${manrope.variable} ${jakarta.variable}`}
     >
       <body className="bg-[#050810] antialiased font-manrope">
-        <QueryProvider>
-          <TooltipProvider>
-            <LayoutShell>{children}</LayoutShell>
-            <Toaster position="top-right" richColors />
-          </TooltipProvider>
-        </QueryProvider>
+        <LocaleProvider>
+          <QueryProvider>
+            <TooltipProvider>
+              <LayoutShell>{children}</LayoutShell>
+              <Toaster position="top-right" richColors />
+            </TooltipProvider>
+          </QueryProvider>
+        </LocaleProvider>
       </body>
     </html>
   );

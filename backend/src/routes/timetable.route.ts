@@ -23,7 +23,7 @@ router.post(
 );
 
 router.patch(
-  "/:id/update",
+  "/:timeTableId/update",
   authenticate,
   authorize("ADMIN", "MODERATOR"),
   checkPermission(Module.TIMETABLE, "canUpdate"),
@@ -39,7 +39,7 @@ router.patch(
 );
 
 router.get(
-  "/:id/time-table",
+  "/:classId/time-table",
   authenticate,
   authorize("ADMIN", "MODERATOR"),
   checkPermission(Module.TIMETABLE, "canRead"),

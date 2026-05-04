@@ -16,7 +16,6 @@ import { MarksInput, UpdateMarkInput } from "../validations/input.validations";
 const log = createModuleLogger("MarksModule");
 
 export async function gradeExamService(
-  schoolId: string,
   teacherId: string,
   subjectCode: string,
   data: MarksInput,
@@ -25,16 +24,12 @@ export async function gradeExamService(
 ): Promise<void> {
   try {
     log.info(`Starting service to grade exam with id ${subjectCode}`, {
-      schoolId,
       ipAddress: context.ipAddress,
     });
 
     const subjectExists = await prisma.subject.findUnique({
       where: {
-        schoolId_code: {
-          schoolId,
-          code: subjectCode,
-        },
+        code: subjectCode,
       },
     });
     if (!subjectExists) {
@@ -57,7 +52,6 @@ export async function gradeExamService(
       where: {
         id: data.examScheduleId,
         subjectId: subjectExists.id,
-        schoolId,
       },
     });
     if (!examSchedule) {
@@ -117,7 +111,6 @@ export async function gradeExamService(
       context,
       statusCode,
       metadata: {
-        schoolId,
         teacherId: subjectAssignedTo.teacherId,
         subjectId: subjectExists.id,
         examScheduleId: data.examScheduleId,
@@ -125,7 +118,6 @@ export async function gradeExamService(
     });
 
     await createAuditLog({
-      schoolId,
       performedById: teacherId,
       action: "CREATE",
       resourceId: result.grade[0]?.id || data.examScheduleId,
@@ -142,7 +134,6 @@ export async function gradeExamService(
     log.error("Internal Server Error. Failed to grade exam", {
       error: err.message,
       ipAddress: context.ipAddress,
-      schoolId,
       subjectCode,
     });
     throw err;
@@ -150,7 +141,6 @@ export async function gradeExamService(
 }
 
 export async function getMarksForAdminService(
-  schoolId: string,
   moderatorId: string,
   subjectId: string,
   context: AuditContext,
@@ -173,17 +163,15 @@ export async function getMarksForAdminService(
   try {
     log.info(`Starting service to fetch grade or marks`, {
       ipAddress: context.ipAddress,
-      schoolId,
       moderatorId,
     });
 
     const subjectExists = await prisma.subject.findFirst({
-      where: { id: subjectId, schoolId },
+      where: { id: subjectId },
     });
     if (!subjectExists) throw new Error(`Subject not found`);
 
     const cacheKey = CACHE_KEYS.markForAdmin(
-      schoolId,
       moderatorId,
       subjectId,
       filters?.studentId || "ALL",
@@ -206,7 +194,7 @@ export async function getMarksForAdminService(
     }
 
     const where: Prisma.MarkWhereInput = {
-      subject: { id: subjectId, schoolId },
+      subject: { id: subjectId },
     };
     if (filters?.studentId) where.studentId = filters.studentId;
     if (filters?.examScheduleId) where.examScheduleId = filters.examScheduleId;
@@ -231,14 +219,14 @@ export async function getMarksForAdminService(
       totalPages: Math.ceil(total / limit),
     };
 
-    await setCache(cacheKey, response, CACHE_TTL.SCHOOL_APPLICATIONS_LIST);
+    await setCache(cacheKey, response, CACHE_TTL.ADMISSION_APPLICATIONS_LIST);
     await createSystemLog({
       level: "INFO",
       module: "GetMarksForAdmin",
       message: "Fetched marks for admin",
       context,
       statusCode,
-      metadata: { schoolId, moderatorId, filters },
+      metadata: { moderatorId, filters },
     });
 
     log.info(`Fetched marks for admin`);
@@ -248,7 +236,6 @@ export async function getMarksForAdminService(
     log.error(`Internal Server Error. Failed to fetch grades or marks`, {
       error: err.message,
       ipAddress: context.ipAddress,
-      schoolId,
       moderatorId,
     });
     throw err;
@@ -256,7 +243,6 @@ export async function getMarksForAdminService(
 }
 
 export async function getMarksForTeacherService(
-  schoolId: string,
   teacherId: string,
   subjectId: string,
   context: AuditContext,
@@ -279,7 +265,6 @@ export async function getMarksForTeacherService(
   try {
     log.info(`Starting service to fetch marks for teachers`, {
       ipAddress: context.ipAddress,
-      schoolId,
       teacherId,
     });
 
@@ -295,7 +280,6 @@ export async function getMarksForTeacherService(
     }
 
     const cacheKey = CACHE_KEYS.markForTeacher(
-      schoolId,
       teacherId,
       subjectId,
       filters?.studentId || "ALL",
@@ -319,7 +303,7 @@ export async function getMarksForTeacherService(
     }
 
     const where: Prisma.MarkWhereInput = {
-      subject: { id: subjectId, schoolId },
+      subject: { id: subjectId },
     };
     if (filters?.studentId) where.studentId = filters.studentId;
     if (filters?.examScheduleId) where.examScheduleId = filters.examScheduleId;
@@ -344,14 +328,14 @@ export async function getMarksForTeacherService(
       totalPages: Math.ceil(total / limit),
     };
 
-    await setCache(cacheKey, response, CACHE_TTL.SCHOOL_APPLICATIONS_LIST);
+    await setCache(cacheKey, response, CACHE_TTL.ADMISSION_APPLICATIONS_LIST);
     await createSystemLog({
       level: "INFO",
       module: "GetMarksForTeacher",
       message: "Fetched marks for teacher",
       context,
       statusCode,
-      metadata: { schoolId, teacherId, filters },
+      metadata: { teacherId, filters },
     });
 
     log.info(`Fetched marks for teacher`);
@@ -361,7 +345,6 @@ export async function getMarksForTeacherService(
     log.error(`Internal Server Error. Failed to fetch marks for teacher`, {
       error: err.message,
       ipAddress: context.ipAddress,
-      schoolId,
       teacherId,
     });
     throw err;
@@ -369,7 +352,6 @@ export async function getMarksForTeacherService(
 }
 
 export async function getMarksForStudentService(
-  schoolId: string,
   studentId: string,
   subjectId: string,
   context: AuditContext,
@@ -391,7 +373,6 @@ export async function getMarksForStudentService(
   try {
     log.info(`Starting service to fetch marks for student`, {
       ipAddress: context.ipAddress,
-      schoolId,
       studentId,
     });
 
@@ -400,7 +381,6 @@ export async function getMarksForStudentService(
     });
     if (!studentExists) {
       log.warn(`Student not found with userId ${studentId}`, {
-        schoolId,
         studentId,
       });
       throw new Error(`Student not found`);
@@ -409,23 +389,18 @@ export async function getMarksForStudentService(
     log.info(`Student found, validating subject`, { studentId, subjectId });
 
     const subjectExists = await prisma.subject.findFirst({
-      where: { id: subjectId, schoolId },
+      where: { id: subjectId },
     });
     if (!subjectExists) {
-      log.warn(
-        `Subject not found with id ${subjectId} for school ${schoolId}`,
-        {
-          schoolId,
-          subjectId,
-        },
-      );
+      log.warn(`Subject not found with id ${subjectId}`, {
+        subjectId,
+      });
       throw new Error(`Subject not found`);
     }
 
-    log.info(`Subject validated, checking cache`, { subjectId, schoolId });
+    log.info(`Subject validated, checking cache`, { subjectId });
 
     const cacheKey = CACHE_KEYS.markForStudent(
-      schoolId,
       studentId,
       subjectId,
       filters?.examScheduleId || "ALL",
@@ -456,7 +431,7 @@ export async function getMarksForStudentService(
 
     const where: Prisma.MarkWhereInput = {
       studentId: studentExists.id,
-      subject: { id: subjectId, schoolId },
+      subject: { id: subjectId },
     };
     if (filters?.examScheduleId) where.examScheduleId = filters.examScheduleId;
     if (filters?.grade) where.grade = filters.grade;
@@ -488,7 +463,7 @@ export async function getMarksForStudentService(
       totalPages: Math.ceil(total / limit),
     };
 
-    await setCache(cacheKey, response, CACHE_TTL.SCHOOL_APPLICATIONS_LIST);
+    await setCache(cacheKey, response, CACHE_TTL.ADMISSION_APPLICATIONS_LIST);
     log.info(`Marks cached successfully`, { cacheKey });
 
     await createSystemLog({
@@ -497,7 +472,7 @@ export async function getMarksForStudentService(
       message: "Fetched marks for student",
       context,
       statusCode,
-      metadata: { schoolId, studentId, subjectId, filters },
+      metadata: { studentId, subjectId, filters },
     });
 
     log.info(`Fetched marks for student successfully`, {
@@ -511,7 +486,6 @@ export async function getMarksForStudentService(
     log.error(`Internal Server Error. Failed to fetch marks for student`, {
       error: err.message,
       ipAddress: context.ipAddress,
-      schoolId,
       studentId,
       subjectId,
     });
@@ -520,7 +494,6 @@ export async function getMarksForStudentService(
 }
 
 export async function updateMarkService(
-  schoolId: string,
   teacherId: string,
   markId: string,
   data: UpdateMarkInput,
@@ -529,7 +502,6 @@ export async function updateMarkService(
 ): Promise<void> {
   try {
     log.info(`Starting service to update mark with id ${markId}`, {
-      schoolId,
       teacherId,
       ipAddress: context.ipAddress,
     });
@@ -539,7 +511,7 @@ export async function updateMarkService(
       include: { examSchedule: true },
     });
     if (!markExists) {
-      log.warn(`Mark not found with id ${markId}`, { markId, schoolId });
+      log.warn(`Mark not found with id ${markId}`, { markId });
       throw new Error(`Mark not found`);
     }
 
@@ -608,13 +580,10 @@ export async function updateMarkService(
     });
 
     await Promise.all([
-      deleteCache(CACHE_PATTERNS.markForAdmin(schoolId, updatedMark.subjectId)),
-      deleteCache(
-        CACHE_PATTERNS.markForTeacher(schoolId, updatedMark.subjectId),
-      ),
+      deleteCache(CACHE_PATTERNS.markForAdmin(updatedMark.subjectId)),
+      deleteCache(CACHE_PATTERNS.markForTeacher(updatedMark.subjectId)),
       deleteCache(
         CACHE_PATTERNS.markForStudent(
-          schoolId,
           updatedMark.studentId,
           updatedMark.subjectId,
         ),
@@ -630,7 +599,6 @@ export async function updateMarkService(
       context,
       statusCode,
       metadata: {
-        schoolId,
         teacherId: subjectAssignedTo.teacherId,
         markId,
         subjectId: markExists.subjectId,
@@ -639,7 +607,6 @@ export async function updateMarkService(
     });
 
     await createAuditLog({
-      schoolId,
       performedById: teacherId,
       action: "UPDATE",
       resourceId: updatedMark.id,
@@ -666,7 +633,6 @@ export async function updateMarkService(
     log.error(`Internal Server Error. Failed to update mark`, {
       error: err.message,
       ipAddress: context.ipAddress,
-      schoolId,
       teacherId,
       markId,
     });

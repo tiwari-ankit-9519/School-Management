@@ -10,28 +10,14 @@ const router: Router = Router();
 router.get(
   "/me",
   authenticate,
-  authorize(
-    "SUPER_ADMIN",
-    "ADMIN",
-    "MODERATOR",
-    "TEACHER",
-    "STUDENT",
-    "PARENT",
-  ),
+  authorize("ADMIN", "MODERATOR", "TEACHER", "STUDENT", "PARENT"),
   getMyProfile,
 );
 
 router.patch(
   "/me",
   authenticate,
-  authorize(
-    "SUPER_ADMIN",
-    "ADMIN",
-    "MODERATOR",
-    "TEACHER",
-    "STUDENT",
-    "PARENT",
-  ),
+  authorize("ADMIN", "MODERATOR", "TEACHER", "STUDENT", "PARENT"),
   updateMyProfile,
 );
 

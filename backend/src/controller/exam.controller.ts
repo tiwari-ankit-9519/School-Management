@@ -17,7 +17,6 @@ export async function createExamSchedule(
   req: AuthenticatedRequest,
   res: Response,
 ): Promise<void> {
-  const schoolId = req.user?.schoolId;
   const moderatorId = req.user?.id;
   const classId = req.params.classId as string;
   const parsed = ExamScheduleSchema.safeParse(req.body);
@@ -30,9 +29,6 @@ export async function createExamSchedule(
     return;
   }
 
-  if (!schoolId) {
-    throw new Error("School ID is required");
-  }
   if (!moderatorId) {
     throw new Error("Modeator ID is required");
   }
@@ -44,7 +40,6 @@ export async function createExamSchedule(
 
   res.status(HTTP_STATUS.OK);
   const examSchdeule = await createExamScheduleService(
-    schoolId,
     moderatorId,
     classId,
     parsed.data,
@@ -63,11 +58,7 @@ export async function getExamScheduleForAdmin(
   req: AuthenticatedRequest,
   res: Response,
 ): Promise<void> {
-  const schoolId = req.user?.schoolId;
   const moderatorId = req.user?.id;
-  if (!schoolId) {
-    throw new Error("School ID is required");
-  }
   if (!moderatorId) {
     throw new Error("Moderator ID is required");
   }
@@ -100,7 +91,6 @@ export async function getExamScheduleForAdmin(
   const auditContext = buildAuditContext(req);
 
   const adminExamSchedule = await getExamScheduleForAdminService(
-    schoolId,
     moderatorId,
     filters,
     auditContext,
@@ -120,11 +110,7 @@ export async function getExamScheduleForTeacher(
   req: AuthenticatedRequest,
   res: Response,
 ): Promise<void> {
-  const schoolId = req.user?.schoolId;
   const teacherId = req.user?.id;
-  if (!schoolId) {
-    throw new Error("School ID is required");
-  }
   if (!teacherId) {
     throw new Error("Teacher ID is required");
   }
@@ -152,7 +138,6 @@ export async function getExamScheduleForTeacher(
   res.status(HTTP_STATUS.OK);
 
   const teacherExamSchedule = await getExamScheduleForTeacherService(
-    schoolId,
     teacherId,
     auditContext,
     res.statusCode,
@@ -172,14 +157,10 @@ export async function getExamScheduleForStudent(
   req: AuthenticatedRequest,
   res: Response,
 ): Promise<void> {
-  const schoolId = req.user?.schoolId;
   const studentId = req.user?.id;
   const auditContext = buildAuditContext(req);
   const page = parseInt(req.query.page as string) || 1;
   const limit = parseInt(req.query.limit as string) || 10;
-  if (!schoolId) {
-    throw new Error("School ID is required");
-  }
   if (!studentId) {
     throw new Error("School ID is required");
   }
@@ -201,7 +182,6 @@ export async function getExamScheduleForStudent(
   res.status(HTTP_STATUS.OK);
 
   const studentExamSchedule = await getExamScheduleForStudentService(
-    schoolId,
     studentId,
     auditContext,
     res.statusCode,

@@ -95,7 +95,6 @@ interface RequestContext {
 
 interface AuthenticatedUser {
   id: string;
-  schoolId: string;
   role: string;
   sessionId: string;
 }
@@ -285,7 +284,6 @@ export function requestContextMiddleware(
   req.log = createRequestLogger(
     req.requestId ?? crypto.randomUUID(),
     req.user?.id,
-    req.user?.schoolId,
     req.user?.role,
     req.context?.ip ?? "unknown",
   );
@@ -350,7 +348,7 @@ export function requestLoggerMiddleware(
     const statusCode = res.statusCode;
     const contentLength = res.getHeader("content-length");
 
-    const baseData = `requestId=${req.requestId} category=${category} method=${req.method} path=${req.path} originalUrl=${req.originalUrl} statusCode=${statusCode} duration=${duration}ms userId=${req.user?.id ?? "unauthenticated"} schoolId=${req.user?.schoolId ?? "none"} role=${req.user?.role ?? "none"} ip=${ip} fingerprint=${fingerprint} isBot=${deviceInfo.isBot} isSlow=${isSlow}`;
+    const baseData = `requestId=${req.requestId} category=${category} method=${req.method} path=${req.path} originalUrl=${req.originalUrl} statusCode=${statusCode} duration=${duration}ms userId=${req.user?.id ?? "unauthenticated"} role=${req.user?.role ?? "none"} ip=${ip} fingerprint=${fingerprint} isBot=${deviceInfo.isBot} isSlow=${isSlow}`;
 
     if (isSlow) {
       log.warn(
@@ -376,7 +374,6 @@ export function requestLoggerMiddleware(
         method: req.method,
         path: req.path,
         role: req.user?.role,
-        schoolId: req.user?.schoolId,
         fingerprint,
         isVpnOrProxy,
       });

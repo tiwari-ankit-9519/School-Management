@@ -20,7 +20,6 @@ export async function gradeExam(
   req: AuthenticatedRequest,
   res: Response,
 ): Promise<void> {
-  const schoolId = req.user?.schoolId;
   const teacherId = req.user?.id;
   const subjectId = req.params.subjectId as string;
   const parsed = MarksSchema.safeParse(req.body);
@@ -32,12 +31,10 @@ export async function gradeExam(
     });
     return;
   }
-  if (!schoolId) throw new Error("School ID is required");
   if (!teacherId) throw new Error("Teacher ID is required");
   const auditContext = buildAuditContext(req);
   res.status(HTTP_STATUS.CREATED);
   await gradeExamService(
-    schoolId,
     teacherId,
     subjectId,
     parsed.data,
@@ -54,7 +51,6 @@ export async function updateMark(
   req: AuthenticatedRequest,
   res: Response,
 ): Promise<void> {
-  const schoolId = req.user?.schoolId;
   const teacherId = req.user?.id;
   const markId = req.params.markId as string;
   const parsed = updateMarkSchema.safeParse(req.body);
@@ -66,12 +62,10 @@ export async function updateMark(
     });
     return;
   }
-  if (!schoolId) throw new Error("School ID is required");
   if (!teacherId) throw new Error("Teacher ID is required");
   const auditContext = buildAuditContext(req);
   res.status(HTTP_STATUS.OK);
   await updateMarkService(
-    schoolId,
     teacherId,
     markId,
     parsed.data,
@@ -88,10 +82,8 @@ export async function getMarksForAdmin(
   req: AuthenticatedRequest,
   res: Response,
 ): Promise<void> {
-  const schoolId = req.user?.schoolId;
   const moderatorId = req.user?.id;
   const subjectId = req.params.subjectId as string;
-  if (!schoolId) throw new Error("School ID is required");
   if (!moderatorId) throw new Error("Moderator ID is required");
   const page = parseInt(req.query.page as string) || 1;
   const limit = parseInt(req.query.limit as string) || 10;
@@ -106,7 +98,6 @@ export async function getMarksForAdmin(
   const auditContext = buildAuditContext(req);
   res.status(HTTP_STATUS.OK);
   const adminGrades = await getMarksForAdminService(
-    schoolId,
     moderatorId,
     subjectId,
     auditContext,
@@ -126,10 +117,8 @@ export async function getMarksForTeacher(
   req: AuthenticatedRequest,
   res: Response,
 ): Promise<void> {
-  const schoolId = req.user?.schoolId;
   const teacherId = req.user?.id;
   const subjectId = req.params.subjectId as string;
-  if (!schoolId) throw new Error("School ID is required");
   if (!teacherId) throw new Error("Teacher ID is required");
   const page = parseInt(req.query.page as string) || 1;
   const limit = parseInt(req.query.limit as string) || 10;
@@ -144,7 +133,6 @@ export async function getMarksForTeacher(
   const auditContext = buildAuditContext(req);
   res.status(HTTP_STATUS.OK);
   const teacherGrades = await getMarksForTeacherService(
-    schoolId,
     teacherId,
     subjectId,
     auditContext,
@@ -164,10 +152,8 @@ export async function getMarksForStudent(
   req: AuthenticatedRequest,
   res: Response,
 ): Promise<void> {
-  const schoolId = req.user?.schoolId;
   const studentId = req.user?.id;
   const subjectId = req.params.subjectId as string;
-  if (!schoolId) throw new Error("School ID is required");
   if (!studentId) throw new Error("Student ID is required");
   const page = parseInt(req.query.page as string) || 1;
   const limit = parseInt(req.query.limit as string) || 10;
@@ -181,7 +167,6 @@ export async function getMarksForStudent(
   const auditContext = buildAuditContext(req);
   res.status(HTTP_STATUS.OK);
   const studentGrades = await getMarksForStudentService(
-    schoolId,
     studentId,
     subjectId,
     auditContext,

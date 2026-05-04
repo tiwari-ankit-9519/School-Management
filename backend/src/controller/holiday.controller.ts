@@ -15,11 +15,7 @@ export async function createHoliday(
   req: AuthenticatedRequest,
   res: Response,
 ): Promise<void> {
-  const schoolId = req.user?.schoolId;
   const moderatorId = req.user?.id;
-  if (!schoolId) {
-    throw new Error("School ID is required");
-  }
   if (!moderatorId) {
     throw new Error("Moderator ID is required");
   }
@@ -36,7 +32,6 @@ export async function createHoliday(
   const auditContext = buildAuditContext(req);
   res.status(HTTP_STATUS.CREATED);
   const newHoliday = await createHolidayService(
-    schoolId,
     moderatorId,
     parsed.data,
     auditContext,
@@ -53,7 +48,6 @@ export async function getAllHolidays(
   req: AuthenticatedRequest,
   res: Response,
 ): Promise<void> {
-  const schoolId = req.user?.schoolId;
   const moderatorId = req.user?.id;
   const auditContext = buildAuditContext(req);
   const page = parseInt(req.query.page as string) || 1;
@@ -66,9 +60,6 @@ export async function getAllHolidays(
     year,
   };
 
-  if (!schoolId) {
-    throw new Error("School ID is required");
-  }
   if (!moderatorId) {
     throw new Error("Moderator ID is required");
   }
@@ -76,7 +67,6 @@ export async function getAllHolidays(
   res.status(HTTP_STATUS.OK);
 
   const holidayList = await getAllHolidaysService(
-    schoolId,
     moderatorId,
     auditContext,
     res.statusCode,
@@ -96,13 +86,9 @@ export async function deleteHoliday(
   req: AuthenticatedRequest,
   res: Response,
 ): Promise<void> {
-  const schoolId = req.user?.schoolId;
   const moderatorId = req.user?.id;
   const holidayId = req.query.holidayId as string;
   const auditContext = buildAuditContext(req);
-  if (!schoolId) {
-    throw new Error("School ID is required");
-  }
   if (!moderatorId) {
     throw new Error("Moderator ID is required");
   }
@@ -110,7 +96,6 @@ export async function deleteHoliday(
   res.status(HTTP_STATUS.OK);
 
   await deleteHolidayService(
-    schoolId,
     moderatorId,
     holidayId,
     auditContext,

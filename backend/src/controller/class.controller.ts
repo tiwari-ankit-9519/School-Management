@@ -21,7 +21,6 @@ export async function createClass(
 ): Promise<void> {
   const auditContext = buildAuditContext(req);
   const adminId = req.user?.id;
-  const schoolId = req.user?.schoolId;
   const academicYearId = req.params.academicYearId as string;
 
   const parsed = ClassSchema.safeParse(req.body);
@@ -43,7 +42,7 @@ export async function createClass(
     return;
   }
 
-  if (!adminId || !schoolId) {
+  if (!adminId) {
     res.status(400).json({
       success: false,
       message: "Admin ID or School ID is missing",
@@ -55,7 +54,6 @@ export async function createClass(
 
   const newClass = await createClassService(
     academicYearId,
-    schoolId,
     adminId,
     parsed.data,
     auditContext,
@@ -109,17 +107,12 @@ export async function getAllClasses(
   res: Response,
 ): Promise<void> {
   const auditContext = buildAuditContext(req);
-  const schoolId = req.user?.schoolId;
-  const academicYearId = req.params.id as string;
-  if (!schoolId) {
-    throw new Error("School ID is required");
-  }
+  const academicYearId = req.params.academicYearId as string;
   if (!academicYearId) {
     throw new Error("Academic Year is required");
   }
   res.status(HTTP_STATUS.OK);
   const allClasses = await getAllClassesService(
-    schoolId,
     academicYearId,
     auditContext,
     res.statusCode,
@@ -127,7 +120,7 @@ export async function getAllClasses(
 
   res.json({
     success: true,
-    message: `Fetched all classes for school with schoolId ${schoolId} for academicYear ${academicYearId}`,
+    message: `Fetched all classes for school for academicYear ${academicYearId}`,
     data: allClasses,
   });
 }
@@ -136,19 +129,14 @@ export async function getSingleClass(
   req: AuthenticatedRequest,
   res: Response,
 ): Promise<void> {
-  const schoolId = req.user?.schoolId;
-  const classId = req.params.id as string;
+  const classId = req.params.classId as string;
   const auditContext = buildAuditContext(req);
-  if (!schoolId) {
-    throw new Error("School ID is required");
-  }
   if (!classId) {
     throw new Error("School ID is required");
   }
   res.status(HTTP_STATUS.OK);
 
   const fetchedClass = await getSingleClassService(
-    schoolId,
     classId,
     auditContext,
     res.statusCode,

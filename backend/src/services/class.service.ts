@@ -12,7 +12,6 @@ const log = createModuleLogger("ClassService");
 
 export async function createClassService(
   academicYearId: string,
-  schoolId: string,
   adminId: string,
   data: ClassInput,
   context: AuditContext,
@@ -25,13 +24,11 @@ export async function createClassService(
       capacity: data.capacity,
       academicYearId,
       adminId,
-      schoolId,
     });
 
     const academicYear = await prisma.academicYear.findFirst({
       where: {
         id: academicYearId,
-        schoolId,
       },
     });
 
@@ -46,7 +43,6 @@ export async function createClassService(
       where: {
         name: data.name,
         section: data.section,
-        schoolId,
         academicYearId,
       },
     });
@@ -65,7 +61,6 @@ export async function createClassService(
         capacity: data.capacity,
         roomNumber: data.roomNumber,
         academicYearId,
-        schoolId,
       },
     });
 
@@ -81,19 +76,16 @@ export async function createClassService(
         capacity: data.capacity,
         academicYearId,
         adminId,
-        schoolId,
       },
     });
 
     await createAuditLog({
-      schoolId,
       performedById: adminId,
       action: "CREATE",
       module: "Class",
       resourceId: newClass.id,
       resourceType: "ClassService",
       newValues: {
-        schoolId,
         className: newClass.name,
         classId: newClass.id,
         studentCapacity: newClass.capacity,
@@ -204,38 +196,35 @@ export async function assignClassTeacherService(
 }
 
 export async function getAllClassesService(
-  schoolId: string,
   academicYearId: string,
   context: AuditContext,
   statusCode: number,
 ): Promise<Class[]> {
   try {
     log.info(
-      `Getting all classes for school with schoolId ${schoolId} for academicYear ${academicYearId}`,
+      `Getting all classes for school for academicYear ${academicYearId}`,
     );
 
     const classes = await prisma.class.findMany({
       where: {
-        schoolId,
         academicYearId,
       },
     });
 
     if (classes.length === 0) {
       log.warn(
-        `No classes found for school ${schoolId} for academicYear ${academicYearId}`,
+        `No classes found for school for academicYear ${academicYearId}`,
       );
       throw new Error(
-        `No classes found for school ${schoolId} for academicYear ${academicYearId}`,
+        `No classes found for school for academicYear ${academicYearId}`,
       );
     }
 
     await createSystemLog({
       level: "INFO",
       module: "Class",
-      message: `Fetched all classes for school ${schoolId} for academicYear ${academicYearId}`,
+      message: `Fetched all classes for school for academicYear ${academicYearId}`,
       metadata: {
-        schoolId,
         academicYearId,
         totalClass: classes.length,
       },
@@ -249,7 +238,6 @@ export async function getAllClassesService(
     log.error(`Failed to get all classes`, {
       error: err.message,
       ipAddress: context.ipAddress,
-      schoolId,
       academicYearId,
     });
     throw err;
@@ -257,20 +245,16 @@ export async function getAllClassesService(
 }
 
 export async function getSingleClassService(
-  schoolId: string,
   classId: string,
   context: AuditContext,
   statusCode: number,
 ): Promise<Class> {
   try {
-    log.info(
-      `Starting service to fetch class with id ${classId} for school with schoolId ${schoolId}`,
-    );
+    log.info(`Starting service to fetch class with id ${classId} for school`);
 
     const classExists = await prisma.class.findUnique({
       where: {
         id: classId,
-        schoolId,
       },
     });
 
@@ -287,7 +271,6 @@ export async function getSingleClassService(
       message: "Class Fetched successfully",
       context,
       metadata: {
-        schoolId,
         classId,
       },
       statusCode,
@@ -299,7 +282,6 @@ export async function getSingleClassService(
     log.error(`Failed to fetch class with classId ${classId}`, {
       error: err.message,
       ipAddress: context.ipAddress,
-      schoolId,
     });
     throw err;
   }

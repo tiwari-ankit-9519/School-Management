@@ -13,13 +13,9 @@ import {
 
 const log = createModuleLogger("ProfileService");
 
-// ─── Input Types ─────────────────────────────────────────────────────────────
-
 export interface UpdateStudentProfileInput {
-  // User table
   email?: string;
   phone?: string;
-  // Student table
   address?: string;
   city?: string;
   state?: string;
@@ -30,10 +26,8 @@ export interface UpdateStudentProfileInput {
 }
 
 export interface UpdateTeacherProfileInput {
-  // User table
   email?: string;
   phone?: string;
-  // Teacher table
   address?: string;
   city?: string;
   state?: string;
@@ -45,32 +39,24 @@ export interface UpdateTeacherProfileInput {
 }
 
 export interface UpdateParentProfileInput {
-  // User table
   email?: string;
   phone?: string;
-  // Parent table
   alternatePhone?: string;
 }
 
 export interface UpdateAdminProfileInput {
-  // User table
   email?: string;
   phone?: string;
-  // Admin table
   designation?: string;
   department?: string;
   photoUrl?: string;
 }
 
 export interface UpdateSuperAdminProfileInput {
-  // User table
   email?: string;
   phone?: string;
-  // SuperAdmin table
   photoUrl?: string;
 }
-
-// ─── Shared: check email uniqueness ──────────────────────────────────────────
 
 async function assertEmailNotTaken(
   email: string,
@@ -85,10 +71,7 @@ async function assertEmailNotTaken(
   }
 }
 
-// ─── Update Student Profile ──────────────────────────────────────────────────
-
 export async function updateStudentProfileService(
-  schoolId: string,
   userId: string,
   data: UpdateStudentProfileInput,
   context: AuditContext,
@@ -97,12 +80,11 @@ export async function updateStudentProfileService(
   try {
     log.info(`Updating student profile for user ${userId}`, {
       ipAddress: context.ipAddress,
-      schoolId,
       userId,
     });
 
     const existing = await prisma.user.findUnique({
-      where: { id: userId, schoolId },
+      where: { id: userId },
       include: { student: true },
     });
 
@@ -162,11 +144,10 @@ export async function updateStudentProfileService(
       message: "Student profile updated successfully",
       context,
       statusCode,
-      metadata: { schoolId, userId },
+      metadata: { userId },
     });
 
     await createAuditLog({
-      schoolId,
       context,
       module: "ProfileService",
       statusCode,
@@ -190,17 +171,13 @@ export async function updateStudentProfileService(
     log.error(`Failed to update student profile`, {
       error: err.message,
       ipAddress: context.ipAddress,
-      schoolId,
       userId,
     });
     throw err;
   }
 }
 
-// ─── Update Teacher Profile ──────────────────────────────────────────────────
-
 export async function updateTeacherProfileService(
-  schoolId: string,
   userId: string,
   data: UpdateTeacherProfileInput,
   context: AuditContext,
@@ -209,12 +186,11 @@ export async function updateTeacherProfileService(
   try {
     log.info(`Updating teacher profile for user ${userId}`, {
       ipAddress: context.ipAddress,
-      schoolId,
       userId,
     });
 
     const existing = await prisma.user.findUnique({
-      where: { id: userId, schoolId },
+      where: { id: userId },
       include: { teacher: true },
     });
 
@@ -277,11 +253,10 @@ export async function updateTeacherProfileService(
       message: "Teacher profile updated successfully",
       context,
       statusCode,
-      metadata: { schoolId, userId },
+      metadata: { userId },
     });
 
     await createAuditLog({
-      schoolId,
       context,
       module: "ProfileService",
       statusCode,
@@ -305,17 +280,13 @@ export async function updateTeacherProfileService(
     log.error(`Failed to update teacher profile`, {
       error: err.message,
       ipAddress: context.ipAddress,
-      schoolId,
       userId,
     });
     throw err;
   }
 }
 
-// ─── Update Parent Profile ───────────────────────────────────────────────────
-
 export async function updateParentProfileService(
-  schoolId: string,
   userId: string,
   data: UpdateParentProfileInput,
   context: AuditContext,
@@ -324,12 +295,11 @@ export async function updateParentProfileService(
   try {
     log.info(`Updating parent profile for user ${userId}`, {
       ipAddress: context.ipAddress,
-      schoolId,
       userId,
     });
 
     const existing = await prisma.user.findUnique({
-      where: { id: userId, schoolId },
+      where: { id: userId },
       include: { parent: true },
     });
 
@@ -371,11 +341,10 @@ export async function updateParentProfileService(
       message: "Parent profile updated successfully",
       context,
       statusCode,
-      metadata: { schoolId, userId },
+      metadata: { userId },
     });
 
     await createAuditLog({
-      schoolId,
       context,
       module: "ProfileService",
       statusCode,
@@ -399,17 +368,13 @@ export async function updateParentProfileService(
     log.error(`Failed to update parent profile`, {
       error: err.message,
       ipAddress: context.ipAddress,
-      schoolId,
       userId,
     });
     throw err;
   }
 }
 
-// ─── Update Admin Profile ────────────────────────────────────────────────────
-
 export async function updateAdminProfileService(
-  schoolId: string,
   userId: string,
   data: UpdateAdminProfileInput,
   context: AuditContext,
@@ -418,12 +383,11 @@ export async function updateAdminProfileService(
   try {
     log.info(`Updating admin profile for user ${userId}`, {
       ipAddress: context.ipAddress,
-      schoolId,
       userId,
     });
 
     const existing = await prisma.user.findUnique({
-      where: { id: userId, schoolId },
+      where: { id: userId },
       include: { admin: true },
     });
 
@@ -477,11 +441,10 @@ export async function updateAdminProfileService(
       message: "Admin profile updated successfully",
       context,
       statusCode,
-      metadata: { schoolId, userId },
+      metadata: { userId },
     });
 
     await createAuditLog({
-      schoolId,
       context,
       module: "ProfileService",
       statusCode,
@@ -505,105 +468,11 @@ export async function updateAdminProfileService(
     log.error(`Failed to update admin profile`, {
       error: err.message,
       ipAddress: context.ipAddress,
-      schoolId,
       userId,
     });
     throw err;
   }
 }
-
-// ─── Update SuperAdmin Profile ───────────────────────────────────────────────
-
-export async function updateSuperAdminProfileService(
-  userId: string,
-  data: UpdateSuperAdminProfileInput,
-  context: AuditContext,
-  statusCode: number,
-) {
-  try {
-    log.info(`Updating super admin profile for user ${userId}`, {
-      ipAddress: context.ipAddress,
-      userId,
-    });
-
-    const existing = await prisma.user.findUnique({
-      where: { id: userId },
-      include: { superAdmin: true },
-    });
-
-    if (!existing || !existing.superAdmin) {
-      throw new Error(`Super admin not found`);
-    }
-
-    if (data.email && data.email !== existing.email) {
-      await assertEmailNotTaken(data.email, userId);
-    }
-
-    const { email, phone, photoUrl } = data;
-
-    const updated = await prisma.$transaction(async (tx) => {
-      const updatedUser = await tx.user.update({
-        where: { id: userId },
-        data: {
-          ...(email !== undefined && { email }),
-          ...(phone !== undefined && { phone }),
-        },
-        select: { id: true, email: true, phone: true, role: true },
-      });
-
-      const updatedSuperAdmin = await tx.superAdmin.update({
-        where: { userId },
-        data: {
-          ...(photoUrl !== undefined && { photoUrl }),
-        },
-      });
-
-      return { user: updatedUser, superAdmin: updatedSuperAdmin };
-    });
-
-    await deleteCache(CACHE_KEYS.userProfile(userId));
-
-    await createSystemLog({
-      level: "INFO",
-      module: "ProfileService",
-      message: "Super admin profile updated successfully",
-      context,
-      statusCode,
-      metadata: { userId },
-    });
-
-    await createAuditLog({
-      schoolId: undefined,
-      context,
-      module: "ProfileService",
-      statusCode,
-      action: "UPDATE",
-      performedById: userId,
-      resourceId: existing.superAdmin.id,
-      resourceType: "SuperAdmin",
-      oldValues: {
-        email: existing.email,
-        phone: existing.phone,
-        superAdmin: existing.superAdmin,
-      },
-      newValues: updated,
-      isSuccessful: true,
-    });
-
-    log.info(`Super admin profile updated for user ${userId}`);
-    return updated;
-  } catch (error) {
-    const err = error as Error;
-    log.error(`Failed to update super admin profile`, {
-      error: err.message,
-      ipAddress: context.ipAddress,
-      userId,
-    });
-    throw err;
-  }
-}
-
-// ─── Get My Profile ──────────────────────────────────────────────────────────
 
 export async function getMyProfileService(
   userId: string,
@@ -630,7 +499,6 @@ export async function getMyProfileService(
       TEACHER: { teacher: true },
       PARENT: { parent: true },
       ADMIN: { admin: true },
-      SUPER_ADMIN: { superAdmin: true },
       MODERATOR: { admin: true },
     };
 
@@ -650,7 +518,6 @@ export async function getMyProfileService(
         teacher: role === Role.TEACHER,
         parent: role === Role.PARENT,
         admin: role === Role.ADMIN || role === Role.MODERATOR,
-        superAdmin: role === Role.SUPER_ADMIN,
       },
     });
 

@@ -13,14 +13,12 @@ const log = createModuleLogger("SubjectSerivce");
 
 export async function createSubjectService(
   adminId: string,
-  schoolId: string,
   data: SubjectInput,
   context: AuditContext,
   statusCode: number,
 ): Promise<Subject> {
   try {
     log.info("Starting subject creation service", {
-      schoolId,
       adminId,
       subjectName: data.name,
       subjectCode: data.code,
@@ -29,10 +27,7 @@ export async function createSubjectService(
 
     const subjectExists = await prisma.subject.findUnique({
       where: {
-        schoolId_code: {
-          schoolId,
-          code: data.code,
-        },
+        code: data.code,
       },
     });
 
@@ -45,7 +40,6 @@ export async function createSubjectService(
 
     const newSubject = await prisma.subject.create({
       data: {
-        schoolId,
         name: data.name,
         code: data.code,
       },
@@ -58,7 +52,6 @@ export async function createSubjectService(
       statusCode,
       message: "Subject created successfully",
       metadata: {
-        schoolId,
         adminId,
         subjectName: data.name,
         subjectCode: data.code,
@@ -67,7 +60,6 @@ export async function createSubjectService(
     });
 
     await createAuditLog({
-      schoolId,
       performedById: adminId,
       action: "CREATE",
       module: "Subject",
@@ -93,7 +85,6 @@ export async function createSubjectService(
     log.error("Failed to create subject", {
       error: err.message,
       ipAddress: context.ipAddress,
-      schoolId,
     });
     throw err;
   }
@@ -101,7 +92,6 @@ export async function createSubjectService(
 
 export async function assignTeacherToSubjectService(
   subjectId: string,
-  schoolId: string,
   data: AssignTeacherToSubjectInput,
   moderatorId: string,
   context: AuditContext,
@@ -112,7 +102,6 @@ export async function assignTeacherToSubjectService(
       `Starting Service to assign teacher to subject with code ${subjectId}`,
       {
         ipAddress: context.ipAddress,
-        schoolId,
       },
     );
 
@@ -149,14 +138,12 @@ export async function assignTeacherToSubjectService(
     });
 
     await createAuditLog({
-      schoolId,
       performedById: moderatorId,
       action: "ASSIGN",
       module: "Subject",
       resourceId: subjectId,
       resourceType: "Teacher being assigned to subject",
       newValues: {
-        schoolId,
         subjectId,
         teacherId: data.teacherId,
         classId: data.classId,
@@ -174,7 +161,6 @@ export async function assignTeacherToSubjectService(
       statusCode,
       metadata: {
         ipAddress: context.ipAddress,
-        schoolId,
         moderatorId,
         classId: data.classId,
         teacherId: data.teacherId,
@@ -185,7 +171,6 @@ export async function assignTeacherToSubjectService(
     log.error(`Failed to assign teacher to subject with code ${subjectId}`, {
       ipAddress: context.ipAddress,
       error: err.message,
-      schoolId,
     });
     throw err;
   }
@@ -193,7 +178,6 @@ export async function assignTeacherToSubjectService(
 
 export async function unassignTeacherFromSubjectService(
   subjectId: string,
-  schoolId: string,
   data: AssignTeacherToSubjectInput,
   moderatorId: string,
   context: AuditContext,
@@ -205,7 +189,6 @@ export async function unassignTeacherFromSubjectService(
       {
         ipAddress: context.ipAddress,
         subjectId,
-        schoolId,
         moderatorId,
       },
     );
@@ -245,14 +228,12 @@ export async function unassignTeacherFromSubjectService(
     });
 
     await createAuditLog({
-      schoolId,
       performedById: moderatorId,
       action: "UNASSIGN",
       module: "Subject",
       resourceId: subjectId,
       resourceType: "Teacher being unassigned from subject",
       newValues: {
-        schoolId,
         subjectId,
         teacherId: data.teacherId,
         classId: data.classId,
@@ -270,7 +251,6 @@ export async function unassignTeacherFromSubjectService(
       statusCode,
       metadata: {
         ipAddress: context.ipAddress,
-        schoolId,
         moderatorId,
         classId: data.classId,
         teacherId: data.teacherId,
@@ -283,7 +263,6 @@ export async function unassignTeacherFromSubjectService(
       {
         ipAddress: context.ipAddress,
         subjectId,
-        schoolId,
         moderatorId,
         error: err.message,
       },
@@ -293,7 +272,6 @@ export async function unassignTeacherFromSubjectService(
 }
 
 export async function getAllSubjectsService(
-  schoolId: string,
   context: AuditContext,
   statusCode: number,
   page: number = 1,
@@ -307,16 +285,15 @@ export async function getAllSubjectsService(
   totalPages: number;
 }> {
   try {
-    log.info(`Fetching all subjects for school with schoolId ${schoolId}`, {
+    log.info(`Fetching all subjects for school`, {
       page,
       limit,
       ipAddress: context.ipAddress,
     });
 
-    const where =
-      isActive !== undefined ? { schoolId, isActive } : { schoolId };
+    const where = isActive !== undefined ? { isActive } : {};
 
-    const cacheKey = CACHE_KEYS.schoolSubjects(schoolId, page, limit);
+    const cacheKey = CACHE_KEYS.subjects(page, limit);
 
     const cached = await getCache<{
       data: Subject[];
@@ -345,7 +322,7 @@ export async function getAllSubjectsService(
 
     await createSystemLog({
       level: "INFO",
-      message: `Fetched all subjects for schoolId ${schoolId}`,
+      message: `Fetched all subjects`,
       module: "GetAllSubjects",
       context,
       metadata: {
@@ -365,7 +342,7 @@ export async function getAllSubjectsService(
       totalPages: Math.ceil(total / limit),
     };
 
-    await setCache(cacheKey, response, CACHE_TTL.SCHOOL_APPLICATIONS_LIST);
+    await setCache(cacheKey, response, CACHE_TTL.ADMISSION_APPLICATIONS_LIST);
 
     log.info("Fetched all school applications successfully", {
       page,
@@ -379,7 +356,6 @@ export async function getAllSubjectsService(
   } catch (error) {
     const err = error as Error;
     log.error("Failed to fetch all subjects", {
-      schoolId,
       ipAddress: context.ipAddress,
       error: err.message,
       page,
@@ -391,20 +367,17 @@ export async function getAllSubjectsService(
 
 export async function getSingleSubjectService(
   subjectId: string,
-  schoolId: string,
   context: AuditContext,
   statusCode: number,
 ): Promise<Subject> {
   try {
     log.info(`Starting service to fetch subject with id ${subjectId}`, {
-      schoolId,
       ipAddress: context.ipAddress,
     });
 
     const subjectExists = await prisma.subject.findUnique({
       where: {
         id: subjectId,
-        schoolId,
       },
       include: {
         teacherSubjects: true,
@@ -423,7 +396,6 @@ export async function getSingleSubjectService(
       context,
       statusCode,
       metadata: {
-        schoolId,
         subjectId,
       },
     });
@@ -437,7 +409,6 @@ export async function getSingleSubjectService(
       {
         error: err.message,
         ipAddress: context.ipAddress,
-        schoolId,
       },
     );
     throw err;

@@ -31,9 +31,8 @@ export async function createSubject(
   }
 
   const auditContext = buildAuditContext(req);
-  const schoolId = req.user?.schoolId;
   const adminId = req.user?.id;
-  if (!schoolId || !adminId) {
+  if (!adminId) {
     throw new Error("School Id or Admin Id is required");
   }
 
@@ -41,7 +40,6 @@ export async function createSubject(
 
   const subject = await createSubjectService(
     adminId,
-    schoolId,
     parsed.data,
     auditContext,
     res.statusCode,
@@ -58,8 +56,7 @@ export async function assignTeacherToSubject(
   req: AuthenticatedRequest,
   res: Response,
 ): Promise<void> {
-  const subjectId = req.params.id as string;
-  const schoolId = req.user?.schoolId;
+  const subjectId = req.params.subjectId as string;
   const moderatorId = req.user?.id;
 
   const parsed = AssignTeacherToSubjectSchema.safeParse(req.body);
@@ -72,9 +69,6 @@ export async function assignTeacherToSubject(
     return;
   }
 
-  if (!schoolId) {
-    throw new Error("School ID is required");
-  }
   if (!moderatorId) {
     throw new Error("Moderator ID is required");
   }
@@ -87,7 +81,6 @@ export async function assignTeacherToSubject(
   res.status(HTTP_STATUS.CREATED);
   await assignTeacherToSubjectService(
     subjectId,
-    schoolId,
     parsed.data,
     moderatorId,
     auditContext,
@@ -104,8 +97,7 @@ export async function unassignTeacherFromSubject(
   req: AuthenticatedRequest,
   res: Response,
 ): Promise<void> {
-  const subjectId = req.params.id as string;
-  const schoolId = req.user?.schoolId;
+  const subjectId = req.params.subjectId as string;
   const moderatorId = req.user?.id;
 
   const parsed = AssignTeacherToSubjectSchema.safeParse(req.body);
@@ -118,9 +110,6 @@ export async function unassignTeacherFromSubject(
     return;
   }
 
-  if (!schoolId) {
-    throw new Error("School ID is required");
-  }
   if (!moderatorId) {
     throw new Error("Moderator ID is required");
   }
@@ -132,7 +121,6 @@ export async function unassignTeacherFromSubject(
 
   await unassignTeacherFromSubjectService(
     subjectId,
-    schoolId,
     parsed.data,
     moderatorId,
     auditContext,
@@ -151,10 +139,6 @@ export async function getAllSubjects(
   req: AuthenticatedRequest,
   res: Response,
 ): Promise<void> {
-  const schoolId = req.user?.schoolId;
-  if (!schoolId) {
-    throw new Error("School ID is required");
-  }
   const page = parseInt(req.query.page as string) || 1;
   const limit = parseInt(req.query.limit as string) || 10;
   const isActive =
@@ -168,7 +152,6 @@ export async function getAllSubjects(
   res.status(HTTP_STATUS.OK);
 
   const allSubjects = await getAllSubjectsService(
-    schoolId,
     auditContext,
     res.statusCode,
     page,
@@ -187,17 +170,12 @@ export async function GetSingleSubject(
   req: AuthenticatedRequest,
   res: Response,
 ): Promise<void> {
-  const schoolId = req.user?.schoolId;
   const auditContext = buildAuditContext(req);
   const subjectId = req.params.subjectId as string;
-  if (!schoolId) {
-    throw new Error("SchoolID is required");
-  }
   res.status(HTTP_STATUS.OK);
 
   const subject = await getSingleSubjectService(
     subjectId,
-    schoolId,
     auditContext,
     res.statusCode,
   );

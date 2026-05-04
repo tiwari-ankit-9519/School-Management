@@ -8,7 +8,6 @@ import { createSystemLog } from "../utils/audit.util";
 const log = createModuleLogger("TeacherService");
 
 export async function getAllTeachersService(
-  schoolId: string,
   page: number = 1,
   limit: number = 10,
   context: AuditContext,
@@ -29,19 +28,14 @@ export async function getAllTeachersService(
   totalPages: number;
 }> {
   try {
-    log.info(
-      `Starting service to fetch all teachers for school with id ${schoolId}`,
-      {
-        ipAddress: context.ipAddress,
-        page,
-        limit,
-        filters,
-      },
-    );
+    log.info(`Starting service to fetch all teachers for school`, {
+      ipAddress: context.ipAddress,
+      page,
+      limit,
+      filters,
+    });
 
-    const where: Prisma.TeacherWhereInput = {
-      user: { schoolId },
-    };
+    const where: Prisma.TeacherWhereInput = {};
 
     if (filters?.status) where.employmentStatus = filters.status;
     if (filters?.gender) where.gender = filters.gender;
@@ -51,7 +45,7 @@ export async function getAllTeachersService(
     if (filters?.experience !== undefined)
       where.experience = { gte: filters.experience };
 
-    const cacheKey = CACHE_KEYS.schoolTeachers(schoolId, page, limit);
+    const cacheKey = CACHE_KEYS.teachers(page, limit);
 
     const cached = await getCache<{
       data: Teacher[];
@@ -81,11 +75,10 @@ export async function getAllTeachersService(
     await createSystemLog({
       level: "INFO",
       module: "GetAllTeachers",
-      message: `Fetched all teachers for school with id ${schoolId}`,
+      message: `Fetched all teachers for school`,
       context,
       statusCode,
       metadata: {
-        schoolId,
         filters,
         page,
         limit,
@@ -100,13 +93,13 @@ export async function getAllTeachersService(
       totalPages: Math.ceil(total / limit),
     };
 
-    await setCache(cacheKey, response, CACHE_TTL.SCHOOL_APPLICATIONS_LIST);
-    log.info(`Fetched all teachers for school with id ${schoolId}`);
+    await setCache(cacheKey, response, CACHE_TTL.ADMISSION_APPLICATIONS_LIST);
+    log.info(`Fetched all teachers for school`);
     return response;
   } catch (error) {
     const err = error as Error;
     log.error(
-      `Internal Server Error. Failed to fetch all teachers for school with id ${schoolId}`,
+      `Internal Server Error. Failed to fetch all teachers for school`,
       {
         error: err.message,
         ipAddress: context.ipAddress,
@@ -120,7 +113,6 @@ export async function getAllTeachersService(
 }
 
 export async function getSingleTeacherService(
-  schoolId: string,
   teacherId: string,
   context: AuditContext,
   statusCode: number,
@@ -128,7 +120,6 @@ export async function getSingleTeacherService(
   try {
     log.info(`Starting service to fetch teacher with id ${teacherId}`, {
       ipAddress: context.ipAddress,
-      schoolId,
     });
 
     const teacherExists = await prisma.teacher.findUnique({
@@ -149,7 +140,6 @@ export async function getSingleTeacherService(
       context,
       statusCode,
       metadata: {
-        schoolId,
         teacherId,
       },
     });
@@ -164,7 +154,6 @@ export async function getSingleTeacherService(
       {
         error: err.message,
         ipAddress: context.ipAddress,
-        schoolId,
       },
     );
     throw err;

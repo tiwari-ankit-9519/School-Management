@@ -33,34 +33,34 @@ router.patch(
 );
 
 router.post(
-  "/:schoolId/teacher/apply",
+  "/teacher/apply",
   upload.array("documents", 5),
   createTeacherApplication,
 );
 
 router.patch(
-  "/teacher/:id/approve",
+  "/teacher/:applicationId/approve",
   authenticate,
   authorize("ADMIN"),
   approveTeacherApplication,
 );
 
 router.patch(
-  "/teacher/:id/shortlist",
+  "/teacher/:applicationId/shortlist",
   authenticate,
   authorize("MODERATOR"),
   shortlistTeacherApplication,
 );
 
 router.patch(
-  "/teacher/:id/reject",
+  "/teacher/:applicationId/reject",
   authenticate,
-  authorize("MODERATOR"),
+  authorize("MODERATOR", "ADMIN"),
   rejectTeacherApplication,
 );
 
 router.patch(
-  "/teacher/:id/resubmit",
+  "/teacher/:applicationId/resubmit",
   upload.array("documents", 5),
   resubmitTeacherApplication,
 );
@@ -68,14 +68,14 @@ router.patch(
 router.get(
   "/teacher/applications",
   authenticate,
-  authorize("ADMIN"),
+  authorize("ADMIN", "MODERATOR"),
   viewAllTeacherApplications,
 );
 
 router.get(
   "/teacher/:applicationId",
   authenticate,
-  authorize("ADMIN"),
+  authorize("ADMIN", "MODERATOR"),
   viewTeacherApplication,
 );
 

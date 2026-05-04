@@ -1,5 +1,5 @@
 -- CreateEnum
-CREATE TYPE "Role" AS ENUM ('SUPER_ADMIN', 'ADMIN', 'TEACHER', 'STUDENT', 'PARENT', 'MODERATOR');
+CREATE TYPE "Role" AS ENUM ('ADMIN', 'TEACHER', 'STUDENT', 'PARENT', 'MODERATOR');
 
 -- CreateEnum
 CREATE TYPE "Gender" AS ENUM ('MALE', 'FEMALE', 'OTHER');
@@ -50,16 +50,13 @@ CREATE TYPE "ParentType" AS ENUM ('FATHER', 'MOTHER', 'GUARDIAN');
 CREATE TYPE "DocumentType" AS ENUM ('ADMISSION_FORM', 'BIRTH_CERTIFICATE', 'TRANSFER_CERTIFICATE', 'MARKSHEET', 'ID_PROOF', 'ADDRESS_PROOF', 'PHOTO', 'RESUME', 'QUALIFICATION_CERTIFICATE', 'MEDICAL_CERTIFICATE', 'FEE_RECEIPT', 'LEAVE_DOCUMENT', 'OTHER');
 
 -- CreateEnum
-CREATE TYPE "DocumentOwnerType" AS ENUM ('STUDENT', 'TEACHER', 'ADMIN', 'PARENT', 'ADMISSION_APPLICATION', 'TEACHER_APPLICATION', 'LEAVE_REQUEST', 'FEE_PAYMENT', 'SCHOOL_APPLICATION');
+CREATE TYPE "DocumentOwnerType" AS ENUM ('STUDENT', 'TEACHER', 'ADMIN', 'PARENT', 'ADMISSION_APPLICATION', 'TEACHER_APPLICATION', 'LEAVE_REQUEST', 'FEE_PAYMENT');
 
 -- CreateEnum
-CREATE TYPE "Module" AS ENUM ('SCHOOL', 'ACADEMIC_YEAR', 'CLASS', 'SUBJECT', 'ADMIN', 'TEACHER', 'STUDENT', 'PARENT', 'SCHOOL_APPLICATION', 'ADMISSION_APPLICATION', 'TEACHER_APPLICATION', 'TEACHER_SUBJECT', 'CLASS_TEACHER', 'ENROLLMENT', 'TIMETABLE', 'HOLIDAY', 'STUDENT_ATTENDANCE', 'TEACHER_ATTENDANCE', 'EXAM_SCHEDULE', 'MARK', 'FEE_STRUCTURE', 'FEE_PAYMENT', 'LEAVE_REQUEST', 'ANNOUNCEMENT', 'NOTIFICATION', 'DOCUMENT', 'AUDIT_LOG', 'SYSTEM_LOG', 'IP_BLACKLIST', 'RATE_LIMIT');
-
--- CreateEnum
-CREATE TYPE "SchoolApplicationStatus" AS ENUM ('PENDING', 'APPROVED', 'REJECTED', 'MORE_INFO_REQUIRED');
+CREATE TYPE "Module" AS ENUM ('ACADEMIC_YEAR', 'CLASS', 'SUBJECT', 'ADMIN', 'TEACHER', 'STUDENT', 'PARENT', 'ADMISSION_APPLICATION', 'TEACHER_APPLICATION', 'TEACHER_SUBJECT', 'CLASS_TEACHER', 'ENROLLMENT', 'TIMETABLE', 'HOLIDAY', 'STUDENT_ATTENDANCE', 'TEACHER_ATTENDANCE', 'EXAM_SCHEDULE', 'MARK', 'FEE_STRUCTURE', 'FEE_PAYMENT', 'LEAVE_REQUEST', 'ANNOUNCEMENT', 'NOTIFICATION', 'DOCUMENT', 'AUDIT_LOG', 'SYSTEM_LOG', 'IP_BLACKLIST', 'RATE_LIMIT');
 
 -- CreateTable
-CREATE TABLE "School" (
+CREATE TABLE "SchoolConfig" (
     "id" TEXT NOT NULL,
     "name" TEXT NOT NULL,
     "code" TEXT NOT NULL,
@@ -78,48 +75,12 @@ CREATE TABLE "School" (
     "isActive" BOOLEAN NOT NULL DEFAULT true,
     "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "updatedAt" TIMESTAMP(3) NOT NULL,
-    CONSTRAINT "School_pkey" PRIMARY KEY ("id")
-);
-
--- CreateTable
-
-
-CREATE TABLE "SchoolApplication" (
-    "id" TEXT NOT NULL,
-    "schoolName" TEXT NOT NULL,
-    "address" TEXT NOT NULL,
-    "city" TEXT NOT NULL,
-    "state" TEXT NOT NULL,
-    "country" TEXT NOT NULL,
-    "pincode" TEXT NOT NULL,
-    "phone" TEXT NOT NULL,
-    "email" TEXT NOT NULL,
-    "website" TEXT,
-    "establishedYear" INTEGER NOT NULL,
-    "affiliationNumber" TEXT,
-    "boardType" TEXT NOT NULL,
-    "adminFirstName" TEXT NOT NULL,
-    "adminLastName" TEXT NOT NULL,
-    "adminEmail" TEXT NOT NULL,
-    "adminPhone" TEXT NOT NULL,
-    "adminGender" "Gender" NOT NULL,
-    "status" "SchoolApplicationStatus" NOT NULL DEFAULT 'PENDING',
-    "appliedAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    "reviewedAt" TIMESTAMP(3),
-    "reviewedBy" TEXT,
-    "rejectionReason" TEXT,
-    "notes" TEXT,
-    "moreInfoFields" TEXT[] DEFAULT ARRAY[]::TEXT[],
-    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    "updatedAt" TIMESTAMP(3) NOT NULL,
-
-    CONSTRAINT "SchoolApplication_pkey" PRIMARY KEY ("id")
+    CONSTRAINT "SchoolConfig_pkey" PRIMARY KEY ("id")
 );
 
 -- CreateTable
 CREATE TABLE "AcademicYear" (
     "id" TEXT NOT NULL,
-    "schoolId" TEXT NOT NULL,
     "name" TEXT NOT NULL,
     "startDate" TIMESTAMP(3) NOT NULL,
     "endDate" TIMESTAMP(3) NOT NULL,
@@ -132,7 +93,6 @@ CREATE TABLE "AcademicYear" (
 -- CreateTable
 CREATE TABLE "Class" (
     "id" TEXT NOT NULL,
-    "schoolId" TEXT NOT NULL,
     "academicYearId" TEXT NOT NULL,
     "name" TEXT NOT NULL,
     "section" TEXT NOT NULL,
@@ -146,7 +106,6 @@ CREATE TABLE "Class" (
 -- CreateTable
 CREATE TABLE "Subject" (
     "id" TEXT NOT NULL,
-    "schoolId" TEXT NOT NULL,
     "name" TEXT NOT NULL,
     "code" TEXT NOT NULL,
     "description" TEXT,
@@ -160,7 +119,6 @@ CREATE TABLE "Subject" (
 -- CreateTable
 CREATE TABLE "RegistrationCounter" (
     "id" TEXT NOT NULL,
-    "schoolId" TEXT NOT NULL,
     "role" "Role" NOT NULL,
     "lastCount" INTEGER NOT NULL DEFAULT 0,
     "updatedAt" TIMESTAMP(3) NOT NULL,
@@ -170,7 +128,6 @@ CREATE TABLE "RegistrationCounter" (
 -- CreateTable
 CREATE TABLE "User" (
     "id" TEXT NOT NULL,
-    "schoolId" TEXT,
     "regNumber" TEXT NOT NULL,
     "role" "Role" NOT NULL,
     "email" TEXT,
@@ -218,23 +175,9 @@ CREATE TABLE "PasswordReset" (
 );
 
 -- CreateTable
-CREATE TABLE "SuperAdmin" (
+CREATE TABLE "UserPermission" (
     "id" TEXT NOT NULL,
     "userId" TEXT NOT NULL,
-    "firstName" TEXT NOT NULL,
-    "lastName" TEXT NOT NULL,
-    "gender" "Gender" NOT NULL,
-    "dateOfBirth" TIMESTAMP(3),
-    "photoUrl" TEXT,
-    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    "updatedAt" TIMESTAMP(3) NOT NULL,
-    CONSTRAINT "SuperAdmin_pkey" PRIMARY KEY ("id")
-);
-
--- CreateTable
-CREATE TABLE "AdminPermission" (
-    "id" TEXT NOT NULL,
-    "adminId" TEXT NOT NULL,
     "module" "Module" NOT NULL,
     "canCreate" BOOLEAN NOT NULL DEFAULT false,
     "canRead" BOOLEAN NOT NULL DEFAULT true,
@@ -244,7 +187,7 @@ CREATE TABLE "AdminPermission" (
     "canExport" BOOLEAN NOT NULL DEFAULT false,
     "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "updatedAt" TIMESTAMP(3) NOT NULL,
-    CONSTRAINT "AdminPermission_pkey" PRIMARY KEY ("id")
+    CONSTRAINT "UserPermission_pkey" PRIMARY KEY ("id")
 );
 
 -- CreateTable
@@ -267,7 +210,6 @@ CREATE TABLE "Admin" (
 -- CreateTable
 CREATE TABLE "TeacherApplication" (
     "id" TEXT NOT NULL,
-    "schoolId" TEXT NOT NULL,
     "firstName" TEXT NOT NULL,
     "lastName" TEXT NOT NULL,
     "email" TEXT NOT NULL,
@@ -339,7 +281,6 @@ CREATE TABLE "ClassTeacher" (
 -- CreateTable
 CREATE TABLE "AdmissionApplication" (
     "id" TEXT NOT NULL,
-    "schoolId" TEXT NOT NULL,
     "firstName" TEXT NOT NULL,
     "lastName" TEXT NOT NULL,
     "gender" "Gender" NOT NULL,
@@ -430,6 +371,7 @@ CREATE TABLE "Timetable" (
     "startTime" TEXT NOT NULL,
     "endTime" TEXT NOT NULL,
     "room" TEXT,
+    "periodNumber" INTEGER NOT NULL,
     "isActive" BOOLEAN NOT NULL DEFAULT true,
     "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "updatedAt" TIMESTAMP(3) NOT NULL,
@@ -466,9 +408,21 @@ CREATE TABLE "TeacherAttendance" (
 );
 
 -- CreateTable
+CREATE TABLE "AdminAttendance" (
+    "id" TEXT NOT NULL,
+    "adminId" TEXT NOT NULL,
+    "date" DATE NOT NULL,
+    "status" "AttendanceStatus" NOT NULL DEFAULT 'PRESENT',
+    "remarks" TEXT,
+    "markedBy" TEXT,
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updatedAt" TIMESTAMP(3) NOT NULL,
+    CONSTRAINT "AdminAttendance_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
 CREATE TABLE "ExamSchedule" (
     "id" TEXT NOT NULL,
-    "schoolId" TEXT,
     "academicYearId" TEXT NOT NULL,
     "classId" TEXT NOT NULL,
     "subjectId" TEXT NOT NULL,
@@ -481,6 +435,7 @@ CREATE TABLE "ExamSchedule" (
     "totalMarks" DOUBLE PRECISION NOT NULL,
     "passingMarks" DOUBLE PRECISION NOT NULL,
     "instructions" TEXT,
+    "weightage" DOUBLE PRECISION NOT NULL DEFAULT 0,
     "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "updatedAt" TIMESTAMP(3) NOT NULL,
     CONSTRAINT "ExamSchedule_pkey" PRIMARY KEY ("id")
@@ -505,7 +460,6 @@ CREATE TABLE "Mark" (
 -- CreateTable
 CREATE TABLE "FeeStructure" (
     "id" TEXT NOT NULL,
-    "schoolId" TEXT NOT NULL,
     "academicYearId" TEXT NOT NULL,
     "classId" TEXT,
     "name" TEXT NOT NULL,
@@ -546,6 +500,7 @@ CREATE TABLE "LeaveRequest" (
     "requesterRole" "Role" NOT NULL,
     "studentId" TEXT,
     "teacherId" TEXT,
+    "classId" TEXT,
     "fromDate" DATE NOT NULL,
     "toDate" DATE NOT NULL,
     "reason" TEXT NOT NULL,
@@ -561,11 +516,9 @@ CREATE TABLE "LeaveRequest" (
 -- CreateTable
 CREATE TABLE "Holiday" (
     "id" TEXT NOT NULL,
-    "schoolId" TEXT NOT NULL,
     "name" TEXT NOT NULL,
     "date" DATE NOT NULL,
     "description" TEXT,
-    "isOptional" BOOLEAN NOT NULL DEFAULT false,
     "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "updatedAt" TIMESTAMP(3) NOT NULL,
     CONSTRAINT "Holiday_pkey" PRIMARY KEY ("id")
@@ -576,7 +529,6 @@ CREATE TABLE "Holiday" (
 
 CREATE TABLE "Announcement" (
     "id" TEXT NOT NULL,
-    "schoolId" TEXT NOT NULL,
     "title" TEXT NOT NULL,
     "content" TEXT NOT NULL,
     "targetRoles" "Role"[],
@@ -593,7 +545,6 @@ CREATE TABLE "Announcement" (
 -- CreateTable
 CREATE TABLE "Notification" (
     "id" TEXT NOT NULL,
-    "schoolId" TEXT,
     "senderId" TEXT,
     "announcementId" TEXT,
     "title" TEXT NOT NULL,
@@ -637,7 +588,6 @@ CREATE TABLE "SSEConnection" (
 -- CreateTable
 CREATE TABLE "Document" (
     "id" TEXT NOT NULL,
-    "schoolId" TEXT,
     "ownerId" TEXT NOT NULL,
     "ownerType" "DocumentOwnerType" NOT NULL,
     "documentType" "DocumentType" NOT NULL,
@@ -663,14 +613,12 @@ CREATE TABLE "Document" (
     "teacherAppId" TEXT,
     "leaveRequestId" TEXT,
     "feePaymentId" TEXT,
-    "schoolApplicationId" TEXT,
     CONSTRAINT "Document_pkey" PRIMARY KEY ("id")
 );
 
 -- CreateTable
 CREATE TABLE "AuditLog" (
     "id" TEXT NOT NULL,
-    "schoolId" TEXT,
     "performedById" TEXT NOT NULL,
     "targetUserId" TEXT,
     "action" "AuditAction" NOT NULL,
@@ -700,7 +648,6 @@ CREATE TABLE "AuditLog" (
 -- CreateTable
 CREATE TABLE "SystemLog" (
     "id" TEXT NOT NULL,
-    "schoolId" TEXT,
     "userId" TEXT,
     "level" "LogLevel" NOT NULL,
     "message" TEXT NOT NULL,
@@ -748,26 +695,14 @@ CREATE TABLE "RateLimitRecord" (
 );
 
 -- CreateTable
-CREATE TABLE "SchoolApplicationHistory" (
-    "id" TEXT NOT NULL,
-    "applicationId" TEXT NOT NULL,
-    "status" "SchoolApplicationStatus" NOT NULL,
-    "rejectionReason" TEXT,
-    "notes" TEXT,
-    "changedAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    "changedBy" TEXT NOT NULL,
-    CONSTRAINT "SchoolApplicationHistory_pkey" PRIMARY KEY ("id")
-);
-
--- CreateTable
 CREATE TABLE "TeacherApplicationHistory" (
     "id" TEXT NOT NULL,
     "applicationId" TEXT NOT NULL,
     "status" "ApplicationStatus" NOT NULL,
+    "previousStatus" "ApplicationStatus" NOT NULL,
     "rejectionReason" TEXT,
     "changedAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "changedBy" TEXT NOT NULL,
-    "previousStatus" "ApplicationStatus" NOT NULL,
     CONSTRAINT "TeacherApplicationHistory_pkey" PRIMARY KEY ("id")
 );
 
@@ -776,95 +711,49 @@ CREATE TABLE "AdmissonApplicationHistory" (
     "id" TEXT NOT NULL,
     "applicationId" TEXT NOT NULL,
     "status" "AdmissionStatus" NOT NULL,
+    "previousStatus" "AdmissionStatus" NOT NULL,
     "rejectionReason" TEXT,
     "changedAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "changedBy" TEXT NOT NULL,
-    "previousStatus" "AdmissionStatus" NOT NULL,
     CONSTRAINT "AdmissonApplicationHistory_pkey" PRIMARY KEY ("id")
 );
 
 -- CreateIndex
-CREATE UNIQUE INDEX "School_code_key" ON "School" ("code");
+CREATE UNIQUE INDEX "SchoolConfig_code_key" ON "SchoolConfig" ("code");
 
 -- CreateIndex
-CREATE UNIQUE INDEX "School_email_key" ON "School" ("email");
+CREATE UNIQUE INDEX "SchoolConfig_email_key" ON "SchoolConfig" ("email");
 
 -- CreateIndex
-CREATE INDEX "School_code_idx" ON "School" ("code");
-
--- CreateIndex
-CREATE INDEX "School_email_idx" ON "School" ("email");
-
--- CreateIndex
-CREATE INDEX "School_isActive_idx" ON "School" ("isActive");
-
--- CreateIndex
-CREATE UNIQUE INDEX "SchoolApplication_email_key" ON "SchoolApplication" ("email");
-
--- CreateIndex
-CREATE UNIQUE INDEX "SchoolApplication_adminEmail_key" ON "SchoolApplication" ("adminEmail");
-
--- CreateIndex
-CREATE INDEX "SchoolApplication_status_idx" ON "SchoolApplication" ("status");
-
--- CreateIndex
-CREATE INDEX "SchoolApplication_email_idx" ON "SchoolApplication" ("email");
-
--- CreateIndex
-CREATE INDEX "SchoolApplication_adminEmail_idx" ON "SchoolApplication" ("adminEmail");
-
--- CreateIndex
-CREATE INDEX "AcademicYear_schoolId_idx" ON "AcademicYear" ("schoolId");
+CREATE UNIQUE INDEX "AcademicYear_name_key" ON "AcademicYear" ("name");
 
 -- CreateIndex
 CREATE INDEX "AcademicYear_isCurrent_idx" ON "AcademicYear" ("isCurrent");
 
 -- CreateIndex
-CREATE INDEX "AcademicYear_schoolId_isCurrent_idx" ON "AcademicYear" ("schoolId", "isCurrent");
-
--- CreateIndex
-CREATE UNIQUE INDEX "AcademicYear_schoolId_name_key" ON "AcademicYear" ("schoolId", "name");
-
--- CreateIndex
-CREATE INDEX "Class_schoolId_idx" ON "Class" ("schoolId");
-
--- CreateIndex
 CREATE INDEX "Class_academicYearId_idx" ON "Class" ("academicYearId");
 
 -- CreateIndex
-CREATE INDEX "Class_schoolId_academicYearId_idx" ON "Class" ("schoolId", "academicYearId");
-
--- CreateIndex
-CREATE UNIQUE INDEX "Class_schoolId_academicYearId_name_section_key" ON "Class" (
-    "schoolId",
+CREATE UNIQUE INDEX "Class_academicYearId_name_section_key" ON "Class" (
     "academicYearId",
     "name",
     "section"
 );
 
 -- CreateIndex
-CREATE INDEX "Subject_schoolId_idx" ON "Subject" ("schoolId");
+CREATE UNIQUE INDEX "Subject_code_key" ON "Subject" ("code");
 
 -- CreateIndex
 CREATE INDEX "Subject_isActive_idx" ON "Subject" ("isActive");
 
 -- CreateIndex
-CREATE UNIQUE INDEX "Subject_schoolId_code_key" ON "Subject" ("schoolId", "code");
-
--- CreateIndex
-CREATE INDEX "RegistrationCounter_schoolId_role_idx" ON "RegistrationCounter" ("schoolId", "role");
-
--- CreateIndex
-CREATE UNIQUE INDEX "RegistrationCounter_schoolId_role_key" ON "RegistrationCounter" ("schoolId", "role");
+CREATE UNIQUE INDEX "RegistrationCounter_role_key" ON "RegistrationCounter" ("role");
 
 -- CreateIndex
 CREATE UNIQUE INDEX "User_regNumber_key" ON "User" ("regNumber");
 
 -- CreateIndex
 CREATE UNIQUE INDEX "User_email_key" ON "User" ("email");
-
--- CreateIndex
-CREATE INDEX "User_schoolId_idx" ON "User" ("schoolId");
 
 -- CreateIndex
 CREATE INDEX "User_regNumber_idx" ON "User" ("regNumber");
@@ -877,12 +766,6 @@ CREATE INDEX "User_email_idx" ON "User" ("email");
 
 -- CreateIndex
 CREATE INDEX "User_isActive_idx" ON "User" ("isActive");
-
--- CreateIndex
-CREATE INDEX "User_schoolId_role_idx" ON "User" ("schoolId", "role");
-
--- CreateIndex
-CREATE INDEX "User_schoolId_isActive_idx" ON "User" ("schoolId", "isActive");
 
 -- CreateIndex
 CREATE UNIQUE INDEX "Session_token_key" ON "Session" ("token");
@@ -915,19 +798,10 @@ CREATE INDEX "PasswordReset_token_idx" ON "PasswordReset" ("token");
 CREATE INDEX "PasswordReset_isUsed_idx" ON "PasswordReset" ("isUsed");
 
 -- CreateIndex
-CREATE UNIQUE INDEX "SuperAdmin_userId_key" ON "SuperAdmin" ("userId");
+CREATE INDEX "UserPermission_userId_idx" ON "UserPermission" ("userId");
 
 -- CreateIndex
-CREATE INDEX "SuperAdmin_userId_idx" ON "SuperAdmin" ("userId");
-
--- CreateIndex
-CREATE INDEX "AdminPermission_adminId_idx" ON "AdminPermission" ("adminId");
-
--- CreateIndex
-CREATE INDEX "AdminPermission_module_idx" ON "AdminPermission" ("module");
-
--- CreateIndex
-CREATE UNIQUE INDEX "AdminPermission_adminId_module_key" ON "AdminPermission" ("adminId", "module");
+CREATE UNIQUE INDEX "UserPermission_userId_module_key" ON "UserPermission" ("userId", "module");
 
 -- CreateIndex
 CREATE UNIQUE INDEX "Admin_userId_key" ON "Admin" ("userId");
@@ -936,16 +810,10 @@ CREATE UNIQUE INDEX "Admin_userId_key" ON "Admin" ("userId");
 CREATE INDEX "Admin_userId_idx" ON "Admin" ("userId");
 
 -- CreateIndex
-CREATE INDEX "TeacherApplication_schoolId_idx" ON "TeacherApplication" ("schoolId");
-
--- CreateIndex
 CREATE INDEX "TeacherApplication_status_idx" ON "TeacherApplication" ("status");
 
 -- CreateIndex
 CREATE INDEX "TeacherApplication_email_idx" ON "TeacherApplication" ("email");
-
--- CreateIndex
-CREATE INDEX "TeacherApplication_schoolId_status_idx" ON "TeacherApplication" ("schoolId", "status");
 
 -- CreateIndex
 CREATE UNIQUE INDEX "Teacher_userId_key" ON "Teacher" ("userId");
@@ -979,13 +847,7 @@ CREATE INDEX "ClassTeacher_teacherId_idx" ON "ClassTeacher" ("teacherId");
 CREATE UNIQUE INDEX "ClassTeacher_classId_teacherId_key" ON "ClassTeacher" ("classId", "teacherId");
 
 -- CreateIndex
-CREATE INDEX "AdmissionApplication_schoolId_idx" ON "AdmissionApplication" ("schoolId");
-
--- CreateIndex
 CREATE INDEX "AdmissionApplication_status_idx" ON "AdmissionApplication" ("status");
-
--- CreateIndex
-CREATE INDEX "AdmissionApplication_schoolId_status_idx" ON "AdmissionApplication" ("schoolId", "status");
 
 -- CreateIndex
 CREATE INDEX "AdmissionApplication_guardianPhone_idx" ON "AdmissionApplication" ("guardianPhone");
@@ -1093,6 +955,18 @@ CREATE INDEX "TeacherAttendance_status_idx" ON "TeacherAttendance" ("status");
 CREATE UNIQUE INDEX "TeacherAttendance_teacherId_date_key" ON "TeacherAttendance" ("teacherId", "date");
 
 -- CreateIndex
+CREATE INDEX "AdminAttendance_adminId_idx" ON "AdminAttendance" ("adminId");
+
+-- CreateIndex
+CREATE INDEX "AdminAttendance_date_idx" ON "AdminAttendance" ("date");
+
+-- CreateIndex
+CREATE INDEX "AdminAttendance_status_idx" ON "AdminAttendance" ("status");
+
+-- CreateIndex
+CREATE UNIQUE INDEX "AdminAttendance_adminId_date_key" ON "AdminAttendance" ("adminId", "date");
+
+-- CreateIndex
 CREATE INDEX "ExamSchedule_academicYearId_idx" ON "ExamSchedule" ("academicYearId");
 
 -- CreateIndex
@@ -1127,9 +1001,6 @@ CREATE INDEX "Mark_studentId_subjectId_idx" ON "Mark" ("studentId", "subjectId")
 
 -- CreateIndex
 CREATE UNIQUE INDEX "Mark_studentId_examScheduleId_key" ON "Mark" ("studentId", "examScheduleId");
-
--- CreateIndex
-CREATE INDEX "FeeStructure_schoolId_idx" ON "FeeStructure" ("schoolId");
 
 -- CreateIndex
 CREATE INDEX "FeeStructure_academicYearId_idx" ON "FeeStructure" ("academicYearId");
@@ -1174,25 +1045,16 @@ CREATE INDEX "LeaveRequest_fromDate_toDate_idx" ON "LeaveRequest" ("fromDate", "
 CREATE INDEX "LeaveRequest_requesterId_idx" ON "LeaveRequest" ("requesterId");
 
 -- CreateIndex
-CREATE INDEX "Holiday_schoolId_idx" ON "Holiday" ("schoolId");
+CREATE UNIQUE INDEX "Holiday_date_key" ON "Holiday" ("date");
 
 -- CreateIndex
 CREATE INDEX "Holiday_date_idx" ON "Holiday" ("date");
-
--- CreateIndex
-CREATE UNIQUE INDEX "Holiday_schoolId_date_key" ON "Holiday" ("schoolId", "date");
-
--- CreateIndex
-CREATE INDEX "Announcement_schoolId_idx" ON "Announcement" ("schoolId");
 
 -- CreateIndex
 CREATE INDEX "Announcement_isActive_idx" ON "Announcement" ("isActive");
 
 -- CreateIndex
 CREATE INDEX "Announcement_publishedAt_idx" ON "Announcement" ("publishedAt");
-
--- CreateIndex
-CREATE INDEX "Announcement_schoolId_isActive_idx" ON "Announcement" ("schoolId", "isActive");
 
 -- CreateIndex
 CREATE INDEX "Notification_senderId_idx" ON "Notification" ("senderId");
@@ -1255,9 +1117,6 @@ CREATE INDEX "Document_documentType_idx" ON "Document" ("documentType");
 CREATE INDEX "Document_cloudinaryId_idx" ON "Document" ("cloudinaryId");
 
 -- CreateIndex
-CREATE INDEX "Document_schoolId_idx" ON "Document" ("schoolId");
-
--- CreateIndex
 CREATE INDEX "Document_uploadedBy_idx" ON "Document" ("uploadedBy");
 
 -- CreateIndex
@@ -1269,9 +1128,6 @@ CREATE INDEX "Document_ownerId_ownerType_documentType_idx" ON "Document" (
     "ownerType",
     "documentType"
 );
-
--- CreateIndex
-CREATE INDEX "AuditLog_schoolId_idx" ON "AuditLog" ("schoolId");
 
 -- CreateIndex
 CREATE INDEX "AuditLog_performedById_idx" ON "AuditLog" ("performedById");
@@ -1295,12 +1151,6 @@ CREATE INDEX "AuditLog_isSuccessful_idx" ON "AuditLog" ("isSuccessful");
 CREATE INDEX "AuditLog_resourceId_resourceType_idx" ON "AuditLog" ("resourceId", "resourceType");
 
 -- CreateIndex
-CREATE INDEX "AuditLog_schoolId_action_idx" ON "AuditLog" ("schoolId", "action");
-
--- CreateIndex
-CREATE INDEX "AuditLog_schoolId_createdAt_idx" ON "AuditLog" ("schoolId", "createdAt");
-
--- CreateIndex
 CREATE INDEX "AuditLog_performedById_createdAt_idx" ON "AuditLog" ("performedById", "createdAt");
 
 -- CreateIndex
@@ -1308,9 +1158,6 @@ CREATE INDEX "SystemLog_level_idx" ON "SystemLog" ("level");
 
 -- CreateIndex
 CREATE INDEX "SystemLog_module_idx" ON "SystemLog" ("module");
-
--- CreateIndex
-CREATE INDEX "SystemLog_schoolId_idx" ON "SystemLog" ("schoolId");
 
 -- CreateIndex
 CREATE INDEX "SystemLog_userId_idx" ON "SystemLog" ("userId");
@@ -1323,12 +1170,6 @@ CREATE INDEX "SystemLog_requestId_idx" ON "SystemLog" ("requestId");
 
 -- CreateIndex
 CREATE INDEX "SystemLog_traceId_idx" ON "SystemLog" ("traceId");
-
--- CreateIndex
-CREATE INDEX "SystemLog_schoolId_level_idx" ON "SystemLog" ("schoolId", "level");
-
--- CreateIndex
-CREATE INDEX "SystemLog_schoolId_createdAt_idx" ON "SystemLog" ("schoolId", "createdAt");
 
 -- CreateIndex
 CREATE INDEX "SystemLog_level_createdAt_idx" ON "SystemLog" ("level", "createdAt");
@@ -1365,24 +1206,8 @@ CREATE UNIQUE INDEX "RateLimitRecord_identifier_endpoint_windowStart_key" ON "Ra
 );
 
 -- AddForeignKey
-ALTER TABLE "AcademicYear"
-ADD CONSTRAINT "AcademicYear_schoolId_fkey" FOREIGN KEY ("schoolId") REFERENCES "School" ("id") ON DELETE CASCADE ON UPDATE CASCADE;
-
--- AddForeignKey
-ALTER TABLE "Class"
-ADD CONSTRAINT "Class_schoolId_fkey" FOREIGN KEY ("schoolId") REFERENCES "School" ("id") ON DELETE CASCADE ON UPDATE CASCADE;
-
--- AddForeignKey
 ALTER TABLE "Class"
 ADD CONSTRAINT "Class_academicYearId_fkey" FOREIGN KEY ("academicYearId") REFERENCES "AcademicYear" ("id") ON DELETE CASCADE ON UPDATE CASCADE;
-
--- AddForeignKey
-ALTER TABLE "Subject"
-ADD CONSTRAINT "Subject_schoolId_fkey" FOREIGN KEY ("schoolId") REFERENCES "School" ("id") ON DELETE CASCADE ON UPDATE CASCADE;
-
--- AddForeignKey
-ALTER TABLE "User"
-ADD CONSTRAINT "User_schoolId_fkey" FOREIGN KEY ("schoolId") REFERENCES "School" ("id") ON DELETE CASCADE ON UPDATE CASCADE;
 
 -- AddForeignKey
 ALTER TABLE "Session"
@@ -1393,20 +1218,12 @@ ALTER TABLE "PasswordReset"
 ADD CONSTRAINT "PasswordReset_userId_fkey" FOREIGN KEY ("userId") REFERENCES "User" ("id") ON DELETE CASCADE ON UPDATE CASCADE;
 
 -- AddForeignKey
-ALTER TABLE "SuperAdmin"
-ADD CONSTRAINT "SuperAdmin_userId_fkey" FOREIGN KEY ("userId") REFERENCES "User" ("id") ON DELETE CASCADE ON UPDATE CASCADE;
-
--- AddForeignKey
-ALTER TABLE "AdminPermission"
-ADD CONSTRAINT "AdminPermission_adminId_fkey" FOREIGN KEY ("adminId") REFERENCES "Admin" ("id") ON DELETE CASCADE ON UPDATE CASCADE;
+ALTER TABLE "UserPermission"
+ADD CONSTRAINT "UserPermission_userId_fkey" FOREIGN KEY ("userId") REFERENCES "User" ("id") ON DELETE CASCADE ON UPDATE CASCADE;
 
 -- AddForeignKey
 ALTER TABLE "Admin"
 ADD CONSTRAINT "Admin_userId_fkey" FOREIGN KEY ("userId") REFERENCES "User" ("id") ON DELETE CASCADE ON UPDATE CASCADE;
-
--- AddForeignKey
-ALTER TABLE "TeacherApplication"
-ADD CONSTRAINT "TeacherApplication_schoolId_fkey" FOREIGN KEY ("schoolId") REFERENCES "School" ("id") ON DELETE CASCADE ON UPDATE CASCADE;
 
 -- AddForeignKey
 ALTER TABLE "Teacher"
@@ -1427,10 +1244,6 @@ ADD CONSTRAINT "ClassTeacher_classId_fkey" FOREIGN KEY ("classId") REFERENCES "C
 -- AddForeignKey
 ALTER TABLE "ClassTeacher"
 ADD CONSTRAINT "ClassTeacher_teacherId_fkey" FOREIGN KEY ("teacherId") REFERENCES "Teacher" ("id") ON DELETE CASCADE ON UPDATE CASCADE;
-
--- AddForeignKey
-ALTER TABLE "AdmissionApplication"
-ADD CONSTRAINT "AdmissionApplication_schoolId_fkey" FOREIGN KEY ("schoolId") REFERENCES "School" ("id") ON DELETE CASCADE ON UPDATE CASCADE;
 
 -- AddForeignKey
 ALTER TABLE "Student"
@@ -1481,6 +1294,10 @@ ALTER TABLE "TeacherAttendance"
 ADD CONSTRAINT "TeacherAttendance_teacherId_fkey" FOREIGN KEY ("teacherId") REFERENCES "Teacher" ("id") ON DELETE CASCADE ON UPDATE CASCADE;
 
 -- AddForeignKey
+ALTER TABLE "AdminAttendance"
+ADD CONSTRAINT "AdminAttendance_adminId_fkey" FOREIGN KEY ("adminId") REFERENCES "Admin" ("id") ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- AddForeignKey
 ALTER TABLE "ExamSchedule"
 ADD CONSTRAINT "ExamSchedule_academicYearId_fkey" FOREIGN KEY ("academicYearId") REFERENCES "AcademicYear" ("id") ON DELETE CASCADE ON UPDATE CASCADE;
 
@@ -1510,10 +1327,6 @@ ADD CONSTRAINT "Mark_subjectId_fkey" FOREIGN KEY ("subjectId") REFERENCES "Subje
 
 -- AddForeignKey
 ALTER TABLE "FeeStructure"
-ADD CONSTRAINT "FeeStructure_schoolId_fkey" FOREIGN KEY ("schoolId") REFERENCES "School" ("id") ON DELETE CASCADE ON UPDATE CASCADE;
-
--- AddForeignKey
-ALTER TABLE "FeeStructure"
 ADD CONSTRAINT "FeeStructure_academicYearId_fkey" FOREIGN KEY ("academicYearId") REFERENCES "AcademicYear" ("id") ON DELETE CASCADE ON UPDATE CASCADE;
 
 -- AddForeignKey
@@ -1537,12 +1350,8 @@ ALTER TABLE "LeaveRequest"
 ADD CONSTRAINT "LeaveRequest_teacherId_fkey" FOREIGN KEY ("teacherId") REFERENCES "Teacher" ("id") ON DELETE SET NULL ON UPDATE CASCADE;
 
 -- AddForeignKey
-ALTER TABLE "Holiday"
-ADD CONSTRAINT "Holiday_schoolId_fkey" FOREIGN KEY ("schoolId") REFERENCES "School" ("id") ON DELETE CASCADE ON UPDATE CASCADE;
-
--- AddForeignKey
-ALTER TABLE "Announcement"
-ADD CONSTRAINT "Announcement_schoolId_fkey" FOREIGN KEY ("schoolId") REFERENCES "School" ("id") ON DELETE CASCADE ON UPDATE CASCADE;
+ALTER TABLE "LeaveRequest"
+ADD CONSTRAINT "LeaveRequest_classId_fkey" FOREIGN KEY ("classId") REFERENCES "Class" ("id") ON DELETE SET NULL ON UPDATE CASCADE;
 
 -- AddForeignKey
 ALTER TABLE "Notification"
@@ -1563,10 +1372,6 @@ ADD CONSTRAINT "NotificationRecipient_userId_fkey" FOREIGN KEY ("userId") REFERE
 -- AddForeignKey
 ALTER TABLE "SSEConnection"
 ADD CONSTRAINT "SSEConnection_userId_fkey" FOREIGN KEY ("userId") REFERENCES "User" ("id") ON DELETE CASCADE ON UPDATE CASCADE;
-
--- AddForeignKey
-ALTER TABLE "Document"
-ADD CONSTRAINT "Document_schoolId_fkey" FOREIGN KEY ("schoolId") REFERENCES "School" ("id") ON DELETE SET NULL ON UPDATE CASCADE;
 
 -- AddForeignKey
 ALTER TABLE "Document"
@@ -1597,14 +1402,6 @@ ALTER TABLE "Document"
 ADD CONSTRAINT "Document_feePaymentId_fkey" FOREIGN KEY ("feePaymentId") REFERENCES "FeePayment" ("id") ON DELETE SET NULL ON UPDATE CASCADE;
 
 -- AddForeignKey
-ALTER TABLE "Document"
-ADD CONSTRAINT "Document_schoolApplicationId_fkey" FOREIGN KEY ("schoolApplicationId") REFERENCES "SchoolApplication" ("id") ON DELETE SET NULL ON UPDATE CASCADE;
-
--- AddForeignKey
-ALTER TABLE "AuditLog"
-ADD CONSTRAINT "AuditLog_schoolId_fkey" FOREIGN KEY ("schoolId") REFERENCES "School" ("id") ON DELETE SET NULL ON UPDATE CASCADE;
-
--- AddForeignKey
 ALTER TABLE "AuditLog"
 ADD CONSTRAINT "AuditLog_performedById_fkey" FOREIGN KEY ("performedById") REFERENCES "User" ("id") ON DELETE RESTRICT ON UPDATE CASCADE;
 
@@ -1614,15 +1411,7 @@ ADD CONSTRAINT "AuditLog_targetUserId_fkey" FOREIGN KEY ("targetUserId") REFEREN
 
 -- AddForeignKey
 ALTER TABLE "SystemLog"
-ADD CONSTRAINT "SystemLog_schoolId_fkey" FOREIGN KEY ("schoolId") REFERENCES "School" ("id") ON DELETE SET NULL ON UPDATE CASCADE;
-
--- AddForeignKey
-ALTER TABLE "SystemLog"
 ADD CONSTRAINT "SystemLog_userId_fkey" FOREIGN KEY ("userId") REFERENCES "User" ("id") ON DELETE SET NULL ON UPDATE CASCADE;
-
--- AddForeignKey
-ALTER TABLE "SchoolApplicationHistory"
-ADD CONSTRAINT "SchoolApplicationHistory_applicationId_fkey" FOREIGN KEY ("applicationId") REFERENCES "SchoolApplication" ("id") ON DELETE RESTRICT ON UPDATE CASCADE;
 
 -- AddForeignKey
 ALTER TABLE "TeacherApplicationHistory"
@@ -1632,307 +1421,19 @@ ADD CONSTRAINT "TeacherApplicationHistory_applicationId_fkey" FOREIGN KEY ("appl
 ALTER TABLE "AdmissonApplicationHistory"
 ADD CONSTRAINT "AdmissonApplicationHistory_applicationId_fkey" FOREIGN KEY ("applicationId") REFERENCES "AdmissionApplication" ("id") ON DELETE RESTRICT ON UPDATE CASCADE;
 
-CREATE OR REPLACE FUNCTION generate_school_code(p_school_name TEXT)
-RETURNS TEXT AS $$
-DECLARE
-  v_words      TEXT[];
-  v_prefix     TEXT := '';
-  v_word       TEXT;
-  v_next       INT;
-  v_candidate  TEXT;
-BEGIN
-  -- Build prefix from school name initials
-  v_words := regexp_split_to_array(trim(p_school_name), '\s+');
-  FOREACH v_word IN ARRAY v_words LOOP
-    v_word := regexp_replace(v_word, '[^a-zA-Z]', '', 'g');
-    IF length(v_word) > 0 THEN
-      v_prefix := v_prefix || upper(left(v_word, 1));
-    END IF;
-    EXIT WHEN length(v_prefix) >= 4;
-  END LOOP;
-
-  IF length(v_prefix) < 2 THEN
-    v_prefix := upper(left(regexp_replace(p_school_name, '[^a-zA-Z]', '', 'g'), 4));
-  END IF;
-
-  -- Single query to find next available counter
-  SELECT COALESCE(
-    MAX(
-      CAST(
-        NULLIF(regexp_replace(code, '^' || v_prefix, ''), '') AS INTEGER
-      )
-    ) + 1,
-    1
-  )
-  INTO v_next
-  FROM "School"
-  WHERE code LIKE v_prefix || '%'
-    AND code ~ ('^' || v_prefix || '[0-9]{3}$');
-
-  v_candidate := v_prefix || LPAD(v_next::TEXT, 3, '0');
-
-  RETURN v_candidate;
-END;
-$$ LANGUAGE plpgsql;
-
-CREATE INDEX IF NOT EXISTS school_code_pattern_idx ON "School" (code varchar_pattern_ops);
-
-CREATE OR REPLACE FUNCTION generate_registration_number(
-  p_school_id TEXT,
-  p_role TEXT
-)
-RETURNS TEXT AS $$
-DECLARE
-  v_prefix    TEXT;
-  v_new_count INT;
-BEGIN
-  IF p_role = 'ADMIN' THEN
-    v_prefix := 'ADM';
-  ELSIF p_role = 'MODERATOR' THEN
-    v_prefix := 'MOD';
-  ELSIF p_role = 'TEACHER' THEN
-    v_prefix := 'TEA';
-  ELSIF p_role = 'STUDENT' THEN
-    v_prefix := 'STU';
-  ELSIF p_role = 'PARENT' THEN
-    v_prefix := 'PAR';
-  ELSE
-    RAISE EXCEPTION 'Unknown role: %', p_role;
-  END IF;
-
-  INSERT INTO "RegistrationCounter" (id, "schoolId", role, "lastCount", "updatedAt")
-  VALUES (
-    gen_random_uuid()::TEXT,
-    p_school_id,
-    p_role::"Role",
-    1,
-    NOW()
-  )
-  ON CONFLICT ("schoolId", role)
-  DO UPDATE SET
-    "lastCount" = "RegistrationCounter"."lastCount" + 1,
-    "updatedAt" = NOW()
-  RETURNING "lastCount" INTO v_new_count;
-
-  RETURN v_prefix || LPAD(v_new_count::TEXT, 4, '0');
-END;
-$$ LANGUAGE plpgsql;
-
-ALTER TABLE "User" DROP CONSTRAINT IF EXISTS chk_user_school_id;
-
-ALTER TABLE "User"
-ADD CONSTRAINT chk_user_school_id CHECK (
-    (
-        role = 'SUPER_ADMIN'
-        AND "schoolId" IS NULL
-    )
-    OR (
-        role != 'SUPER_ADMIN'
-        AND "schoolId" IS NOT NULL
-    )
-);
-
-CREATE OR REPLACE FUNCTION trg_fn_assign_superadmin_reg()
-RETURNS TRIGGER AS $$
-DECLARE
-  v_existing_count INT;
-BEGIN
-  SELECT COUNT(*)
-  INTO v_existing_count
-  FROM "User"
-  WHERE role = 'SUPER_ADMIN'
-    AND id != NEW.id;
-
-  IF v_existing_count >= 1 THEN
-    RAISE EXCEPTION 'Only one Super Admin is allowed in the system.';
-  END IF;
-
-  NEW."regNumber" := 'SADM001';
-  NEW."schoolId"  := NULL;
-
-  RETURN NEW;
-END;
-$$ LANGUAGE plpgsql;
-
-DROP TRIGGER IF EXISTS trg_assign_superadmin_reg ON "User";
-
-CREATE TRIGGER trg_assign_superadmin_reg
-  BEFORE INSERT ON "User"
-  FOR EACH ROW
-  WHEN (NEW.role = 'SUPER_ADMIN')
-  EXECUTE FUNCTION trg_fn_assign_superadmin_reg();
-
-CREATE OR REPLACE FUNCTION trg_fn_assign_admin_reg()
-RETURNS TRIGGER AS $$
-BEGIN
-  IF NEW.role = 'ADMIN' AND NEW."schoolId" IS NOT NULL THEN
-    NEW."regNumber" := generate_registration_number(NEW."schoolId", 'ADMIN');
-  END IF;
-  RETURN NEW;
-END;
-$$ LANGUAGE plpgsql;
-
-DROP TRIGGER IF EXISTS trg_assign_admin_reg ON "User";
-
-CREATE TRIGGER trg_assign_admin_reg
-  BEFORE INSERT ON "User"
-  FOR EACH ROW
-  WHEN (NEW.role = 'ADMIN')
-  EXECUTE FUNCTION trg_fn_assign_admin_reg();
-
-CREATE OR REPLACE FUNCTION trg_fn_assign_moderator_reg()
-RETURNS TRIGGER AS $$
-BEGIN
-  IF NEW.role = 'MODERATOR' AND NEW."schoolId" IS NOT NULL THEN
-    NEW."regNumber" := generate_registration_number(NEW."schoolId", 'MODERATOR');
-  END IF;
-  RETURN NEW;
-END;
-$$ LANGUAGE plpgsql;
-
-DROP TRIGGER IF EXISTS trg_assign_moderator_reg ON "User";
-
-CREATE TRIGGER trg_assign_moderator_reg
-  BEFORE INSERT ON "User"
-  FOR EACH ROW
-  WHEN (NEW.role = 'MODERATOR')
-  EXECUTE FUNCTION trg_fn_assign_moderator_reg();
-
-CREATE OR REPLACE FUNCTION trg_fn_assign_teacher_reg()
-RETURNS TRIGGER AS $$
-DECLARE
-  v_school_id TEXT;
-BEGIN
-  IF NEW."employmentStatus" = 'ACTIVE' AND OLD."employmentStatus" != 'ACTIVE' THEN
-    SELECT u."schoolId"
-    INTO v_school_id
-    FROM "User" u
-    WHERE u.id = NEW."userId";
-
-    IF v_school_id IS NOT NULL THEN
-      UPDATE "User"
-      SET "regNumber" = generate_registration_number(v_school_id, 'TEACHER')
-      WHERE id = NEW."userId";
-    END IF;
-  END IF;
-
-  RETURN NEW;
-END;
-$$ LANGUAGE plpgsql;
-
-DROP TRIGGER IF EXISTS trg_assign_teacher_reg ON "Teacher";
-
-CREATE TRIGGER trg_assign_teacher_reg
-  AFTER UPDATE ON "Teacher"
-  FOR EACH ROW
-  WHEN (
-    NEW."employmentStatus" = 'ACTIVE'
-    AND OLD."employmentStatus" != 'ACTIVE'
-  )
-  EXECUTE FUNCTION trg_fn_assign_teacher_reg();
-
-CREATE OR REPLACE FUNCTION trg_fn_assign_student_reg()
-RETURNS TRIGGER AS $$
-DECLARE
-  v_school_id TEXT;
-BEGIN
-  IF NEW."enrollmentStatus" = 'ACTIVE' AND OLD."enrollmentStatus" != 'ACTIVE' THEN
-    SELECT u."schoolId"
-    INTO v_school_id
-    FROM "User" u
-    WHERE u.id = NEW."userId";
-
-    IF v_school_id IS NOT NULL THEN
-      UPDATE "User"
-      SET "regNumber" = generate_registration_number(v_school_id, 'STUDENT')
-      WHERE id = NEW."userId";
-    END IF;
-  END IF;
-
-  RETURN NEW;
-END;
-$$ LANGUAGE plpgsql;
-
-DROP TRIGGER IF EXISTS trg_assign_student_reg ON "Student";
-
-CREATE TRIGGER trg_assign_student_reg
-  AFTER UPDATE ON "Student"
-  FOR EACH ROW
-  WHEN (
-    NEW."enrollmentStatus" = 'ACTIVE'
-    AND OLD."enrollmentStatus" != 'ACTIVE'
-  )
-  EXECUTE FUNCTION trg_fn_assign_student_reg();
-
-CREATE OR REPLACE FUNCTION trg_fn_assign_parent_reg()
-RETURNS TRIGGER AS $$
-DECLARE
-  v_existing_reg TEXT;
-  v_current_reg  TEXT;
-  v_school_id    TEXT;
-BEGIN
-  SELECT u."regNumber"
-  INTO v_existing_reg
-  FROM "Parent" p
-  JOIN "User" u ON u.id = p."userId"
-  WHERE p."studentId" = NEW."studentId"
-    AND p.id != NEW.id
-  LIMIT 1;
-
-  IF v_existing_reg IS NOT NULL THEN
-    RAISE EXCEPTION
-      'Student % already has a parent with a registration number. Only one parent can receive a registration number.',
-      NEW."studentId";
-  END IF;
-
-  SELECT u."regNumber"
-  INTO v_current_reg
-  FROM "User" u
-  WHERE u.id = NEW."userId";
-
-  IF v_current_reg IS NOT NULL THEN
-    RETURN NEW;
-  END IF;
-
-  SELECT u."schoolId"
-  INTO v_school_id
-  FROM "User" u
-  WHERE u.id = NEW."userId";
-
-  IF v_school_id IS NOT NULL THEN
-    UPDATE "User"
-    SET "regNumber" = generate_registration_number(v_school_id, 'PARENT')
-    WHERE id = NEW."userId";
-  END IF;
-
-  RETURN NEW;
-END;
-$$ LANGUAGE plpgsql;
-
-DROP TRIGGER IF EXISTS trg_assign_parent_reg ON "Parent";
-
-CREATE TRIGGER trg_assign_parent_reg
-  AFTER INSERT ON "Parent"
-  FOR EACH ROW
-  EXECUTE FUNCTION trg_fn_assign_parent_reg();
-
+-- Prevent registration number from being changed once assigned
 CREATE OR REPLACE FUNCTION trg_fn_prevent_reg_change()
 RETURNS TRIGGER AS $$
 BEGIN
-  IF OLD."regNumber" IS NOT NULL
-    AND NEW."regNumber" != OLD."regNumber"
-  THEN
+  IF OLD."regNumber" IS NOT NULL AND NEW."regNumber" != OLD."regNumber" THEN
     RAISE EXCEPTION
       'Registration number cannot be modified once assigned. Current: %, Attempted: %',
       OLD."regNumber",
       NEW."regNumber";
   END IF;
-
   RETURN NEW;
 END;
 $$ LANGUAGE plpgsql;
-
-DROP TRIGGER IF EXISTS trg_prevent_reg_change ON "User";
 
 CREATE TRIGGER trg_prevent_reg_change
   BEFORE UPDATE ON "User"
@@ -1940,56 +1441,7 @@ CREATE TRIGGER trg_prevent_reg_change
   WHEN (OLD."regNumber" IS DISTINCT FROM NEW."regNumber")
   EXECUTE FUNCTION trg_fn_prevent_reg_change();
 
-CREATE OR REPLACE FUNCTION trg_fn_prevent_duplicate_superadmin()
-RETURNS TRIGGER AS $$
-BEGIN
-  IF NEW.role = 'SUPER_ADMIN' AND OLD.role != 'SUPER_ADMIN' THEN
-    RAISE EXCEPTION 'Cannot change role to SUPER_ADMIN after creation.';
-  END IF;
-
-  RETURN NEW;
-END;
-$$ LANGUAGE plpgsql;
-
-DROP TRIGGER IF EXISTS trg_prevent_duplicate_superadmin ON "User";
-
-CREATE TRIGGER trg_prevent_duplicate_superadmin
-  BEFORE UPDATE ON "User"
-  FOR EACH ROW
-  WHEN (NEW.role = 'SUPER_ADMIN' AND OLD.role != 'SUPER_ADMIN')
-  EXECUTE FUNCTION trg_fn_prevent_duplicate_superadmin();
-
-CREATE UNIQUE INDEX IF NOT EXISTS "TeacherSubject_teacherId_subjectId_no_class_key" ON "TeacherSubject" ("teacherId", "subjectId")
+-- Partial unique index for TeacherSubject where classId is NULL
+CREATE UNIQUE INDEX "TeacherSubject_teacherId_subjectId_no_class_key" ON "TeacherSubject" ("teacherId", "subjectId")
 WHERE
     "classId" IS NULL;
-
-ALTER TABLE "Timetable" ADD COLUMN "periodNumber" INTEGER NOT NULL;
-
--- CreateTable
-CREATE TABLE "AdminAttendance" (
-    "id" TEXT NOT NULL,
-    "adminId" TEXT NOT NULL,
-    "date" DATE NOT NULL,
-    "status" "AttendanceStatus" NOT NULL DEFAULT 'PRESENT',
-    "remarks" TEXT,
-    "markedBy" TEXT,
-    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    "updatedAt" TIMESTAMP(3) NOT NULL,
-    CONSTRAINT "AdminAttendance_pkey" PRIMARY KEY ("id")
-);
-
--- CreateIndex
-CREATE INDEX "AdminAttendance_adminId_idx" ON "AdminAttendance" ("adminId");
-
--- CreateIndex
-CREATE INDEX "AdminAttendance_date_idx" ON "AdminAttendance" ("date");
-
--- CreateIndex
-CREATE INDEX "AdminAttendance_status_idx" ON "AdminAttendance" ("status");
-
--- CreateIndex
-CREATE UNIQUE INDEX "AdminAttendance_adminId_date_key" ON "AdminAttendance" ("adminId", "date");
-
--- AddForeignKey
-ALTER TABLE "AdminAttendance"
-ADD CONSTRAINT "AdminAttendance_adminId_fkey" FOREIGN KEY ("adminId") REFERENCES "Admin" ("id") ON DELETE CASCADE ON UPDATE CASCADE;

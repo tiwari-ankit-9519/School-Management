@@ -7,7 +7,6 @@ datasource db {
 }
 
 enum Role {
-  SUPER_ADMIN
   ADMIN
   TEACHER
   STUDENT
@@ -176,169 +175,78 @@ enum DocumentOwnerType {
   TEACHER_APPLICATION
   LEAVE_REQUEST
   FEE_PAYMENT
-  SCHOOL_APPLICATION
 }
 
 enum Module {
-  // ─── School & Structure ───────────────────────────────
-  SCHOOL
   ACADEMIC_YEAR
   CLASS
   SUBJECT
-
-  // ─── User & Profile Management ────────────────────────
   ADMIN
   TEACHER
   STUDENT
   PARENT
-
-  // ─── Applications & Onboarding ────────────────────────
-  SCHOOL_APPLICATION
   ADMISSION_APPLICATION
   TEACHER_APPLICATION
-
-  // ─── Assignments ──────────────────────────────────────
   TEACHER_SUBJECT
   CLASS_TEACHER
   ENROLLMENT
-
-  // ─── Scheduling ───────────────────────────────────────
   TIMETABLE
   HOLIDAY
-
-  // ─── Attendance ───────────────────────────────────────
   STUDENT_ATTENDANCE
   TEACHER_ATTENDANCE
-
-  // ─── Exams & Marks ────────────────────────────────────
   EXAM_SCHEDULE
   MARK
-
-  // ─── Finance ──────────────────────────────────────────
   FEE_STRUCTURE
   FEE_PAYMENT
-
-  // ─── Leave ────────────────────────────────────────────
   LEAVE_REQUEST
-
-  // ─── Communication ────────────────────────────────────
   ANNOUNCEMENT
   NOTIFICATION
-
-  // ─── Documents ────────────────────────────────────────
   DOCUMENT
-
-  // ─── System ───────────────────────────────────────────
   AUDIT_LOG
   SYSTEM_LOG
   IP_BLACKLIST
   RATE_LIMIT
 }
 
-model School {
-  id                    String                 @id @default(cuid())
-  name                  String
-  code                  String                 @unique
-  address               String
-  city                  String
-  state                 String
-  country               String
-  pincode               String
-  phone                 String
-  email                 String                 @unique
-  website               String?
-  logoUrl               String?
-  establishedYear       Int
-  affiliationNumber     String?
-  boardType             String
-  isActive              Boolean                @default(true)
-  createdAt             DateTime               @default(now())
-  updatedAt             DateTime               @updatedAt
-  academicYears         AcademicYear[]
-  classes               Class[]
-  subjects              Subject[]
-  users                 User[]
-  admissionApplications AdmissionApplication[]
-  teacherApplications   TeacherApplication[]
-  announcements         Announcement[]
-  feeStructures         FeeStructure[]
-  holidays              Holiday[]
-  systemLogs            SystemLog[]
-  auditLogs             AuditLog[]
-  documents             Document[]
-
-  @@index([code])
-  @@index([email])
-  @@index([isActive])
-}
-
-enum SchoolApplicationStatus {
-  PENDING
-  APPROVED
-  REJECTED
-  MORE_INFO_REQUIRED
-}
-
-model SchoolApplication {
-  id                String                     @id @default(cuid())
-  schoolName        String
+model SchoolConfig {
+  id                String   @id @default(cuid())
+  name              String
+  code              String   @unique
   address           String
   city              String
   state             String
   country           String
   pincode           String
   phone             String
-  email             String                     @unique
+  email             String   @unique
   website           String?
+  logoUrl           String?
   establishedYear   Int
   affiliationNumber String?
   boardType         String
-  adminFirstName    String
-  adminLastName     String
-  adminEmail        String                     @unique
-  adminPhone        String
-  adminGender       Gender
-  status            SchoolApplicationStatus    @default(PENDING)
-  appliedAt         DateTime                   @default(now())
-  reviewedAt        DateTime?
-  reviewedBy        String?
-  rejectionReason   String?
-  notes             String?
-  moreInfoFields    String[]                   @default([])
-  createdAt         DateTime                   @default(now())
-  updatedAt         DateTime                   @updatedAt
-  documents         Document[]                 @relation("SchoolApplicationDocuments")
-  histories         SchoolApplicationHistory[]
-
-  @@index([status])
-  @@index([email])
-  @@index([adminEmail])
+  isActive          Boolean  @default(true)
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
 }
 
 model AcademicYear {
   id            String         @id @default(cuid())
-  schoolId      String
-  name          String
+  name          String         @unique
   startDate     DateTime
   endDate       DateTime
   isCurrent     Boolean        @default(false)
   createdAt     DateTime       @default(now())
   updatedAt     DateTime       @updatedAt
-  school        School         @relation(fields: [schoolId], references: [id], onDelete: Cascade)
   classes       Class[]
   enrollments   Enrollment[]
   examSchedules ExamSchedule[]
   feeStructures FeeStructure[]
 
-  @@unique([schoolId, name])
-  @@index([schoolId])
   @@index([isCurrent])
-  @@index([schoolId, isCurrent])
 }
 
 model Class {
   id             String         @id @default(cuid())
-  schoolId       String
   academicYearId String
   name           String
   section        String
@@ -346,7 +254,6 @@ model Class {
   roomNumber     String?
   createdAt      DateTime       @default(now())
   updatedAt      DateTime       @updatedAt
-  school         School         @relation(fields: [schoolId], references: [id], onDelete: Cascade)
   academicYear   AcademicYear   @relation(fields: [academicYearId], references: [id], onDelete: Cascade)
   enrollments    Enrollment[]
   timetables     Timetable[]
@@ -355,47 +262,38 @@ model Class {
   feeStructures  FeeStructure[]
   leaveRequest   LeaveRequest[]
 
-  @@unique([schoolId, academicYearId, name, section])
-  @@index([schoolId])
+  @@unique([academicYearId, name, section])
   @@index([academicYearId])
-  @@index([schoolId, academicYearId])
 }
 
 model Subject {
   id              String           @id @default(cuid())
-  schoolId        String
   name            String
-  code            String
+  code            String           @unique
   description     String?
   isElective      Boolean          @default(false)
   isActive        Boolean          @default(true)
   createdAt       DateTime         @default(now())
   updatedAt       DateTime         @updatedAt
-  school          School           @relation(fields: [schoolId], references: [id], onDelete: Cascade)
   teacherSubjects TeacherSubject[]
   timetables      Timetable[]
   examSchedules   ExamSchedule[]
   marks           Mark[]
 
-  @@unique([schoolId, code])
-  @@index([schoolId])
   @@index([isActive])
 }
 
 model RegistrationCounter {
   id        String   @id @default(cuid())
-  schoolId  String
   role      Role
   lastCount Int      @default(0)
   updatedAt DateTime @updatedAt
 
-  @@unique([schoolId, role])
-  @@index([schoolId, role])
+  @@unique([role])
 }
 
 model User {
   id                String                  @id @default(cuid())
-  schoolId          String?
   regNumber         String                  @unique
   role              Role
   email             String?                 @unique
@@ -407,8 +305,6 @@ model User {
   lastLoginIp       String?
   createdAt         DateTime                @default(now())
   updatedAt         DateTime                @updatedAt
-  school            School?                 @relation(fields: [schoolId], references: [id], onDelete: Cascade)
-  superAdmin        SuperAdmin?
   admin             Admin?
   teacher           Teacher?
   student           Student?
@@ -423,13 +319,10 @@ model User {
   sentNotifications Notification[]          @relation("NotificationSender")
   userPermission    UserPermission[]
 
-  @@index([schoolId])
   @@index([regNumber])
   @@index([role])
   @@index([email])
   @@index([isActive])
-  @@index([schoolId, role])
-  @@index([schoolId, isActive])
 }
 
 model Session {
@@ -472,40 +365,6 @@ model PasswordReset {
   @@index([isUsed])
 }
 
-model SuperAdmin {
-  id          String    @id @default(cuid())
-  userId      String    @unique
-  firstName   String
-  lastName    String
-  gender      Gender
-  dateOfBirth DateTime?
-  photoUrl    String?
-  createdAt   DateTime  @default(now())
-  updatedAt   DateTime  @updatedAt
-  user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
-
-  @@index([userId])
-}
-
-// model AdminPermission {
-//   id         String   @id @default(cuid())
-//   adminId    String
-//   module     Module
-//   canCreate  Boolean  @default(false)
-//   canRead    Boolean  @default(true)
-//   canUpdate  Boolean  @default(false)
-//   canDelete  Boolean  @default(false)
-//   canApprove Boolean  @default(false)
-//   canExport  Boolean  @default(false)
-//   createdAt  DateTime @default(now())
-//   updatedAt  DateTime @updatedAt
-//   admin      Admin    @relation(fields: [adminId], references: [id], onDelete: Cascade)
-
-//   @@unique([adminId, module])
-//   @@index([adminId])
-//   @@index([module])
-// }
-
 model UserPermission {
   id         String   @id @default(cuid())
   userId     String
@@ -538,7 +397,6 @@ model Admin {
   createdAt       DateTime          @default(now())
   updatedAt       DateTime          @updatedAt
   user            User              @relation(fields: [userId], references: [id], onDelete: Cascade)
-  // permissions     AdminPermission[]
   adminAttendance AdminAttendance[]
 
   @@index([userId])
@@ -546,7 +404,6 @@ model Admin {
 
 model TeacherApplication {
   id              String                      @id @default(cuid())
-  schoolId        String
   firstName       String
   lastName        String
   email           String
@@ -568,14 +425,11 @@ model TeacherApplication {
   createdAt       DateTime                    @default(now())
   updatedAt       DateTime                    @updatedAt
   photoUrl        String?
-  school          School                      @relation(fields: [schoolId], references: [id], onDelete: Cascade)
   documents       Document[]                  @relation("TeacherApplicationDocuments")
   histories       TeacherApplicationHistory[]
 
-  @@index([schoolId])
   @@index([status])
   @@index([email])
-  @@index([schoolId, status])
 }
 
 model Teacher {
@@ -641,7 +495,6 @@ model ClassTeacher {
 
 model AdmissionApplication {
   id                String                       @id @default(cuid())
-  schoolId          String
   firstName         String
   lastName          String
   gender            Gender
@@ -669,14 +522,11 @@ model AdmissionApplication {
   updatedAt         DateTime                     @updatedAt
   photoUrl          String?
   guardianPhotoUrl  String?
-  school            School                       @relation(fields: [schoolId], references: [id], onDelete: Cascade)
   student           Student?
   documents         Document[]                   @relation("AdmissionApplicationDocuments")
   histories         AdmissonApplicationHistory[]
 
-  @@index([schoolId])
   @@index([status])
-  @@index([schoolId, status])
   @@index([guardianPhone])
 }
 
@@ -834,7 +684,6 @@ model AdminAttendance {
 
 model ExamSchedule {
   id             String       @id @default(cuid())
-  schoolId       String?
   academicYearId String
   classId        String
   subjectId      String
@@ -847,6 +696,7 @@ model ExamSchedule {
   totalMarks     Float
   passingMarks   Float
   instructions   String?
+  weightage      Float        @default(0)
   createdAt      DateTime     @default(now())
   updatedAt      DateTime     @updatedAt
   academicYear   AcademicYear @relation(fields: [academicYearId], references: [id], onDelete: Cascade)
@@ -854,7 +704,6 @@ model ExamSchedule {
   subject        Subject      @relation(fields: [subjectId], references: [id], onDelete: Cascade)
   teacher        Teacher      @relation(fields: [teacherId], references: [id], onDelete: Cascade)
   marks          Mark[]
-  weightage      Float        @default(0)
 
   @@index([academicYearId])
   @@index([classId])
@@ -890,7 +739,6 @@ model Mark {
 
 model FeeStructure {
   id             String       @id @default(cuid())
-  schoolId       String
   academicYearId String
   classId        String?
   name           String
@@ -902,12 +750,10 @@ model FeeStructure {
   isActive       Boolean      @default(true)
   createdAt      DateTime     @default(now())
   updatedAt      DateTime     @updatedAt
-  school         School       @relation(fields: [schoolId], references: [id], onDelete: Cascade)
   academicYear   AcademicYear @relation(fields: [academicYearId], references: [id], onDelete: Cascade)
   class          Class?       @relation(fields: [classId], references: [id])
   feePayments    FeePayment[]
 
-  @@index([schoolId])
   @@index([academicYearId])
   @@index([classId])
   @@index([isActive])
@@ -945,6 +791,7 @@ model LeaveRequest {
   requesterRole Role
   studentId     String?
   teacherId     String?
+  classId       String?
   fromDate      DateTime    @db.Date
   toDate        DateTime    @db.Date
   reason        String
@@ -956,9 +803,8 @@ model LeaveRequest {
   updatedAt     DateTime    @updatedAt
   student       Student?    @relation(fields: [studentId], references: [id])
   teacher       Teacher?    @relation(fields: [teacherId], references: [id])
-  documents     Document[]  @relation("LeaveRequestDocuments")
   class         Class?      @relation(fields: [classId], references: [id])
-  classId       String?
+  documents     Document[]  @relation("LeaveRequestDocuments")
 
   @@index([studentId])
   @@index([teacherId])
@@ -969,22 +815,17 @@ model LeaveRequest {
 
 model Holiday {
   id          String   @id @default(cuid())
-  schoolId    String
   name        String
-  date        DateTime @db.Date
+  date        DateTime @unique @db.Date
   description String?
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
-  school      School   @relation(fields: [schoolId], references: [id], onDelete: Cascade)
 
-  @@unique([schoolId, date])
-  @@index([schoolId])
   @@index([date])
 }
 
 model Announcement {
   id            String         @id @default(cuid())
-  schoolId      String
   title         String
   content       String
   targetRoles   Role[]
@@ -994,18 +835,14 @@ model Announcement {
   createdBy     String
   createdAt     DateTime       @default(now())
   updatedAt     DateTime       @updatedAt
-  school        School         @relation(fields: [schoolId], references: [id], onDelete: Cascade)
   notifications Notification[]
 
-  @@index([schoolId])
   @@index([isActive])
   @@index([publishedAt])
-  @@index([schoolId, isActive])
 }
 
 model Notification {
   id             String                  @id @default(cuid())
-  schoolId       String?
   senderId       String?
   announcementId String?
   title          String
@@ -1067,7 +904,6 @@ model SSEConnection {
 
 model Document {
   id               String            @id @default(cuid())
-  schoolId         String?
   ownerId          String
   ownerType        DocumentOwnerType
   documentType     DocumentType
@@ -1087,29 +923,25 @@ model Document {
   createdAt        DateTime          @default(now())
   updatedAt        DateTime          @updatedAt
 
-  studentId           String?
-  teacherId           String?
-  parentId            String?
-  admissionId         String?
-  teacherAppId        String?
-  leaveRequestId      String?
-  feePaymentId        String?
-  schoolApplicationId String?
+  studentId      String?
+  teacherId      String?
+  parentId       String?
+  admissionId    String?
+  teacherAppId   String?
+  leaveRequestId String?
+  feePaymentId   String?
 
-  school                 School?               @relation(fields: [schoolId], references: [id])
-  studentOwner           Student?              @relation("StudentDocuments", fields: [studentId], references: [id])
-  teacherOwner           Teacher?              @relation("TeacherDocuments", fields: [teacherId], references: [id])
-  parentOwner            Parent?               @relation("ParentDocuments", fields: [parentId], references: [id])
-  admissionOwner         AdmissionApplication? @relation("AdmissionApplicationDocuments", fields: [admissionId], references: [id])
-  teacherAppOwner        TeacherApplication?   @relation("TeacherApplicationDocuments", fields: [teacherAppId], references: [id])
-  leaveRequestOwner      LeaveRequest?         @relation("LeaveRequestDocuments", fields: [leaveRequestId], references: [id])
-  feePaymentOwner        FeePayment?           @relation("FeePaymentDocuments", fields: [feePaymentId], references: [id])
-  schoolApplicationOwner SchoolApplication?    @relation("SchoolApplicationDocuments", fields: [schoolApplicationId], references: [id])
+  studentOwner      Student?              @relation("StudentDocuments", fields: [studentId], references: [id])
+  teacherOwner      Teacher?              @relation("TeacherDocuments", fields: [teacherId], references: [id])
+  parentOwner       Parent?               @relation("ParentDocuments", fields: [parentId], references: [id])
+  admissionOwner    AdmissionApplication? @relation("AdmissionApplicationDocuments", fields: [admissionId], references: [id])
+  teacherAppOwner   TeacherApplication?   @relation("TeacherApplicationDocuments", fields: [teacherAppId], references: [id])
+  leaveRequestOwner LeaveRequest?         @relation("LeaveRequestDocuments", fields: [leaveRequestId], references: [id])
+  feePaymentOwner   FeePayment?           @relation("FeePaymentDocuments", fields: [feePaymentId], references: [id])
 
   @@index([ownerId, ownerType])
   @@index([documentType])
   @@index([cloudinaryId])
-  @@index([schoolId])
   @@index([uploadedBy])
   @@index([isActive])
   @@index([ownerId, ownerType, documentType])
@@ -1117,7 +949,6 @@ model Document {
 
 model AuditLog {
   id            String      @id @default(cuid())
-  schoolId      String?
   performedById String
   targetUserId  String?
   action        AuditAction
@@ -1141,11 +972,9 @@ model AuditLog {
   duration      Int?
   requestId     String?
   createdAt     DateTime    @default(now())
-  school        School?     @relation(fields: [schoolId], references: [id])
   performedBy   User        @relation("AuditPerformedBy", fields: [performedById], references: [id])
   targetUser    User?       @relation("AuditTargetUser", fields: [targetUserId], references: [id])
 
-  @@index([schoolId])
   @@index([performedById])
   @@index([targetUserId])
   @@index([action])
@@ -1153,14 +982,11 @@ model AuditLog {
   @@index([createdAt])
   @@index([isSuccessful])
   @@index([resourceId, resourceType])
-  @@index([schoolId, action])
-  @@index([schoolId, createdAt])
   @@index([performedById, createdAt])
 }
 
 model SystemLog {
   id         String   @id @default(cuid())
-  schoolId   String?
   userId     String?
   level      LogLevel
   message    String
@@ -1178,18 +1004,14 @@ model SystemLog {
   stackTrace String?
   metadata   Json?
   createdAt  DateTime @default(now())
-  school     School?  @relation(fields: [schoolId], references: [id])
   user       User?    @relation(fields: [userId], references: [id])
 
   @@index([level])
   @@index([module])
-  @@index([schoolId])
   @@index([userId])
   @@index([createdAt])
   @@index([requestId])
   @@index([traceId])
-  @@index([schoolId, level])
-  @@index([schoolId, createdAt])
   @@index([level, createdAt])
 }
 
@@ -1225,35 +1047,24 @@ model RateLimitRecord {
   @@index([identifier, endpoint])
 }
 
-model SchoolApplicationHistory {
-  id              String                  @id @default(cuid())
-  applicationId   String
-  status          SchoolApplicationStatus
-  rejectionReason String?
-  notes           String?
-  changedAt       DateTime                @default(now())
-  changedBy       String
-  application     SchoolApplication       @relation(fields: [applicationId], references: [id])
-}
-
 model TeacherApplicationHistory {
   id              String             @id @default(cuid())
   applicationId   String
   status          ApplicationStatus
+  previousStatus  ApplicationStatus
   rejectionReason String?
   changedAt       DateTime           @default(now())
   changedBy       String
   application     TeacherApplication @relation(fields: [applicationId], references: [id])
-  previousStatus  ApplicationStatus
 }
 
 model AdmissonApplicationHistory {
   id              String               @id @default(cuid())
   applicationId   String
   status          AdmissionStatus
+  previousStatus  AdmissionStatus
   rejectionReason String?
   changedAt       DateTime             @default(now())
   changedBy       String
   application     AdmissionApplication @relation(fields: [applicationId], references: [id])
-  previousStatus  AdmissionStatus
 }

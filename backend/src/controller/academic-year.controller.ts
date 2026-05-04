@@ -19,9 +19,8 @@ export async function createAcademicYear(
     return;
   }
   const adminId = req.user?.id;
-  const schoolId = req.user?.schoolId;
 
-  if (!adminId || !schoolId) {
+  if (!adminId) {
     res.status(400).json({
       success: false,
       message: "Admin ID or School ID is missing",
@@ -35,7 +34,6 @@ export async function createAcademicYear(
   const academicYear = await createAcademicYearService(
     parsed.data,
     adminId,
-    schoolId,
     auditContext,
     res.statusCode,
   );

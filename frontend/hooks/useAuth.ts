@@ -35,10 +35,8 @@ export const useLogin = () => {
       setAccessToken(data.accessToken);
       queryClient.invalidateQueries({ queryKey: QUERY_KEYS.CURRENT_USER });
       toast.success("Welcome Back!");
-      if (data.user.role === "SUPER_ADMIN") {
-        router.push("/super-admin/dashboard");
-      } else if (data.user.role === "ADMIN") {
-        router.push("/admin-dashboard");
+      if (data.user.role === "ADMIN") {
+        router.push("/admin/dashboard");
       } else if (data.user.role === "STUDENT") {
         router.push("/student-dashboard");
       } else if (data.user.role === "PARENT") {

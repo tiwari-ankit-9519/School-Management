@@ -1,7 +1,6 @@
 import {
   LayoutDashboard,
   School,
-  Users,
   BookOpen,
   ClipboardList,
   CalendarDays,
@@ -13,133 +12,123 @@ import {
 } from "lucide-react";
 
 export interface NavChild {
-  label: string;
+  labelKey: string;
   href: string;
 }
 
 export interface NavItem {
-  label: string;
+  labelKey: string;
   href?: string;
   icon: LucideIcon;
   children?: NavChild[];
 }
 
-export type UserRole =
-  | "SUPER_ADMIN"
-  | "ADMIN"
-  | "STUDENT"
-  | "TEACHER"
-  | "PARENT";
+export type UserRole = "ADMIN" | "STUDENT" | "TEACHER" | "PARENT";
 
 export const NAV_CONFIG: Record<UserRole, NavItem[]> = {
-  SUPER_ADMIN: [
-    {
-      label: "Dashboard",
-      href: "/super-admin/dashboard",
-      icon: LayoutDashboard,
-    },
-    {
-      label: "Schools",
-      icon: School,
-      children: [
-        { label: "Applications", href: "/super-admin/view-applications" },
-      ],
-    },
-    {
-      label: "Users",
-      href: "/super-admin/users",
-      icon: Users,
-    },
-  ],
   ADMIN: [
     {
-      label: "Dashboard",
+      labelKey: "dashboard",
       href: "/admin/dashboard",
       icon: LayoutDashboard,
     },
     {
-      label: "Students",
+      labelKey: "schools",
+      icon: School,
+      children: [
+        {
+          labelKey: "Admission Applications",
+          href: "/admin/admission-applications",
+        },
+        {
+          labelKey: "Teacher Applications",
+          href: `/admin/teacher-applications`,
+        },
+      ],
+    },
+    {
+      labelKey: "students",
       href: "/admin/students",
       icon: GraduationCap,
     },
     {
-      label: "Teachers",
+      labelKey: "teachers",
       href: "/admin/teachers",
       icon: UsersRound,
     },
     {
-      label: "Classes",
+      labelKey: "classes",
       href: "/admin/classes",
       icon: BookOpen,
     },
     {
-      label: "Fees",
+      labelKey: "fees",
       href: "/admin/fees",
       icon: Banknote,
     },
     {
-      label: "Settings",
+      labelKey: "settings",
       href: "/admin/settings",
       icon: ClipboardList,
     },
   ],
   STUDENT: [
     {
-      label: "Attendance",
+      labelKey: "attendance",
       href: "/student/attendance",
       icon: ClipboardList,
     },
     {
-      label: "Results",
+      labelKey: "results",
       href: "/student/results",
       icon: GraduationCap,
     },
     {
-      label: "Fees",
+      labelKey: "fees",
       href: "/student/fees",
       icon: Banknote,
     },
     {
-      label: "Timetable",
+      labelKey: "timetable",
       href: "/student/timetable",
       icon: CalendarDays,
     },
   ],
   TEACHER: [
     {
-      label: "Classes",
+      labelKey: "classes",
       href: "/teacher/classes",
       icon: BookOpen,
     },
     {
-      label: "Assignments",
+      labelKey: "assignments",
       href: "/teacher/assignments",
       icon: ClipboardList,
     },
     {
-      label: "Attendance",
+      labelKey: "attendance",
       href: "/teacher/attendance",
       icon: CalendarDays,
     },
     {
-      label: "Results",
+      labelKey: "results",
       href: "/teacher/results",
       icon: GraduationCap,
     },
   ],
   PARENT: [
     {
-      label: "Children",
+      labelKey: "children",
       href: "/parent/children",
       icon: Baby,
     },
     {
-      label: "Fees",
+      labelKey: "fees",
       href: "/parent/fees",
       icon: Banknote,
     },
     {
-      label: "Attendance",
+      labelKey: "attendance",
       href: "/parent/attendance",
       icon: ClipboardList,
     },

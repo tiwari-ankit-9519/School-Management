@@ -28,13 +28,9 @@ export async function applyLeaveRequestForStudent(
   res: Response,
 ): Promise<void> {
   const role = req.user?.role as Role;
-  const schoolId = req.user?.schoolId;
   const requesterId = req?.user?.id;
   if (!role) {
     throw new Error("Role is required");
-  }
-  if (!schoolId) {
-    throw new Error("School ID required");
   }
   if (!requesterId) {
     throw new Error("Requestor ID is required");
@@ -53,7 +49,6 @@ export async function applyLeaveRequestForStudent(
 
   res.status(HTTP_STATUS.CREATED);
   const leaveApplied = await applyLeaveRequestByStudentService(
-    schoolId,
     requesterId,
     role,
     auditContext,
@@ -72,7 +67,6 @@ export async function getLeaveRequestsOfStudentForClassTeacher(
   req: AuthenticatedRequest,
   res: Response,
 ): Promise<void> {
-  const schoolId = req.user?.schoolId;
   const reviewerId = req.user?.id;
   const classId = req.params.classId as string;
   const page = parseInt(req.query.page as string) || 1;
@@ -83,9 +77,6 @@ export async function getLeaveRequestsOfStudentForClassTeacher(
     status,
     studentId,
   };
-  if (!schoolId) {
-    throw new Error("School ID is required");
-  }
   if (!reviewerId) {
     throw new Error("Reviewer ID is required");
   }
@@ -95,7 +86,6 @@ export async function getLeaveRequestsOfStudentForClassTeacher(
   const auditContext = buildAuditContext(req);
 
   const studentLeaves = await getLeaveRequestsOfStudentForClassTeacherService(
-    schoolId,
     reviewerId,
     classId,
     auditContext,
@@ -116,15 +106,11 @@ export async function reviewLeaveRequestOfStudentByClassTeacher(
   req: AuthenticatedRequest,
   res: Response,
 ): Promise<void> {
-  const schoolId = req.user?.schoolId;
   const leaveId = req.params.leaveId as string;
   const reviewerId = req.user?.id;
   const auditContext = buildAuditContext(req);
   const parsed = reviewLeaveRequestSchema.safeParse(req.body);
 
-  if (!schoolId) {
-    throw new Error("School ID is required");
-  }
   if (!leaveId) {
     throw new Error("Leave ID is required");
   }
@@ -142,7 +128,6 @@ export async function reviewLeaveRequestOfStudentByClassTeacher(
   }
 
   await reviewLeaveRequestOfStudentByClassTeacherService(
-    schoolId,
     leaveId,
     reviewerId,
     auditContext,
@@ -160,14 +145,10 @@ export async function applyLeaveRequestByTeacher(
   req: AuthenticatedRequest,
   res: Response,
 ): Promise<void> {
-  const schoolId = req.user?.schoolId;
   const requesterId = req.user?.id;
   const role = req.user?.role as Role;
   const auditContext = buildAuditContext(req);
   const parsed = createLeaveRequestSchema.safeParse(req.body);
-  if (!schoolId) {
-    throw new Error("School ID is required");
-  }
   if (!requesterId) {
     throw new Error("Requester ID is required");
   }
@@ -184,7 +165,6 @@ export async function applyLeaveRequestByTeacher(
   }
 
   const teacherLeave = await applyLeaveRequestByTeacherService(
-    schoolId,
     requesterId,
     role,
     auditContext,
@@ -203,7 +183,6 @@ export async function getLeaveRequestsOfTeacherForModerator(
   req: AuthenticatedRequest,
   res: Response,
 ): Promise<void> {
-  const schoolId = req.user?.schoolId;
   const adminId = req.user?.id;
   const auditContext = buildAuditContext(req);
   const page = parseInt(req.query.page as string) || 1;
@@ -215,9 +194,6 @@ export async function getLeaveRequestsOfTeacherForModerator(
     status,
   };
 
-  if (!schoolId) {
-    throw new Error("School ID is required");
-  }
   if (!adminId) {
     throw new Error("Admin ID is required");
   }
@@ -226,7 +202,6 @@ export async function getLeaveRequestsOfTeacherForModerator(
 
   const teachersLeavesRequest =
     await getLeaveRequestsOfTeacherForModeratorService(
-      schoolId,
       adminId,
       auditContext,
       res.statusCode,
@@ -246,14 +221,10 @@ export async function reviewLeaveRequestOfTeacherForModerator(
   req: AuthenticatedRequest,
   res: Response,
 ): Promise<void> {
-  const schoolId = req.user?.schoolId;
   const leaveId = req.params.leaveId as string;
   const reviewerId = req.user?.id;
   const auditContext = buildAuditContext(req);
   const parsed = reviewLeaveRequestSchema.safeParse(req.body);
-  if (!schoolId) {
-    throw new Error("School ID is required");
-  }
   if (!leaveId) {
     throw new Error("Leave ID is required");
   }
@@ -271,7 +242,6 @@ export async function reviewLeaveRequestOfTeacherForModerator(
 
   res.status(HTTP_STATUS.OK);
   await reviewLeaveRequestOfTeacherForModeratorService(
-    schoolId,
     leaveId,
     reviewerId,
     auditContext,
@@ -289,14 +259,10 @@ export async function applyLeaveRequestByModerator(
   req: AuthenticatedRequest,
   res: Response,
 ): Promise<void> {
-  const schoolId = req.user?.schoolId;
   const requesterId = req.user?.id;
   const role = req.user?.role as Role;
   const auditContext = buildAuditContext(req);
   const parsed = createLeaveRequestSchema.safeParse(req.body);
-  if (!schoolId) {
-    throw new Error("School ID is required");
-  }
   if (!requesterId) {
     throw new Error("Requester ID is required");
   }
@@ -314,7 +280,6 @@ export async function applyLeaveRequestByModerator(
 
   res.status(HTTP_STATUS.CREATED);
   const moderatorLeaves = await applyLeaveRequestByModeratorService(
-    schoolId,
     requesterId,
     role,
     auditContext,
@@ -333,7 +298,6 @@ export async function getLeaveRequestsOfModeratorForAdmin(
   req: AuthenticatedRequest,
   res: Response,
 ): Promise<void> {
-  const schoolId = req.user?.schoolId;
   const adminId = req.user?.id;
   const auditContext = buildAuditContext(req);
   const page = parseInt(req.query.page as string) || 1;
@@ -345,9 +309,6 @@ export async function getLeaveRequestsOfModeratorForAdmin(
     moderatorId,
   };
 
-  if (!schoolId) {
-    throw new Error("School ID is required");
-  }
   if (!adminId) {
     throw new Error("Admin ID is required");
   }
@@ -355,7 +316,6 @@ export async function getLeaveRequestsOfModeratorForAdmin(
   res.status(HTTP_STATUS.OK);
   const moderatorLeaveRequest =
     await getLeaveRequestsOfModeratorForAdminService(
-      schoolId,
       adminId,
       auditContext,
       res.statusCode,
@@ -375,7 +335,6 @@ export async function reviewLeaveRequestOfModeratorForAdmin(
   req: AuthenticatedRequest,
   res: Response,
 ): Promise<void> {
-  const schoolId = req.user?.schoolId;
   const leaveId = req.params.leaveId as string;
   const reviewerId = req.user?.id;
   const auditContext = buildAuditContext(req);
@@ -388,9 +347,6 @@ export async function reviewLeaveRequestOfModeratorForAdmin(
     });
     return;
   }
-  if (!schoolId) {
-    throw new Error("School ID is required");
-  }
   if (!leaveId) {
     throw new Error("Leave ID is required");
   }
@@ -401,7 +357,6 @@ export async function reviewLeaveRequestOfModeratorForAdmin(
   res.status(HTTP_STATUS.OK);
 
   await reviewLeaveRequestOfModeratorForAdminService(
-    schoolId,
     leaveId,
     reviewerId,
     auditContext,
@@ -419,15 +374,11 @@ export async function getMyLeaveRequests(
   req: AuthenticatedRequest,
   res: Response,
 ): Promise<void> {
-  const schoolId = req.user?.schoolId;
   const requesterId = req.user?.id;
   const auditContext = buildAuditContext(req);
   const page = parseInt(req.query.page as string) || 1;
   const limit = parseInt(req.query.limit as string) || 10;
   const status = (req.query.status as LeaveStatus) || undefined;
-  if (!schoolId) {
-    throw new Error("School ID is required");
-  }
   if (!requesterId) {
     throw new Error("Requester ID is required");
   }
@@ -438,7 +389,6 @@ export async function getMyLeaveRequests(
   res.status(HTTP_STATUS.OK);
 
   const myLeaveRequests = await getMyLeaveRequestsService(
-    schoolId,
     requesterId,
     auditContext,
     res.statusCode,

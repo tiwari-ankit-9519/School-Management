@@ -7,6 +7,7 @@ import {
   ModeratorSchema,
   RejectTeacherApplicationSchema,
   ResubmitApplicationSchema,
+  ResubmitTeacherApplicationSchema,
   TeacherApplicationSchema,
   UpdateUserPermissionSchema,
 } from "../validations/input.validations";
@@ -39,9 +40,8 @@ export async function createModerator(
   }
 
   const auditContext = buildAuditContext(req);
-  const schoolId = req.user?.schoolId;
   const adminId = req.user?.id;
-  if (!schoolId || !adminId) {
+  if (!adminId) {
     throw new Error("School Id or Admin ID are required");
   }
 
@@ -49,7 +49,6 @@ export async function createModerator(
 
   const moderator = await createModeratorService(
     parsed.data,
-    schoolId,
     adminId,
     auditContext,
     res.statusCode,
@@ -91,15 +90,10 @@ export async function createTeacherApplication(
 
   const files = (req.files as Express.Multer.File[]) ?? [];
   const auditContext = buildAuditContext(req);
-  const schoolId = req.params.schoolId as string;
-  if (!schoolId) {
-    throw new Error("School Id is required");
-  }
 
   res.status(HTTP_STATUS.CREATED);
   const teacherApplication = await teacherApplicationService(
     parsed.data,
-    schoolId,
     files,
     auditContext,
     res.statusCode,
@@ -116,11 +110,7 @@ export async function viewAllTeacherApplications(
   req: AuthenticatedRequest,
   res: Response,
 ): Promise<void> {
-  const schoolId = req.user?.schoolId;
   const auditContext = buildAuditContext(req);
-  if (!schoolId) {
-    throw new Error("School ID is required");
-  }
   const page = parseInt(req.query.page as string) || 1;
   const limit = parseInt(req.query.limit as string) || 10;
   const status = req.query.status as ApplicationStatus | undefined;
@@ -131,7 +121,6 @@ export async function viewAllTeacherApplications(
     res.statusCode,
     page,
     limit,
-    schoolId,
     status,
   );
 
@@ -147,15 +136,13 @@ export async function viewTeacherApplication(
   res: Response,
 ): Promise<void> {
   const auditContext = buildAuditContext(req);
-  const schoolId = req.user?.schoolId;
   const applicationId = req.params.applicationId as string;
-  if (!schoolId || !applicationId) {
+  if (!applicationId) {
     throw new Error("Application ID and School ID is required");
   }
   res.status(HTTP_STATUS.OK);
   const application = await getTeacherApplicationService(
     applicationId,
-    schoolId,
     auditContext,
     res.statusCode,
   );
@@ -170,13 +157,9 @@ export async function shortlistTeacherApplication(
   req: AuthenticatedRequest,
   res: Response,
 ): Promise<void> {
-  const applicationId = req.params.id as string;
+  const applicationId = req.params.applicationId as string;
   const moderatorId = req.user?.id;
-  const schoolId = req.user?.schoolId;
   const auditcontext = buildAuditContext(req);
-  if (!schoolId) {
-    throw new Error("SchoolID is missing");
-  }
   if (!applicationId) {
     throw new Error("Application ID is missing");
   }
@@ -186,7 +169,6 @@ export async function shortlistTeacherApplication(
   const updatedApplication = await shortlistApplicationService(
     applicationId,
     moderatorId,
-    schoolId,
     auditcontext,
     res.statusCode,
   );
@@ -201,14 +183,10 @@ export async function approveTeacherApplication(
   req: AuthenticatedRequest,
   res: Response,
 ): Promise<void> {
-  const schoolId = req.user?.schoolId;
   const adminId = req.user?.id;
-  const applicationId = req.params.id as string;
+  const applicationId = req.params.applicationId as string;
   const auditContext = buildAuditContext(req);
 
-  if (!schoolId) {
-    throw new Error("SchoolID is missing");
-  }
   if (!applicationId) {
     throw new Error("Application ID is missing");
   }
@@ -220,7 +198,6 @@ export async function approveTeacherApplication(
 
   const teacher = await approveTeacherApplicationService(
     applicationId,
-    schoolId,
     adminId,
     auditContext,
     res.statusCode,
@@ -248,13 +225,9 @@ export async function rejectTeacherApplication(
     return;
   }
 
-  const schoolId = req.user?.schoolId;
   const moderatorId = req.user?.id;
-  const applicationId = req.params.id as string;
+  const applicationId = req.params.applicationId as string;
 
-  if (!schoolId) {
-    throw new Error("School ID is required");
-  }
   if (!applicationId) {
     throw new Error("Application ID is required");
   }
@@ -266,7 +239,6 @@ export async function rejectTeacherApplication(
 
   await rejectTeacherApplicaitonService(
     applicationId,
-    schoolId,
     moderatorId,
     parsed.data.rejectionReason,
     auditContext,
@@ -284,7 +256,7 @@ export async function resubmitTeacherApplication(
   res: Response,
 ): Promise<void> {
   const auditContext = buildAuditContext(req);
-  const applicationId = req.params.id as string;
+  const applicationId = req.params.applicationId as string;
 
   if (req.body.documents && typeof req.body.documents === "string") {
     try {
@@ -299,7 +271,7 @@ export async function resubmitTeacherApplication(
     }
   }
 
-  const parsed = ResubmitApplicationSchema.safeParse(req.body);
+  const parsed = ResubmitTeacherApplicationSchema.safeParse(req.body);
   if (!parsed.success) {
     res.status(400).json({
       success: false,
@@ -347,14 +319,12 @@ export async function updateUserPermissions(
     return;
   }
 
-  const schoolId = req.user?.schoolId as string;
   const adminId = req.user?.id as string;
 
   res.status(HTTP_STATUS.OK);
 
   const result = await updateUserPermissionsService(
     parsed.data,
-    schoolId,
     adminId,
     auditContext,
     res.statusCode,

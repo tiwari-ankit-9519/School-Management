@@ -9,7 +9,6 @@ import { StudentWithClassDetailsReturn } from "../validations/input.validations"
 const log = createModuleLogger("StudentModule");
 
 export async function getAllStudentsListService(
-  schoolId: string,
   moderatorId: string,
   context: AuditContext,
   statusCode: number,
@@ -29,12 +28,9 @@ export async function getAllStudentsListService(
   totalPages: number;
 }> {
   try {
-    log.info(
-      `Starting service to get list of all student of school with id ${schoolId}`,
-    );
+    log.info(`Starting service to get list of all student of school`);
 
     const cacheKey = CACHE_KEYS.allStudents(
-      schoolId,
       page,
       limit,
       filters?.classId || "ALL",
@@ -52,15 +48,11 @@ export async function getAllStudentsListService(
     }>(cacheKey);
 
     if (cached) {
-      log.info(`Returning all students of school with id ${schoolId}`);
+      log.info(`Returning all students of school`);
       return cached;
     }
 
-    const where: Prisma.EnrollmentWhereInput = {
-      class: {
-        schoolId,
-      },
-    };
+    const where: Prisma.EnrollmentWhereInput = {};
 
     if (filters?.classId) where.classId = filters.classId;
     if (filters?.academicYearId) where.academicYearId = filters.academicYearId;
@@ -87,7 +79,6 @@ export async function getAllStudentsListService(
       context,
       statusCode,
       metadata: {
-        schoolId,
         moderatorId,
         filters,
       },
@@ -99,15 +90,14 @@ export async function getAllStudentsListService(
       limit,
       totalPages: Math.ceil(total / limit),
     };
-    await setCache(cacheKey, response, CACHE_TTL.SCHOOL_APPLICATIONS_LIST);
-    log.info(`Fetched all students of school with id ${schoolId}`);
+    await setCache(cacheKey, response, CACHE_TTL.ADMISSION_APPLICATIONS_LIST);
+    log.info(`Fetched all students of school`);
     return response;
   } catch (error) {
     const err = error as Error;
     log.error("Internal Server Error", {
       error: err.message,
       ipAddress: context.ipAddress,
-      schoolId,
     });
     throw err;
   }
@@ -115,7 +105,6 @@ export async function getAllStudentsListService(
 
 export async function getSingleStudentDetailService(
   studentId: string,
-  schoolId: string,
   context: AuditContext,
   statusCode: number,
   filters: {
@@ -134,7 +123,6 @@ export async function getSingleStudentDetailService(
     const studentDetail = await prisma.enrollment.findFirst({
       where: {
         studentId,
-        class: { schoolId },
         ...(filters?.academicYearId && {
           academicYearId: filters.academicYearId,
         }),

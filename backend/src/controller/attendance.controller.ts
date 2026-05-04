@@ -24,12 +24,8 @@ export async function markStudentAttendance(
   res: Response,
 ): Promise<void> {
   const classId = req.params.id as string;
-  const schoolId = req.user?.schoolId;
   const classTeacherId = req.user?.id;
   const auditContext = buildAuditContext(req);
-  if (!schoolId) {
-    throw new Error("School ID is required");
-  }
   if (!classId) {
     throw new Error("Class ID is required");
   }
@@ -51,7 +47,6 @@ export async function markStudentAttendance(
 
   const studentAttendance = await markStudentAttendanceService(
     classId,
-    schoolId,
     parsed.data,
     classTeacherId,
     auditContext,
@@ -69,11 +64,7 @@ export async function markTeacherAttendance(
   req: AuthenticatedRequest,
   res: Response,
 ): Promise<void> {
-  const schoolId = req.user?.schoolId;
   const moderatorId = req.user?.id;
-  if (!schoolId) {
-    throw new Error(`School ID is requird`);
-  }
   if (!moderatorId) {
     throw new Error(`Moderator ID is required`);
   }
@@ -93,7 +84,6 @@ export async function markTeacherAttendance(
   res.status(HTTP_STATUS.CREATED);
 
   const teacherAttendance = await markTeacherAttendanceService(
-    schoolId,
     parsed.data,
     auditContext,
     moderatorId,
@@ -111,7 +101,6 @@ export async function markModeratorAttendance(
   req: AuthenticatedRequest,
   res: Response,
 ): Promise<void> {
-  const schoolId = req.user?.schoolId;
   const adminId = req.user?.id;
   const auditContext = buildAuditContext(req);
   const parsed = ModeratorAttendanceSchema.safeParse(req.body);
@@ -124,9 +113,6 @@ export async function markModeratorAttendance(
     return;
   }
 
-  if (!schoolId) {
-    throw new Error("School ID is required");
-  }
   if (!adminId) {
     throw new Error("Admin ID is required");
   }
@@ -134,7 +120,6 @@ export async function markModeratorAttendance(
   res.status(HTTP_STATUS.CREATED);
 
   const moderatorAttendance = await markModeratorAttendanceService(
-    schoolId,
     parsed.data,
     auditContext,
     res.statusCode,
@@ -156,12 +141,8 @@ export async function getStudentAttendance(
   const limit = parseInt(req.query.limit as string) || 10;
   const date = req.query.date as string | undefined;
   const status = req.query.status as AttendanceStatus | undefined;
-  const schoolId = req.user?.schoolId;
   const classId = req.params.id as string;
   const classTeacherId = req.user?.id;
-  if (!schoolId) {
-    throw new Error("School ID is required");
-  }
   if (!classTeacherId) {
     throw new Error("Teacher ID is required");
   }
@@ -182,7 +163,6 @@ export async function getStudentAttendance(
     classTeacherId,
     auditContext,
     res.statusCode,
-    schoolId,
     page,
     limit,
     filters,
@@ -199,11 +179,6 @@ export async function getTeachersAttendance(
   req: AuthenticatedRequest,
   res: Response,
 ): Promise<void> {
-  const schoolId = req.user?.schoolId;
-  if (!schoolId) {
-    throw new Error("School ID is required");
-  }
-
   const date = req.query.date as string | undefined;
   const status = req.query.status as AttendanceStatus | undefined;
 
@@ -219,7 +194,6 @@ export async function getTeachersAttendance(
   const allTeachersAttendance = await getTeachersAttendanceService(
     auditContext,
     res.statusCode,
-    schoolId,
     page,
     limit,
     filters,
@@ -236,11 +210,6 @@ export async function getAdminsAttendance(
   req: AuthenticatedRequest,
   res: Response,
 ): Promise<void> {
-  const schoolId = req.user?.schoolId;
-  if (!schoolId) {
-    throw new Error("School ID is required");
-  }
-
   const date = req.query.date as string | undefined;
   const status = req.query.status as AttendanceStatus | undefined;
 
@@ -256,7 +225,6 @@ export async function getAdminsAttendance(
   const allAdminsAttendance = await getAdminsAttendanceService(
     auditContext,
     res.statusCode,
-    schoolId,
     page,
     limit,
     filters,

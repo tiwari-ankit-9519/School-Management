@@ -39,7 +39,6 @@ import {
 import { checkRedisConnection } from "./config/redis.config.js";
 import { createModuleLogger } from "./config/logger.config.js";
 import authRoute from "@/src/routes/auth.route.js";
-import schoolApplicationRoute from "@/src/routes/school-application.route.js";
 import academicYearRoute from "@/src/routes/academic-year.route.js";
 import classRoute from "@/src/routes/class.route.js";
 import subjectRoute from "@/src/routes/subject.route.js";
@@ -171,7 +170,6 @@ app.use(`${API_PREFIX}/super-admin`, strictRateLimit);
 app.use(requestContextMiddleware);
 
 app.use(`${API_PREFIX}/auth`, authRoute);
-app.use(`${API_PREFIX}/school-application`, schoolApplicationRoute);
 app.use(`${API_PREFIX}/school/academic-year`, academicYearRoute);
 app.use(`${API_PREFIX}/school/class`, classRoute);
 app.use(`${API_PREFIX}/school/subject`, subjectRoute);

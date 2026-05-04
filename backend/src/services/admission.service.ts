@@ -34,6 +34,7 @@ import {
   setCache,
 } from "../utils/cache.util";
 import { hashPassword } from "../utils/password";
+import { generateRegistrationNumber } from "../utils/registration.util";
 
 const log = createModuleLogger("AdmissionServiceLogger");
 
@@ -42,7 +43,6 @@ export async function submitAdmissionApplicationService(
   files: Express.Multer.File[],
   photoUrl: Express.Multer.File | undefined,
   guardianPhotoUrl: Express.Multer.File | undefined,
-  schoolId: string,
   context: AuditContext,
   statusCode: number,
 ): Promise<AdmissionApplication> {
@@ -52,48 +52,44 @@ export async function submitAdmissionApplicationService(
       data,
     });
 
-    const [admissionApplicationExists, school] = await Promise.all([
-      await prisma.admissionApplication.findFirst({
-        where: {
-          schoolId,
-          firstName: {
-            equals: data.firstName,
-            mode: "insensitive",
+    const [admissionApplicationExists, school, currentAcademicYear] =
+      await Promise.all([
+        prisma.admissionApplication.findFirst({
+          where: {
+            firstName: { equals: data.firstName, mode: "insensitive" },
+            lastName: { equals: data.lastName, mode: "insensitive" },
+            dateOfBirth: data.dateOfBirth,
+            appliedForClass: data.appliedForClass,
+            guardianPhone: data.guardianPhone,
+            guardianRelation: data.guardianRelation,
           },
-          lastName: {
-            equals: data.lastName,
-            mode: "insensitive",
-          },
-          dateOfBirth: data.dateOfBirth,
-          appliedForClass: data.appliedForClass,
-          guardianPhone: data.guardianPhone,
-          guardianRelation: data.guardianRelation,
-        },
-      }),
-      await prisma.school.findUnique({
-        where: {
-          id: schoolId,
-        },
-      }),
-    ]);
+        }),
+        prisma.schoolConfig.findFirst(),
+        prisma.academicYear.findFirst({
+          where: { isCurrent: true },
+        }),
+      ]);
+
+    if (!currentAcademicYear) {
+      throw new Error(
+        "No active academic year found. Cannot accept applications.",
+      );
+    }
 
     if (admissionApplicationExists) {
       if (admissionApplicationExists.status === "REJECTED") {
         log.info("Resubmitting student admission application", {
           existingAdmissionApplicationId: admissionApplicationExists.id,
         });
-
         const uploadedFiles: Array<{
           uploadResult: CloudinaryUploadResult;
           documentType: DocumentType;
           title: string;
         }> = [];
-
         if (files.length > 0) {
           log.info("Uploading documents to cloudinary", {
             fileCount: files.length,
           });
-
           for (let index = 0; index < files.length; index++) {
             const file = files[index];
             const documentMeta = data.documents?.[index];
@@ -113,7 +109,6 @@ export async function submitAdmissionApplicationService(
             });
           }
         }
-
         const resubmittedAdmissionApplication = await prisma.$transaction(
           async (tx) => {
             const updated = await tx.admissionApplication.update({
@@ -135,6 +130,7 @@ export async function submitAdmissionApplicationService(
                 guardianRelation: data.guardianRelation,
                 guardianPhone: data.guardianPhone,
                 guardianEmail: data.guardianEmail,
+                status: "PENDING",
                 photoUrl: photoUrl
                   ? (
                       await uploadToCloudinary(
@@ -153,18 +149,14 @@ export async function submitAdmissionApplicationService(
                   : null,
               },
             });
-
             if (uploadedFiles.length > 0) {
               const existingDocs = await tx.document.findMany({
                 where: {
                   ownerId: updated.id,
-                  ownerType: "TEACHER_APPLICATION",
+                  ownerType: "ADMISSION_APPLICATION",
                 },
-                select: {
-                  cloudinaryId: true,
-                },
+                select: { cloudinaryId: true },
               });
-
               existingDocs.forEach(({ cloudinaryId }) => {
                 deleteFromCloudinary(cloudinaryId).catch((err) => {
                   log.warn("Failed to delete old document from cloudinary", {
@@ -173,13 +165,12 @@ export async function submitAdmissionApplicationService(
                   });
                 });
               });
-
               await tx.document.createMany({
                 data: uploadedFiles.map(
                   ({ uploadResult, documentType, title }) => ({
                     ownerId: updated.id,
-                    ownerType: "TEACHER_APPLICATION" as DocumentOwnerType,
-                    teacherAppId: updated.id,
+                    ownerType: "ADMISSION_APPLICATION" as DocumentOwnerType,
+                    admissionId: updated.id,
                     documentType,
                     title,
                     originalFileName: uploadResult.originalFileName,
@@ -196,7 +187,6 @@ export async function submitAdmissionApplicationService(
                   }),
                 ),
               });
-
               log.info("Documents saved to database", {
                 applicationId: updated.id,
                 documentCount: uploadedFiles.length,
@@ -205,13 +195,12 @@ export async function submitAdmissionApplicationService(
             return updated;
           },
         );
-
         await createSystemLog({
           level: "INFO",
-          message: "Admission Application resubmitted",
+          message: "Admission application resubmitted",
           module: "AdmissionApplication",
           metadata: {
-            teacherApplicationId: resubmittedAdmissionApplication.id,
+            admissionApplicationId: resubmittedAdmissionApplication.id,
             firstName: data.firstName,
             lastName: data.lastName,
             email: data.guardianEmail,
@@ -220,13 +209,11 @@ export async function submitAdmissionApplicationService(
           context,
           statusCode,
         });
-
-        log.info("Teacher application resubmitted successfully", {
+        log.info("Admission application resubmitted successfully", {
           applicationId: resubmittedAdmissionApplication.id,
           email: data.guardianEmail,
           documentCount: uploadedFiles.length,
         });
-
         await sendAdmissionApplicationResubmittedEmailService({
           studentFirstName: data.firstName,
           studentLastName: data.lastName,
@@ -238,15 +225,12 @@ export async function submitAdmissionApplicationService(
           schoolName: school!.name,
           applicationId: resubmittedAdmissionApplication.id,
         });
-
         return resubmittedAdmissionApplication;
       }
-
       log.warn("Admission application already exists", {
         existingAdmissionApplicationId: admissionApplicationExists.id,
-        existitngAdmissionApplicationStatus: admissionApplicationExists.status,
+        existingAdmissionApplicationStatus: admissionApplicationExists.status,
       });
-
       throw new Error("An admission application already exists");
     }
 
@@ -255,12 +239,10 @@ export async function submitAdmissionApplicationService(
       documentType: DocumentType;
       title: string;
     }> = [];
-
     if (files.length > 0) {
       log.info("Uploading documents to Cloudinary", {
         fileCount: files.length,
       });
-
       for (let i = 0; i < files.length; i++) {
         const file = files[i];
         const documentMeta = data.documents?.[i];
@@ -284,7 +266,6 @@ export async function submitAdmissionApplicationService(
     const newAdmissionApplication = await prisma.$transaction(async (tx) => {
       const application = await tx.admissionApplication.create({
         data: {
-          schoolId,
           firstName: data.firstName,
           lastName: data.lastName,
           gender: data.gender,
@@ -315,32 +296,12 @@ export async function submitAdmissionApplicationService(
             : null,
         },
       });
-
       if (uploadedFiles.length > 0) {
-        const existingDocs = await tx.document.findMany({
-          where: {
-            ownerId: application.id,
-            ownerType: "TEACHER_APPLICATION",
-          },
-          select: {
-            cloudinaryId: true,
-          },
-        });
-
-        existingDocs.forEach(({ cloudinaryId }) => {
-          deleteFromCloudinary(cloudinaryId).catch((err) => {
-            log.warn("Failed to delete old document from Cloudinary", {
-              cloudinaryId,
-              error: (err as Error).message,
-            });
-          });
-        });
-
         await tx.document.createMany({
           data: uploadedFiles.map(({ uploadResult, documentType, title }) => ({
             ownerId: application.id,
-            ownerType: "TEACHER_APPLICATION" as DocumentOwnerType,
-            teacherAppId: application.id,
+            ownerType: "ADMISSION_APPLICATION" as DocumentOwnerType,
+            admissionId: application.id,
             documentType,
             title,
             originalFileName: uploadResult.originalFileName,
@@ -356,7 +317,6 @@ export async function submitAdmissionApplicationService(
             uploadedBy: "APPLICANT",
           })),
         });
-
         log.info("Documents saved to database", {
           applicationId: application.id,
           documentCount: uploadedFiles.length,
@@ -367,7 +327,7 @@ export async function submitAdmissionApplicationService(
 
     await createSystemLog({
       level: "INFO",
-      message: "Admission application submitted succesfully",
+      message: "Admission application submitted successfully",
       module: "AdmissionApplication",
       metadata: {
         applicationId: newAdmissionApplication.id,
@@ -378,14 +338,12 @@ export async function submitAdmissionApplicationService(
       context,
       statusCode,
     });
-
-    log.info("Teacher application created successfully", {
+    log.info("Admission application created successfully", {
       applicationId: newAdmissionApplication.id,
       firstName: newAdmissionApplication.firstName,
       lastName: newAdmissionApplication.lastName,
       email: newAdmissionApplication.guardianEmail,
     });
-
     await sendAdmissionApplicationSubmittedEmailService({
       studentFirstName: data.firstName,
       studentLastName: data.lastName,
@@ -411,7 +369,6 @@ export async function submitAdmissionApplicationService(
 }
 
 export async function getAllAdmissionApplicationService(
-  schoolId: string,
   context: AuditContext,
   statusCode: number,
   page: number = 1,
@@ -429,13 +386,12 @@ export async function getAllAdmissionApplicationService(
       page,
       limit,
       status: status ?? "ALL",
-      schoolId,
       ipAddress: context.ipAddress,
     });
 
-    const where = status ? { schoolId, status } : { schoolId };
+    const where = status ? { status } : {};
+
     const cacheKey = CACHE_KEYS.admissionApplications(
-      schoolId,
       status ?? "ALL",
       page,
       limit,
@@ -459,14 +415,9 @@ export async function getAllAdmissionApplicationService(
         where,
         skip: (page - 1) * limit,
         take: limit,
-        orderBy: {
-          appliedAt: "desc",
-        },
-        include: {
-          documents: true,
-        },
+        orderBy: { appliedAt: "desc" },
+        include: { documents: true },
       }),
-
       prisma.admissionApplication.count({ where }),
     ]);
 
@@ -492,9 +443,9 @@ export async function getAllAdmissionApplicationService(
       totalPages: Math.ceil(total / limit),
     };
 
-    await setCache(cacheKey, response, CACHE_TTL.SCHOOL_APPLICATIONS_LIST);
+    await setCache(cacheKey, response, CACHE_TTL.ADMISSION_APPLICATIONS_LIST);
 
-    log.info("Fetched all admission application successfully", {
+    log.info("Fetched all admission applications successfully", {
       page,
       limit,
       total,
@@ -517,7 +468,6 @@ export async function getAllAdmissionApplicationService(
 
 export async function getAdmissionApplicationService(
   applicationId: string,
-  schoolId: string,
   context: AuditContext,
   statusCode: number,
 ): Promise<AdmissionApplication> {
@@ -525,12 +475,11 @@ export async function getAdmissionApplicationService(
     log.info(
       `Starting service to fetch admission application with applicationId ${applicationId}`,
       {
-        schoolId,
         ipAddress: context.ipAddress,
       },
     );
 
-    const cacheKey = CACHE_KEYS.admissionApplication(schoolId, applicationId);
+    const cacheKey = CACHE_KEYS.admissionApplication(applicationId);
     const cached = await getCache<AdmissionApplication>(cacheKey);
 
     if (cached) {
@@ -540,7 +489,6 @@ export async function getAdmissionApplicationService(
 
     const application = await prisma.admissionApplication.findUnique({
       where: {
-        schoolId,
         id: applicationId,
       },
     });
@@ -561,12 +509,15 @@ export async function getAdmissionApplicationService(
       context,
       metadata: {
         applicationId,
-        schoolId,
       },
       statusCode,
     });
 
-    await setCache(cacheKey, application, CACHE_TTL.SCHOOL_APPLICATION_SINGLE);
+    await setCache(
+      cacheKey,
+      application,
+      CACHE_TTL.ADMISSION_APPLICATION_SINGLE,
+    );
     log.info("Fetched admission applicaiton successfully");
     return application;
   } catch (error) {
@@ -577,7 +528,6 @@ export async function getAdmissionApplicationService(
         error: err.message,
         ipAddress: context.ipAddress,
         applicationId,
-        schoolId,
       },
     );
     throw err;
@@ -587,7 +537,6 @@ export async function getAdmissionApplicationService(
 export async function approveAdmissionApplicationService(
   applicationId: string,
   reviewerId: string,
-  schoolId: string,
   context: AuditContext,
   classId: string,
   statusCode: number,
@@ -597,40 +546,31 @@ export async function approveAdmissionApplicationService(
       `Starting service to approve admission applicaiton with applicationId ${applicationId}`,
       {
         ipAddress: context.ipAddress,
-        schoolId,
         reviewerId,
       },
     );
-    const [admissionApplicationExists, school, currentAcademicYear] =
-      await Promise.all([
+    const [admissionApplicationExists, currentAcademicYear] = await Promise.all(
+      [
         prisma.admissionApplication.findUnique({
           where: {
             id: applicationId,
-            schoolId,
           },
         }),
-        prisma.school.findUnique({
-          where: {
-            id: schoolId,
-          },
-        }),
+
         prisma.academicYear.findFirst({
           where: {
-            schoolId,
             isCurrent: true,
           },
         }),
-      ]);
+      ],
+    );
     if (!admissionApplicationExists) {
       log.warn(
         `No admission application found with applicationId ${applicationId}`,
       );
       throw new Error(`Application not found`);
     }
-    if (!school) {
-      log.warn(`School not found with schoolId ${schoolId}`);
-      throw new Error(`School not found`);
-    }
+
     if (!currentAcademicYear) {
       throw new Error(`No active academic year found for this school`);
     }
@@ -645,25 +585,15 @@ export async function approveAdmissionApplicationService(
     const classExists = await prisma.class.findUnique({
       where: { id: classId },
     });
-    if (
-      !classExists ||
-      classExists.schoolId !== schoolId ||
-      classExists.academicYearId !== currentAcademicYear.id
-    ) {
+    if (!classExists || classExists.academicYearId !== currentAcademicYear.id) {
       log.warn(`Class not found or does not belong to current academic year`);
       throw new Error(
         `Class not found or does not belong to current academic year`,
       );
     }
     const response = await prisma.$transaction(async (tx) => {
-      const [{ generate_registration_number: studentRegNumber }] =
-        await tx.$queryRaw<[{ generate_registration_number: string }]>`
-        SELECT generate_registration_number(${schoolId}, ${Role.STUDENT})
-      `;
-      const [{ generate_registration_number: parentRegNumber }] =
-        await tx.$queryRaw<[{ generate_registration_number: string }]>`
-        SELECT generate_registration_number(${schoolId}, ${Role.PARENT})
-      `;
+      const studentRegNumber = await generateRegistrationNumber(Role.STUDENT);
+      const parentRegNumber = await generateRegistrationNumber(Role.PARENT);
       const studentTempPassword = `STUDENT@${Math.random().toString(36).slice(-8)}`;
       const parentTempPassword = `PARENT@${Math.random().toString(36).slice(-8)}`;
       const hasedPasswordStudent = await hashPassword(studentTempPassword);
@@ -687,7 +617,6 @@ export async function approveAdmissionApplicationService(
       }
       const studentUser = await tx.user.create({
         data: {
-          schoolId,
           regNumber: studentRegNumber,
           email: null,
           phone: null,
@@ -717,7 +646,6 @@ export async function approveAdmissionApplicationService(
       });
       const parentUser = await tx.user.create({
         data: {
-          schoolId,
           regNumber: parentRegNumber,
           email: admissionApplicationExists.guardianEmail,
           phone: admissionApplicationExists.guardianPhone,
@@ -757,7 +685,6 @@ export async function approveAdmissionApplicationService(
       await tx.admissionApplication.update({
         where: {
           id: applicationId,
-          schoolId,
         },
         data: {
           status: "APPROVED",
@@ -821,18 +748,13 @@ export async function approveAdmissionApplicationService(
       };
     });
     await Promise.all([
-      deleteCache(CACHE_KEYS.admissionApplication(schoolId, applicationId)),
-      deleteCache(CACHE_KEYS.admissionApplications(schoolId, "ALL", 1, 10)),
-      deleteCache(CACHE_KEYS.admissionApplications(schoolId, "PENDING", 1, 10)),
-      deleteCache(
-        CACHE_KEYS.admissionApplications(schoolId, "APPROVED", 1, 10),
-      ),
-      deleteCache(
-        CACHE_KEYS.admissionApplications(schoolId, "SHORTLISTED", 1, 10),
-      ),
+      deleteCache(CACHE_KEYS.admissionApplication(applicationId)),
+      deleteCache(CACHE_KEYS.admissionApplications("ALL", 1, 10)),
+      deleteCache(CACHE_KEYS.admissionApplications("PENDING", 1, 10)),
+      deleteCache(CACHE_KEYS.admissionApplications("APPROVED", 1, 10)),
+      deleteCache(CACHE_KEYS.admissionApplications("SHORTLISTED", 1, 10)),
     ]);
     await createAuditLog({
-      schoolId,
       performedById: reviewerId,
       action: "APPROVE",
       module: "Admission",
@@ -877,7 +799,7 @@ export async function approveAdmissionApplicationService(
       parentRegNumber: response.parentRegNumber,
       studentTempPassword: response.studentTempPassword,
       parentTempPassword: response.parentTempPassword,
-      schoolName: school.name,
+      schoolName: null as unknown as string,
       applicationId: admissionApplicationExists.id,
       appliedForClass: admissionApplicationExists.appliedForClass,
     });
@@ -889,7 +811,6 @@ export async function approveAdmissionApplicationService(
       {
         error: err.message,
         ipAddress: context.ipAddress,
-        schoolId,
       },
     );
     throw err;
@@ -898,7 +819,6 @@ export async function approveAdmissionApplicationService(
 
 export async function rejectAdmissionnApplicationService(
   applicationId: string,
-  schoolId: string,
   moderatorId: string,
   rejectionReason: string,
   context: AuditContext,
@@ -908,20 +828,12 @@ export async function rejectAdmissionnApplicationService(
     log.info(`Starting Admission Application rejection service`, {
       applicationId,
       ipAddress: context.ipAddress,
-      schoolId,
     });
 
-    const [admissionApplication, school] = await Promise.all([
+    const [admissionApplication] = await Promise.all([
       await prisma.admissionApplication.findUnique({
         where: {
           id: applicationId,
-          schoolId,
-        },
-      }),
-
-      await prisma.school.findUnique({
-        where: {
-          id: schoolId,
         },
       }),
     ]);
@@ -950,7 +862,7 @@ export async function rejectAdmissionnApplicationService(
 
     await prisma.$transaction(async (tx) => {
       await tx.admissionApplication.update({
-        where: { id: applicationId, schoolId },
+        where: { id: applicationId },
         data: {
           status: "REJECTED",
           reviewedAt: new Date(),
@@ -971,7 +883,6 @@ export async function rejectAdmissionnApplicationService(
 
       const nextWaitListed = await tx.admissionApplication.findFirst({
         where: {
-          schoolId,
           appliedForClass: admissionApplication.appliedForClass,
           status: "WAITLISTED",
         },
@@ -997,7 +908,6 @@ export async function rejectAdmissionnApplicationService(
 
         await tx.admissionApplication.updateMany({
           where: {
-            schoolId,
             appliedForClass: admissionApplication.appliedForClass,
             status: "WAITLISTED",
             waitlistPosition: { gt: promotedPosition },
@@ -1019,7 +929,6 @@ export async function rejectAdmissionnApplicationService(
     });
 
     await createAuditLog({
-      schoolId,
       performedById: moderatorId,
       action: "REJECT",
       module: "AdmissionApplication",
@@ -1057,7 +966,7 @@ export async function rejectAdmissionnApplicationService(
       guardianLastName: admissionApplication.guardianLastName,
       guardianEmail: admissionApplication.guardianEmail ?? "",
       appliedForClass: admissionApplication.appliedForClass,
-      schoolName: school!.name,
+      schoolName: null as unknown as string,
       applicationId,
       rejectionReason,
     });
@@ -1098,12 +1007,6 @@ export async function resubmitAdmissionApplicationService(
       await prisma.admissionApplication.findUnique({
         where: { id: applicationId },
       });
-
-    const school = await prisma.school.findUnique({
-      where: {
-        id: admissionApplicationExists?.schoolId,
-      },
-    });
 
     if (!admissionApplicationExists) {
       log.warn(`Application not found with applicationId ${applicationId}`);
@@ -1247,7 +1150,7 @@ export async function resubmitAdmissionApplicationService(
       guardianEmail: admissionApplicationExists.guardianEmail ?? "",
       guardianPhone: admissionApplicationExists.guardianPhone,
       appliedForClass: admissionApplicationExists.appliedForClass,
-      schoolName: school!.name,
+      schoolName: null as unknown as string,
       applicationId,
     });
     return updatedApplication;
@@ -1276,7 +1179,6 @@ export async function resubmitAdmissionApplicationService(
 
 export async function waitlistAdmissionApplicationService(
   applicationId: string,
-  schoolId: string,
   waitlistReason: string,
   moderatorId: string,
   context: AuditContext,
@@ -1286,20 +1188,15 @@ export async function waitlistAdmissionApplicationService(
     log.info(
       `Statring service to waitlist admission applicaiton with applicationId ${applicationId}`,
       {
-        schoolId,
         ipAddress: context.ipAddress,
       },
     );
 
-    const [admissionApplication, school] = await Promise.all([
+    const [admissionApplication] = await Promise.all([
       await prisma.admissionApplication.findUnique({
         where: {
-          schoolId,
           id: applicationId,
         },
-      }),
-      await prisma.school.findUnique({
-        where: { id: schoolId },
       }),
     ]);
 
@@ -1321,7 +1218,6 @@ export async function waitlistAdmissionApplicationService(
 
     const lastWaitlistPosition = await prisma.admissionApplication.findFirst({
       where: {
-        schoolId,
         appliedForClass: admissionApplication.appliedForClass,
         status: "WAITLISTED",
       },
@@ -1338,7 +1234,6 @@ export async function waitlistAdmissionApplicationService(
       await tx.admissionApplication.update({
         where: {
           id: applicationId,
-          schoolId,
         },
         data: {
           status: "WAITLISTED",
@@ -1371,7 +1266,6 @@ export async function waitlistAdmissionApplicationService(
     });
 
     await createAuditLog({
-      schoolId,
       performedById: moderatorId,
       action: "UPDATE",
       module: "AdmissionApplication",
@@ -1395,7 +1289,7 @@ export async function waitlistAdmissionApplicationService(
       guardianLastName: admissionApplication.guardianLastName,
       guardianEmail: admissionApplication.guardianEmail ?? "",
       appliedForClass: admissionApplication.appliedForClass,
-      schoolName: school!.name,
+      schoolName: null as unknown as string,
       applicationId,
       waitlistPosition: nextWaitListPosition,
       waitlistReason,
@@ -1408,7 +1302,6 @@ export async function waitlistAdmissionApplicationService(
         error: err.message,
         ipAddress: context.ipAddress,
         applicationId,
-        schoolId,
       },
     );
     throw err;

@@ -42,12 +42,12 @@ import {
   DEFAULT_TEACHER_PERMISSIONS,
   mergePermissions,
 } from "../utils/permission.util";
+import { generateRegistrationNumber } from "../utils/registration.util";
 
 const log = createModuleLogger("UserManagement");
 
 export async function createModeratorService(
   data: CreateModeratorInput,
-  schoolId: string,
   adminId: string,
   context: AuditContext,
   statusCode: number,
@@ -55,20 +55,15 @@ export async function createModeratorService(
   try {
     log.info("Moderator creation service start", {
       ipAddress: context.ipAddress,
-      schoolId,
       adminId,
       data,
     });
 
-    const [moderatorExists, school] = await Promise.all([
+    const [moderatorExists] = await Promise.all([
       prisma.user.findFirst({
         where: {
           OR: [{ email: data.email }, { phone: data.phone }],
         },
-      }),
-      prisma.school.findUniqueOrThrow({
-        where: { id: schoolId },
-        select: { name: true },
       }),
     ]);
 
@@ -80,18 +75,13 @@ export async function createModeratorService(
     }
 
     const result = await prisma.$transaction(async (tx) => {
-      const [{ generate_registration_number: regNumber }] = await tx.$queryRaw<
-        [{ generate_registration_number: string }]
-      >`
-        SELECT generate_registration_number(${schoolId}, ${Role.MODERATOR})
-      `;
+      const regNumber = await generateRegistrationNumber(Role.MODERATOR);
 
       const tempPassword = `Moderator@${Math.random().toString(36).slice(-8)}`;
       const hashedPassword = await hashPassword(tempPassword);
 
       const user = await tx.user.create({
         data: {
-          schoolId,
           regNumber,
           email: data.email,
           phone: data.phone,
@@ -191,7 +181,6 @@ export async function createModeratorService(
       context,
       statusCode,
       metadata: {
-        schoolId,
         adminId,
         regNumber: result.moderator.user.regNumber,
         userFirstName: result.moderator.firstName,
@@ -205,7 +194,6 @@ export async function createModeratorService(
     });
 
     await createAuditLog({
-      schoolId,
       performedById: adminId,
       action: "CREATE",
       module: "User",
@@ -234,7 +222,7 @@ export async function createModeratorService(
       tempPassword: result.tempPassword,
       designation: result.moderator.designation ?? "",
       department: result.moderator.department ?? "",
-      schoolName: school.name,
+      schoolName: null as unknown as string,
     });
 
     log.info("Moderator created successfully", {
@@ -246,7 +234,6 @@ export async function createModeratorService(
   } catch (error) {
     const err = error as Error;
     log.error("Failed to create moderator", {
-      schoolId,
       adminId,
       ipAddress: context.ipAddress,
       error: err.message,
@@ -257,7 +244,6 @@ export async function createModeratorService(
 
 export async function teacherApplicationService(
   data: TeacherApplicationInput,
-  schoolId: string,
   files: Express.Multer.File[],
   context: AuditContext,
   statusCode: number,
@@ -272,12 +258,6 @@ export async function teacherApplicationService(
     const applicationExists = await prisma.teacherApplication.findFirst({
       where: {
         OR: [{ email: data.email }, { phone: data.phone }],
-      },
-    });
-
-    const school = await prisma.school.findUnique({
-      where: {
-        id: schoolId,
       },
     });
 
@@ -337,7 +317,6 @@ export async function teacherApplicationService(
               qualification: data.qualification,
               experience: data.experience,
               specialization: data.specialization,
-              schoolId,
             },
           });
 
@@ -422,7 +401,7 @@ export async function teacherApplicationService(
           qualification: data.qualification,
           experience: data.experience,
           specialization: data.specialization,
-          schoolName: school?.name ?? "",
+          schoolName: "",
           applicationId: applicationExists.id,
         });
 
@@ -488,7 +467,6 @@ export async function teacherApplicationService(
           qualification: data.qualification,
           experience: data.experience,
           specialization: data.specialization,
-          schoolId,
         },
       });
 
@@ -570,7 +548,7 @@ export async function teacherApplicationService(
       qualification: data.qualification,
       experience: data.experience,
       specialization: data.specialization,
-      schoolName: school?.name ?? "",
+      schoolName: "",
       applicationId: newApplication.id,
     });
 
@@ -591,7 +569,6 @@ export async function getAllTeachersApplicationService(
   statusCode: number,
   page: number = 1,
   limit: number = 10,
-  schoolId: string,
   status?: ApplicationStatus,
 ): Promise<{
   data: TeacherApplication[];
@@ -605,13 +582,11 @@ export async function getAllTeachersApplicationService(
       page,
       limit,
       status: status ?? "ALL",
-      schoolId,
       ipAddress: context.ipAddress,
     });
 
-    const where = status ? { schoolId, status } : { schoolId };
+    const where = status ? { status } : {};
     const cacheKey = CACHE_KEYS.teacherApplications(
-      schoolId,
       status ?? "ALL",
       page,
       limit,
@@ -667,7 +642,7 @@ export async function getAllTeachersApplicationService(
       totalPages: Math.ceil(total / limit),
     };
 
-    await setCache(cacheKey, response, CACHE_TTL.SCHOOL_APPLICATIONS_LIST);
+    await setCache(cacheKey, response, CACHE_TTL.ADMISSION_APPLICATIONS_LIST);
 
     log.info("Fetched all school applications successfully", {
       page,
@@ -692,7 +667,6 @@ export async function getAllTeachersApplicationService(
 
 export async function getTeacherApplicationService(
   applicationId: string,
-  schoolId: string,
   context: AuditContext,
   statusCode: number,
 ): Promise<TeacherApplication> {
@@ -700,12 +674,11 @@ export async function getTeacherApplicationService(
     log.info(
       `Starting the serivce to fetch teacher application with applicationId ${applicationId}`,
       {
-        schoolId,
         ipAddress: context.ipAddress,
       },
     );
 
-    const cacheKey = CACHE_KEYS.teacherApplication(schoolId, applicationId);
+    const cacheKey = CACHE_KEYS.teacherApplication(applicationId);
 
     const cached = await getCache<TeacherApplication>(cacheKey);
 
@@ -717,7 +690,6 @@ export async function getTeacherApplicationService(
     const application = await prisma.teacherApplication.findUnique({
       where: {
         id: applicationId,
-        schoolId,
       },
     });
 
@@ -735,12 +707,15 @@ export async function getTeacherApplicationService(
       context,
       metadata: {
         applicationId,
-        schoolId,
       },
       statusCode,
     });
 
-    await setCache(cacheKey, application, CACHE_TTL.SCHOOL_APPLICATION_SINGLE);
+    await setCache(
+      cacheKey,
+      application,
+      CACHE_TTL.ADMISSION_APPLICATIONS_LIST,
+    );
     log.info("Fetched application successfully");
     return application;
   } catch (error) {
@@ -759,28 +734,23 @@ export async function getTeacherApplicationService(
 export async function shortlistApplicationService(
   applicationId: string,
   moderatorId: string,
-  schoolId: string,
   context: AuditContext,
   statusCode: number,
 ): Promise<TeacherApplication> {
   try {
     log.info("Starting Shortlisting application service", {
-      schoolId,
       applicationId,
       ipAddress: context.ipAddress,
     });
 
     const application = await prisma.teacherApplication.findUnique({
       where: {
-        schoolId,
         id: applicationId,
       },
     });
 
     if (!application) {
-      log.warn(
-        `Application ID ${applicationId} not found for schoolId ${schoolId}`,
-      );
+      log.warn(`Application ID ${applicationId} not found`);
       throw new Error("Application ID not found");
     }
 
@@ -802,8 +772,8 @@ export async function shortlistApplicationService(
       },
     });
 
-    await deleteCache(CACHE_KEYS.teacherApplications(schoolId, "ALL", 1, 10));
-    await deleteCache(CACHE_KEYS.teacherApplication(schoolId, applicationId));
+    await deleteCache(CACHE_KEYS.teacherApplications("ALL", 1, 10));
+    await deleteCache(CACHE_KEYS.teacherApplication(applicationId));
 
     await createSystemLog({
       level: "INFO",
@@ -812,14 +782,13 @@ export async function shortlistApplicationService(
       context,
       metadata: {
         applicationId,
-        schoolId,
+
         ipAddress: context.ipAddress,
       },
       statusCode,
     });
 
     await createAuditLog({
-      schoolId,
       performedById: moderatorId,
       action: "UPDATE",
       module: "TeacherApplication",
@@ -851,7 +820,6 @@ export async function shortlistApplicationService(
     log.error("Failed to shortlist teacher application", {
       error: err.message,
       ipAddress: context.ipAddress,
-      schoolId,
       applicationId,
     });
     throw err;
@@ -860,7 +828,6 @@ export async function shortlistApplicationService(
 
 export async function approveTeacherApplicationService(
   applicationId: string,
-  schoolId: string,
   adminId: string,
   context: AuditContext,
   statusCode: number,
@@ -868,20 +835,13 @@ export async function approveTeacherApplicationService(
   try {
     log.info("Starting service to approve teacher application", {
       ipAddress: context.ipAddress,
-      schoolId,
       applicationId,
     });
 
-    const [application, school] = await Promise.all([
+    const [application] = await Promise.all([
       prisma.teacherApplication.findUnique({
         where: {
-          schoolId,
           id: applicationId,
-        },
-      }),
-      prisma.school.findUnique({
-        where: {
-          id: schoolId,
         },
       }),
     ]);
@@ -908,18 +868,13 @@ export async function approveTeacherApplicationService(
         },
       });
 
-      const [{ generate_registration_number: regNumber }] = await tx.$queryRaw<
-        [{ generate_registration_number: string }]
-      >`
-        SELECT generate_registration_number(${schoolId}, ${Role.TEACHER})
-      `;
+      const regNumber = await generateRegistrationNumber(Role.TEACHER);
 
       const tempPassword = `Teacher@${Math.random().toString(36).slice(-8)}`;
       const hashedPassword = await hashPassword(tempPassword);
 
       const user = await tx.user.create({
         data: {
-          schoolId,
           regNumber,
           email: application.email,
           phone: application.phone,
@@ -983,11 +938,9 @@ export async function approveTeacherApplicationService(
       };
     });
 
-    await deleteCache(CACHE_KEYS.teacherApplication(schoolId, applicationId));
-    await deleteCache(CACHE_KEYS.teacherApplications(schoolId, "ALL", 1, 10));
-    await deleteCache(
-      CACHE_KEYS.teacherApplications(schoolId, "SHORTLISTED", 1, 10),
-    );
+    await deleteCache(CACHE_KEYS.teacherApplication(applicationId));
+    await deleteCache(CACHE_KEYS.teacherApplications("ALL", 1, 10));
+    await deleteCache(CACHE_KEYS.teacherApplications("SHORTLISTED", 1, 10));
 
     await createSystemLog({
       level: "INFO",
@@ -996,7 +949,6 @@ export async function approveTeacherApplicationService(
       context,
       statusCode,
       metadata: {
-        schoolId,
         regNumber: response.teacher.user.regNumber,
         userFirstName: response.teacher.firstName,
         userLastName: response.teacher.lastName,
@@ -1006,7 +958,6 @@ export async function approveTeacherApplicationService(
     });
 
     await createAuditLog({
-      schoolId,
       performedById: adminId,
       action: "APPROVE",
       module: "User",
@@ -1035,7 +986,7 @@ export async function approveTeacherApplicationService(
       regNumber: response.teacher.user.regNumber,
       tempPassword: response.tempPassword,
       applicationId,
-      schoolName: school?.name ?? "",
+      schoolName: "",
     });
 
     return response.teacher;
@@ -1044,7 +995,6 @@ export async function approveTeacherApplicationService(
     log.error("Failed to approve teacher application", {
       error: err.message,
       ipAddress: context.ipAddress,
-      schoolId,
       applicationId,
     });
     throw err;
@@ -1053,7 +1003,6 @@ export async function approveTeacherApplicationService(
 
 export async function rejectTeacherApplicaitonService(
   applicationId: string,
-  schoolId: string,
   moderatorId: string,
   rejectionReason: string,
   context: AuditContext,
@@ -1064,21 +1013,14 @@ export async function rejectTeacherApplicaitonService(
       `Starting service to reject teacher application with applicationId ${applicationId}`,
       {
         applicationId,
-        schoolId,
         ipAddress: context.ipAddress,
       },
     );
 
-    const [teacherApplicationExists, school] = await Promise.all([
+    const [teacherApplicationExists] = await Promise.all([
       prisma.teacherApplication.findUnique({
         where: {
-          schoolId,
           id: applicationId,
-        },
-      }),
-      await prisma.school.findUnique({
-        where: {
-          id: schoolId,
         },
       }),
     ]);
@@ -1103,7 +1045,6 @@ export async function rejectTeacherApplicaitonService(
     await prisma.$transaction(async (tx) => {
       await tx.teacherApplication.update({
         where: {
-          schoolId,
           id: applicationId,
         },
         data: {
@@ -1126,7 +1067,6 @@ export async function rejectTeacherApplicaitonService(
     });
 
     await createAuditLog({
-      schoolId,
       performedById: moderatorId,
       action: "REJECT",
       module: "TeacherApplication",
@@ -1166,7 +1106,7 @@ export async function rejectTeacherApplicaitonService(
       qualification: teacherApplicationExists.qualification,
       experience: teacherApplicationExists.experience,
       specialization: teacherApplicationExists.specialization ?? undefined,
-      schoolName: school?.name ?? "",
+      schoolName: "",
       applicationId: applicationId,
       rejectionReason: rejectionReason,
     });
@@ -1178,7 +1118,6 @@ export async function rejectTeacherApplicaitonService(
         error: err.message,
         ipAddress: context.ipAddress,
         applicationId,
-        schoolId,
       },
     );
     throw err;
@@ -1208,12 +1147,6 @@ export async function resubmitTeacherApplicationService(
     const teacherApplication = await prisma.teacherApplication.findUnique({
       where: {
         id: applicationId,
-      },
-    });
-
-    const school = await prisma.school.findUnique({
-      where: {
-        id: teacherApplication?.schoolId,
       },
     });
 
@@ -1353,7 +1286,7 @@ export async function resubmitTeacherApplicationService(
       qualification: teacherApplication.qualification,
       experience: teacherApplication.experience,
       specialization: teacherApplication.specialization ?? "",
-      schoolName: school?.name ?? "",
+      schoolName: "",
       applicationId,
     });
     return updatedApplication;
@@ -1382,7 +1315,6 @@ export async function resubmitTeacherApplicationService(
 
 export async function updateUserPermissionsService(
   data: UpdateUserPermissionInput,
-  schoolId: string,
   adminId: string,
   context: AuditContext,
   statusCode: number,
@@ -1390,7 +1322,6 @@ export async function updateUserPermissionsService(
   try {
     log.info("Starting update user permissions service", {
       ipAddress: context.ipAddress,
-      schoolId,
       adminId,
       targetUserId: data.userId,
     });
@@ -1398,7 +1329,6 @@ export async function updateUserPermissionsService(
     const targetUser = await prisma.user.findUnique({
       where: {
         id: data.userId,
-        schoolId,
       },
       select: {
         id: true,
@@ -1409,7 +1339,7 @@ export async function updateUserPermissionsService(
     });
 
     if (!targetUser) {
-      log.warn("Target user not found", { userId: data.userId, schoolId });
+      log.warn("Target user not found", { userId: data.userId });
       throw new Error("User not found");
     }
 
@@ -1471,7 +1401,6 @@ export async function updateUserPermissionsService(
     });
 
     await createAuditLog({
-      schoolId,
       performedById: adminId,
       action: "PERMISSION_CHANGE",
       module: "UserPermission",
@@ -1494,7 +1423,6 @@ export async function updateUserPermissionsService(
       module: "UserPermission",
       context,
       metadata: {
-        schoolId,
         adminId,
         targetUserId: data.userId,
         targetUserRegNumber: targetUser.regNumber,
@@ -1515,7 +1443,6 @@ export async function updateUserPermissionsService(
     const err = error as Error;
     log.error("Failed to update user permissions", {
       error: err.message,
-      schoolId,
       adminId,
       targetUserId: data.userId,
       ipAddress: context.ipAddress,

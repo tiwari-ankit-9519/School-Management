@@ -12,10 +12,8 @@ import {
   SidebarGroupContent,
   SidebarHeader,
   SidebarMenu,
-  SidebarMenuButton,
   SidebarMenuItem,
   SidebarMenuSub,
-  SidebarMenuSubButton,
   SidebarMenuSubItem,
   SidebarProvider,
   SidebarTrigger,
@@ -37,6 +35,8 @@ import {
 import { NAV_CONFIG, UserRole, NavItem } from "@/config/sidebar-config";
 import { useAuthStore } from "@/stores/useAuthStore";
 import { useLogout } from "@/hooks/useAuth";
+import { useTranslations } from "@/hooks/useTranslations";
+import { LanguageToggle } from "@/components/LanguageToggle";
 
 const sidebarCssVars = {
   "--sidebar-background": "#060a14",
@@ -51,17 +51,17 @@ const sidebarCssVars = {
 
 function NavItemRow({ item }: { item: NavItem }) {
   const pathname = usePathname();
+  const t = useTranslations("sidebar");
   const [open, setOpen] = useState(() => {
     if (!item.children) return false;
     return item.children.some((c) => pathname === c.href);
   });
-
   const isActive = item.href ? pathname === item.href : false;
 
   if (item.children) {
     return (
       <SidebarMenuItem>
-        <SidebarMenuButton
+        <button
           onClick={() => setOpen((o) => !o)}
           className={`group w-full flex items-center gap-3 px-3 py-2.5 rounded-xl transition-all duration-200 font-manrope text-sm cursor-pointer ${
             open
@@ -76,15 +76,16 @@ function NavItemRow({ item }: { item: NavItem }) {
                 : "text-white/30 group-hover:text-white/60"
             }`}
           />
-          <span className="flex-1 text-left">{item.label}</span>
+          <span className="flex-1 text-left">
+            {t(item.labelKey as Parameters<typeof t>[0])}
+          </span>
           <motion.div
             animate={{ rotate: open ? 90 : 0 }}
             transition={{ duration: 0.2 }}
           >
             <ChevronRight className="h-3.5 w-3.5 opacity-50" />
           </motion.div>
-        </SidebarMenuButton>
-
+        </button>
         <AnimatePresence initial={false}>
           {open && (
             <motion.div
@@ -99,16 +100,16 @@ function NavItemRow({ item }: { item: NavItem }) {
                   const childActive = pathname === child.href;
                   return (
                     <SidebarMenuSubItem key={child.href}>
-                      <SidebarMenuSubButton
-                        asChild
-                        className={`rounded-lg px-3 py-2 text-xs font-manrope transition-all duration-200 ${
+                      <Link
+                        href={child.href}
+                        className={`block rounded-lg px-3 py-2 text-xs font-manrope transition-all duration-200 ${
                           childActive
                             ? "bg-indigo-500/15 text-indigo-300 font-medium"
                             : "text-white/40 hover:text-white/70 hover:bg-white/5"
                         }`}
                       >
-                        <Link href={child.href}>{child.label}</Link>
-                      </SidebarMenuSubButton>
+                        {t(child.labelKey as Parameters<typeof t>[0])}
+                      </Link>
                     </SidebarMenuSubItem>
                   );
                 })}
@@ -122,31 +123,29 @@ function NavItemRow({ item }: { item: NavItem }) {
 
   return (
     <SidebarMenuItem>
-      <SidebarMenuButton
-        asChild
+      <Link
+        href={item.href ?? "#"}
         className={`group flex items-center gap-3 px-3 py-2.5 rounded-xl transition-all duration-200 font-manrope text-sm ${
           isActive
             ? "bg-indigo-500/15 text-indigo-300 font-medium"
             : "text-white/50 hover:text-white/80 hover:bg-white/5"
         }`}
       >
-        <Link href={item.href ?? "#"}>
-          <item.icon
-            className={`h-4 w-4 shrink-0 transition-colors ${
-              isActive
-                ? "text-indigo-400"
-                : "text-white/30 group-hover:text-white/60"
-            }`}
+        <item.icon
+          className={`h-4 w-4 shrink-0 transition-colors ${
+            isActive
+              ? "text-indigo-400"
+              : "text-white/30 group-hover:text-white/60"
+          }`}
+        />
+        <span>{t(item.labelKey as Parameters<typeof t>[0])}</span>
+        {isActive && (
+          <motion.div
+            layoutId="active-indicator"
+            className="ml-auto w-1.5 h-1.5 rounded-full bg-indigo-400"
           />
-          <span>{item.label}</span>
-          {isActive && (
-            <motion.div
-              layoutId="active-indicator"
-              className="ml-auto w-1.5 h-1.5 rounded-full bg-indigo-400"
-            />
-          )}
-        </Link>
-      </SidebarMenuButton>
+        )}
+      </Link>
     </SidebarMenuItem>
   );
 }
@@ -155,12 +154,11 @@ function AppSidebarInner() {
   const { user } = useAuthStore();
   const { mutate: logout } = useLogout();
   const router = useRouter();
-
+  const t = useTranslations("common");
   const role = user?.role as UserRole | undefined;
   const navItems = role ? NAV_CONFIG[role] : [];
 
   const roleLabel: Record<UserRole, string> = {
-    SUPER_ADMIN: "Super Admin",
     ADMIN: "Admin",
     STUDENT: "Student",
     TEACHER: "Teacher",
@@ -199,20 +197,24 @@ function AppSidebarInner() {
           </div>
         </div>
       </SidebarHeader>
-
       <SidebarContent className="px-3 py-4 bg-[#060a14]">
         <SidebarGroup>
           <SidebarGroupContent>
             <SidebarMenu className="space-y-0.5">
               {navItems.map((item) => (
-                <NavItemRow key={item.label} item={item} />
+                <NavItemRow key={item.labelKey} item={item} />
               ))}
             </SidebarMenu>
           </SidebarGroupContent>
         </SidebarGroup>
       </SidebarContent>
-
       <SidebarFooter className="px-3 py-4 border-t border-white/6 bg-[#060a14]">
+        <div className="flex items-center justify-between px-1 mb-2">
+          <span className="text-white/20 text-[10px] font-manrope">
+            Language
+          </span>
+          <LanguageToggle />
+        </div>
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
             <button className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl hover:bg-white/5 transition-all duration-200 group">
@@ -237,7 +239,7 @@ function AppSidebarInner() {
           >
             <DropdownMenuItem className="flex items-center gap-2.5 px-3 py-2.5 text-white/60 hover:text-white hover:bg-white/5 rounded-lg font-manrope text-xs cursor-pointer">
               <Settings className="h-3.5 w-3.5" />
-              Settings
+              {t("settings")}
             </DropdownMenuItem>
             <DropdownMenuSeparator className="bg-white/8" />
             <DropdownMenuItem
@@ -245,7 +247,7 @@ function AppSidebarInner() {
               className="flex items-center gap-2.5 px-3 py-2.5 text-red-400/80 hover:text-red-400 hover:bg-red-500/8 rounded-lg font-manrope text-xs cursor-pointer"
             >
               <LogOut className="h-3.5 w-3.5" />
-              Sign out
+              {t("logout")}
             </DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>

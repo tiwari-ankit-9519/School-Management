@@ -20,7 +20,6 @@ const log = createModuleLogger("AttendanceModule");
 
 export async function markStudentAttendanceService(
   classId: string,
-  schoolId: string,
   data: StudentAttendanceInput,
   classTeacherId: string,
   context: AuditContext,
@@ -36,14 +35,13 @@ export async function markStudentAttendanceService(
       `Starting service to mark attendance of the class with id ${classId}`,
       {
         ipAddress: context.ipAddress,
-        schoolId,
         classId,
         classTeacherId,
       },
     );
 
     const classExists = await prisma.class.findUnique({
-      where: { id: classId, schoolId },
+      where: { id: classId },
     });
 
     if (!classExists) {
@@ -63,7 +61,7 @@ export async function markStudentAttendanceService(
     }
 
     const isHoliday = await prisma.holiday.findFirst({
-      where: { date: new Date(data.date), schoolId },
+      where: { date: new Date(data.date) },
     });
 
     if (isHoliday) {
@@ -114,7 +112,6 @@ export async function markStudentAttendanceService(
       metadata: {
         classId,
         classTeacherId,
-        schoolId,
         totalPresent: response.summary["PRESENT"] || 0,
         totalAbsent: response.summary["ABSENT"] || 0,
         totalLate: response.summary["LATE"] || 0,
@@ -123,7 +120,6 @@ export async function markStudentAttendanceService(
     });
 
     await createAuditLog({
-      schoolId,
       performedById: classTeacherId,
       action: "CREATE",
       module: "StudentAttendance",
@@ -155,7 +151,6 @@ export async function markStudentAttendanceService(
 }
 
 export async function markTeacherAttendanceService(
-  schoolId: string,
   data: TeacherAttendanceInput,
   context: AuditContext,
   moderatorId: string,
@@ -169,7 +164,6 @@ export async function markTeacherAttendanceService(
   try {
     log.info(`Starting service to mark teacher attendance`, {
       ipAddress: context.ipAddress,
-      schoolId,
       moderatorId,
     });
 
@@ -177,7 +171,6 @@ export async function markTeacherAttendanceService(
     const teachersExist = await prisma.teacher.count({
       where: {
         id: { in: teacherIds },
-        user: { schoolId },
       },
     });
     if (teachersExist !== teacherIds.length) {
@@ -186,7 +179,7 @@ export async function markTeacherAttendanceService(
     }
 
     const isHoliday = await prisma.holiday.findFirst({
-      where: { date: new Date(data.date), schoolId },
+      where: { date: new Date(data.date) },
     });
 
     if (isHoliday) {
@@ -239,7 +232,6 @@ export async function markTeacherAttendanceService(
       context,
       statusCode,
       metadata: {
-        schoolId,
         totalPresent: response.summary["PRESENT"] || 0,
         totalAbsent: response.summary["ABSENT"] || 0,
         totalLate: response.summary["LATE"] || 0,
@@ -249,10 +241,9 @@ export async function markTeacherAttendanceService(
 
     await createAuditLog({
       performedById: moderatorId,
-      schoolId,
       action: "CREATE",
       module: "TeacherAttendance",
-      resourceId: response.teacherAttendanceMarked[0]?.id ?? schoolId,
+      resourceId: response.teacherAttendanceMarked[0]?.id ?? "",
       resourceType: "TeacherAttendance",
       context,
       isSuccessful: true,
@@ -272,7 +263,6 @@ export async function markTeacherAttendanceService(
     log.error(`Internal Server Error. Failed to mark teacher attendance`, {
       error: err.message,
       ipAddress: context.ipAddress,
-      schoolId,
       moderatorId,
     });
     throw err;
@@ -280,7 +270,6 @@ export async function markTeacherAttendanceService(
 }
 
 export async function markModeratorAttendanceService(
-  schoolId: string,
   data: ModeratorAttendanceInput,
   context: AuditContext,
   statusCode: number,
@@ -294,7 +283,6 @@ export async function markModeratorAttendanceService(
   try {
     log.info(`Starting service to mark attendance for moderators`, {
       ipAddress: context.ipAddress,
-      schoolId,
       adminId,
     });
 
@@ -302,7 +290,6 @@ export async function markModeratorAttendanceService(
     const moderatorExists = await prisma.adminAttendance.count({
       where: {
         id: { in: moderatorIds },
-        user: { schoolId },
       },
     });
 
@@ -312,7 +299,7 @@ export async function markModeratorAttendanceService(
     }
 
     const isHoliday = await prisma.holiday.findFirst({
-      where: { date: new Date(data.date), schoolId },
+      where: { date: new Date(data.date) },
     });
 
     if (isHoliday) {
@@ -365,7 +352,6 @@ export async function markModeratorAttendanceService(
       context,
       statusCode,
       metadata: {
-        schoolId,
         totalPresent: response.summary["PRESENT"] || 0,
         totalAbsent: response.summary["ABSENT"] || 0,
         totalLate: response.summary["LATE"] || 0,
@@ -375,10 +361,9 @@ export async function markModeratorAttendanceService(
 
     await createAuditLog({
       performedById: adminId,
-      schoolId,
       action: "CREATE",
       module: "TeacherAttendance",
-      resourceId: response.moderatorAttendanceMarked[0]?.id ?? schoolId,
+      resourceId: response.moderatorAttendanceMarked[0]?.id ?? "",
       resourceType: "TeacherAttendance",
       context,
       isSuccessful: true,
@@ -398,7 +383,6 @@ export async function markModeratorAttendanceService(
     log.error("Internal Server Error. Failed to mark moderator attendance", {
       error: err.message,
       ipAddress: context.ipAddress,
-      schoolId,
       adminId,
     });
     throw err;
@@ -410,7 +394,6 @@ export async function getStudentAttendanceService(
   classTeacherId: string,
   context: AuditContext,
   statusCode: number,
-  schoolId: string,
   page: number = 1,
   limit: number = 10,
   filters?: {
@@ -428,7 +411,6 @@ export async function getStudentAttendanceService(
     log.info(
       `Starting service to fetch students attendance of class ${classId}`,
       {
-        schoolId,
         classTeacherId,
         filters,
       },
@@ -436,7 +418,6 @@ export async function getStudentAttendanceService(
     const cacheKey = CACHE_KEYS.studentAttendance(
       classId,
       classTeacherId,
-      schoolId,
       page,
       limit,
     );
@@ -453,7 +434,7 @@ export async function getStudentAttendanceService(
     }
     const [classExists, isClassTeacher] = await prisma.$transaction([
       prisma.class.findUnique({
-        where: { id: classId, schoolId },
+        where: { id: classId },
       }),
       prisma.classTeacher.findFirst({
         where: { teacherId: classTeacherId, classId },
@@ -498,7 +479,6 @@ export async function getStudentAttendanceService(
       metadata: {
         classId,
         classTeacherId,
-        schoolId,
         filters,
       },
     });
@@ -509,7 +489,7 @@ export async function getStudentAttendanceService(
       limit,
       totalPages: Math.ceil(total / limit),
     };
-    await setCache(cacheKey, response, CACHE_TTL.SCHOOL_APPLICATIONS_LIST);
+    await setCache(cacheKey, response, CACHE_TTL.ADMISSION_APPLICATIONS_LIST);
     log.info(`Fetched attendance of students of class ${classExists.name}`);
     return response;
   } catch (error) {
@@ -519,7 +499,6 @@ export async function getStudentAttendanceService(
       {
         error: err.message,
         ipAddress: context.ipAddress,
-        schoolId,
         classId,
         classTeacherId,
       },
@@ -531,7 +510,6 @@ export async function getStudentAttendanceService(
 export async function getTeachersAttendanceService(
   context: AuditContext,
   statusCode: number,
-  schoolId: string,
   page: number = 1,
   limit: number = 10,
   filters?: {
@@ -548,12 +526,10 @@ export async function getTeachersAttendanceService(
   try {
     log.info("Starting service to get all teachers attendance", {
       ipAddress: context.ipAddress,
-      schoolId,
       filters,
     });
 
     const cacheKey = CACHE_KEYS.teacherAttendance(
-      schoolId,
       page,
       limit,
       filters?.status ?? "ALL",
@@ -573,13 +549,7 @@ export async function getTeachersAttendanceService(
       return cached;
     }
 
-    const where: Prisma.TeacherAttendanceWhereInput = {
-      teacher: {
-        user: {
-          schoolId,
-        },
-      },
-    };
+    const where: Prisma.TeacherAttendanceWhereInput = {};
 
     if (filters?.status) where.status = filters.status;
     if (filters?.date) where.date = new Date(filters.date);
@@ -598,8 +568,8 @@ export async function getTeachersAttendanceService(
     ]);
 
     if (teacherAttendance.length === 0) {
-      log.warn(`No attendance found for teacher of ${schoolId}`);
-      throw new Error(`No attendance found for teacher of ${schoolId}`);
+      log.warn(`No attendance found for teacher`);
+      throw new Error(`No attendance found for teacher`);
     }
 
     await createSystemLog({
@@ -609,7 +579,6 @@ export async function getTeachersAttendanceService(
       context,
       statusCode,
       metadata: {
-        schoolId,
         filters,
       },
     });
@@ -620,8 +589,8 @@ export async function getTeachersAttendanceService(
       limit,
       totalPages: Math.ceil(total / limit),
     };
-    await setCache(cacheKey, response, CACHE_TTL.SCHOOL_APPLICATIONS_LIST);
-    log.info(`Fetched attendance of teachers for school with id ${schoolId}`);
+    await setCache(cacheKey, response, CACHE_TTL.ADMISSION_APPLICATIONS_LIST);
+    log.info(`Fetched attendance of teachers for school`);
     return response;
   } catch (error) {
     const err = error as Error;
@@ -630,7 +599,6 @@ export async function getTeachersAttendanceService(
       {
         error: err.message,
         ipAddress: context.ipAddress,
-        schoolId,
       },
     );
     throw err;
@@ -640,7 +608,6 @@ export async function getTeachersAttendanceService(
 export async function getAdminsAttendanceService(
   context: AuditContext,
   statusCode: number,
-  schoolId: string,
   page: number = 1,
   limit: number = 10,
   filters?: {
@@ -657,12 +624,10 @@ export async function getAdminsAttendanceService(
   try {
     log.info("Starting service to get all moderators attendance", {
       ipAddress: context.ipAddress,
-      schoolId,
       filters,
     });
 
     const cacheKey = CACHE_KEYS.moderatorAttendance(
-      schoolId,
       page,
       limit,
       filters?.status ?? "ALL",
@@ -682,13 +647,7 @@ export async function getAdminsAttendanceService(
       return cached;
     }
 
-    const where: Prisma.AdminAttendanceWhereInput = {
-      admin: {
-        user: {
-          schoolId,
-        },
-      },
-    };
+    const where: Prisma.AdminAttendanceWhereInput = {};
 
     if (filters?.status) where.status = filters.status;
     if (filters?.date) where.date = new Date(filters.date);
@@ -707,8 +666,8 @@ export async function getAdminsAttendanceService(
     ]);
 
     if (moderatorAttendance.length === 0) {
-      log.warn(`No attendance found for admins of ${schoolId}`);
-      throw new Error(`No attendance found for admins of ${schoolId}`);
+      log.warn(`No attendance found for admins`);
+      throw new Error(`No attendance found for admins`);
     }
 
     await createSystemLog({
@@ -718,7 +677,6 @@ export async function getAdminsAttendanceService(
       context,
       statusCode,
       metadata: {
-        schoolId,
         filters,
       },
     });
@@ -729,15 +687,14 @@ export async function getAdminsAttendanceService(
       limit,
       totalPages: Math.ceil(total / limit),
     };
-    await setCache(cacheKey, response, CACHE_TTL.SCHOOL_APPLICATIONS_LIST);
-    log.info(`Fetched attendance of admins for school with id ${schoolId}`);
+    await setCache(cacheKey, response, CACHE_TTL.ADMISSION_APPLICATIONS_LIST);
+    log.info(`Fetched attendance of admins for school`);
     return response;
   } catch (error) {
     const err = error as Error;
     log.error("Internal Server Error. Failed to fetch all admins attendance", {
       error: err.message,
       ipAddress: context.ipAddress,
-      schoolId,
     });
     throw err;
   }

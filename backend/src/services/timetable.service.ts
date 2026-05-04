@@ -13,7 +13,6 @@ const log = createModuleLogger("TimeTableModule");
 
 export async function createTimeTableService(
   data: CreateTimeTableInput[],
-  schoolId: string,
   moderatorId: string,
   context: AuditContext,
   statusCode: number,
@@ -52,7 +51,6 @@ export async function createTimeTableService(
 
     await createAuditLog({
       performedById: moderatorId,
-      schoolId,
       action: "CREATE",
       module: "CreateTimeTable",
       resourceId: data[0].classId,
@@ -73,7 +71,6 @@ export async function createTimeTableService(
     const err = error as Error;
     log.error(`Failed to create timetable`, {
       ipAddress: context.ipAddress,
-      schoolId: schoolId,
       error: err.message,
     });
     throw err;
@@ -82,7 +79,6 @@ export async function createTimeTableService(
 
 export async function getTimeTableForClassService(
   classId: string,
-  schoolId: string,
   page: number = 1,
   limit: number = 10,
   context: AuditContext,
@@ -99,16 +95,14 @@ export async function getTimeTableForClassService(
     log.info(
       `Starting service to get time table for class with id ${classId}`,
       {
-        schoolId,
         ipAddress: context.ipAddress,
       },
     );
 
-    const where: Prisma.TimetableWhereInput = { classId, class: { schoolId } };
+    const where: Prisma.TimetableWhereInput = { classId };
     if (dayOfWeek) where.dayOfWeek = dayOfWeek;
 
     const cacheKey = CACHE_KEYS.timetable(
-      schoolId,
       classId,
       dayOfWeek ?? "ALL",
       page,
@@ -152,7 +146,6 @@ export async function getTimeTableForClassService(
       context,
       statusCode,
       metadata: {
-        schoolId,
         classId,
         page,
         limit,
@@ -167,7 +160,7 @@ export async function getTimeTableForClassService(
       totalPages: Math.ceil(total / limit),
     };
 
-    await setCache(cacheKey, response, CACHE_TTL.SCHOOL_APPLICATIONS_LIST);
+    await setCache(cacheKey, response, CACHE_TTL.ADMISSION_APPLICATIONS_LIST);
     log.info(`Fetched time table for class with id ${classId}`);
     return response;
   } catch (error) {
@@ -175,7 +168,6 @@ export async function getTimeTableForClassService(
     log.error(`Failed to fetch time table for class ${classId}`, {
       error: err.message,
       ipAddress: context.ipAddress,
-      schoolId,
       classId,
     });
     throw err;
@@ -188,7 +180,6 @@ export async function updateTimeTableForClassService(
   moderatorId: string,
   context: AuditContext,
   statusCode: number,
-  schoolId: string,
 ): Promise<Timetable> {
   try {
     log.info(`Starting service to update time table with id ${timeTableId}`, {
@@ -244,7 +235,6 @@ export async function updateTimeTableForClassService(
     });
 
     await createAuditLog({
-      schoolId,
       performedById: moderatorId,
       action: "UPDATE",
       module: "UpdateTimeTable",
@@ -286,7 +276,6 @@ export async function swapTimeTableForClassService(
   timetableId1: string,
   timetableId2: string,
   moderatorId: string,
-  schoolId: string,
   context: AuditContext,
   statusCode: number,
 ): Promise<Timetable[]> {
@@ -340,7 +329,6 @@ export async function swapTimeTableForClassService(
     });
 
     await createAuditLog({
-      schoolId,
       performedById: moderatorId,
       action: "UPDATE",
       module: "SwapTimeTable",

@@ -7,6 +7,7 @@ import {
   rejectAdmissionnApplication,
   resubmitAdmissionApplication,
   submitAdmissionApplication,
+  waitlistAdmissionApplication,
 } from "../controller/admission.controller";
 import {
   authenticate,
@@ -18,7 +19,7 @@ import { Module } from "@prisma/client";
 const router: Router = Router();
 
 router.post(
-  "/:id",
+  "/",
   upload.fields([
     { name: "documents", maxCount: 5 },
     { name: "photoUrl", maxCount: 1 },
@@ -36,7 +37,7 @@ router.get(
 );
 
 router.get(
-  "/:id",
+  "/:applicationId",
   authenticate,
   authorize("ADMIN", "MODERATOR"),
   checkPermission(Module.ADMISSION_APPLICATION, "canRead"),
@@ -48,11 +49,11 @@ router.patch(
   authenticate,
   authorize("ADMIN", "MODERATOR"),
   checkPermission(Module.ADMISSION_APPLICATION, "canApprove"),
-  rejectAdmissionnApplication,
+  waitlistAdmissionApplication,
 );
 
 router.patch(
-  "/:id/reject",
+  "/:applicationId/reject",
   authenticate,
   authorize("ADMIN", "MODERATOR"),
   checkPermission(Module.ADMISSION_APPLICATION, "canApprove"),
@@ -60,7 +61,7 @@ router.patch(
 );
 
 router.patch(
-  "/:id/approve",
+  "/:applicationId/approve",
   authenticate,
   authorize("ADMIN", "MODERATOR"),
   checkPermission(Module.ADMISSION_APPLICATION, "canApprove"),
@@ -68,7 +69,7 @@ router.patch(
 );
 
 router.patch(
-  "/:id/resubmit",
+  "/:applicationId/resubmit",
   upload.fields([
     { name: "documents", maxCount: 5 },
     { name: "photoUrl", maxCount: 1 },

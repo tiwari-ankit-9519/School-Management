@@ -55,7 +55,6 @@ declare namespace Express {
 
 export interface AuthenticatedUser {
   id: string;
-  schoolId: string;
   role: string;
 }
 

@@ -21,7 +21,7 @@ router.get(
 );
 
 router.get(
-  "/:id",
+  "/:studentId",
   authenticate,
   authorize("ADMIN", "MODERATOR"),
   checkPermission(Module.STUDENT, "canRead"),

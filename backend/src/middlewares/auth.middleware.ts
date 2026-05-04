@@ -152,7 +152,6 @@ export async function authenticate(
       where: { id: decoded.userId },
       select: {
         id: true,
-        schoolId: true,
         role: true,
         isActive: true,
         isVerified: true,
@@ -196,35 +195,31 @@ export async function authenticate(
       return;
     }
 
-    if (user.role !== "SUPER_ADMIN" && user.schoolId) {
-      const school = await prisma.school.findUnique({
-        where: { id: user.schoolId },
-        select: { isActive: true },
+    const schoolConfig = await prisma.schoolConfig.findFirst({
+      select: { isActive: true },
+    });
+
+    if (!schoolConfig?.isActive) {
+      logSecurityEvent(
+        "INACTIVE_SCHOOL_ACCESS_ATTEMPT",
+        req.context?.ip ?? "unknown",
+        user.id,
+        {
+          requestId: req.requestId,
+          path: req.path,
+          userId: user.id,
+        },
+      );
+      res.status(403).json({
+        success: false,
+        message:
+          "Your school account has been deactivated. Please contact support.",
       });
-      if (!school?.isActive) {
-        logSecurityEvent(
-          "INACTIVE_SCHOOL_ACCESS_ATTEMPT",
-          req.context?.ip ?? "unknown",
-          user.id,
-          {
-            requestId: req.requestId,
-            path: req.path,
-            userId: user.id,
-            schoolId: user.schoolId,
-          },
-        );
-        res.status(403).json({
-          success: false,
-          message:
-            "Your school account has been deactivated. Please contact support.",
-        });
-        return;
-      }
+      return;
     }
 
     req.user = {
       id: user.id,
-      schoolId: user.schoolId ?? "",
       role: user.role,
       sessionId: decoded.sessionId,
     };
@@ -232,7 +227,6 @@ export async function authenticate(
     log.debug("User authenticated successfully", {
       userId: user.id,
       role: user.role,
-      schoolId: user.schoolId,
       sessionId: decoded.sessionId,
       requestId: req.requestId,
     });
@@ -354,11 +348,6 @@ export function checkPermission(module: Module, action: PermissionAction) {
       }
 
       const { role, id: userId } = req.user;
-
-      if (role === "SUPER_ADMIN") {
-        next();
-        return;
-      }
 
       if (IMPLICIT_ACCESS_ROLES.includes(role as Role)) {
         next();
