@@ -3,7 +3,7 @@
     "platformPreview": "प्लेटफ़ॉर्म पूर्वावलोकन",
     "schoolDashboard": "स्कूल डैशबोर्ड",
     "students": "छात्र",
-    "schools": "स्कूलों",
+    "schools": "स्कूल",
     "staff": "कर्मचारी",
     "thisMonth": "इस महीने",
     "attendanceRate": "उपस्थिति दर · आज",
@@ -19,16 +19,10 @@
     "password": "पासवर्ड",
     "forgotPassword": "पासवर्ड भूल गए?",
     "signInBtn": "दाखिल करना",
-    "signingIn": "इन कर रहे हैं...",
+    "signingIn": "साइन इन कर रहे हैं...",
     "needAccess": "पहुंच की आवश्यकता है?",
     "contactAdmin": "अपने व्यवस्थापक से संपर्क करें",
-    "footer": "© 2025 EduSphere · पूरे भारत में 340+ स्कूलों द्वारा विश्वसनीय",
-    "springfield": "स्प्रिंगफील्ड अकादमी",
-    "greenwood": "ग्रीनवुड हाई",
-    "sunrise": "सनराइज पब्लिक स्कूल",
-    "trustedBy1": "स्प्रिंगफील्ड अकादमी",
-    "trustedBy2": "ग्रीनवुड हाई",
-    "trustedBy3": "+338 अधिक"
+    "footer": "© 2025 EduSphere · पूरे भारत में 340+ स्कूलों द्वारा विश्वसनीय"
   },
   "sidebar": {
   "dashboard": "डैशबोर्ड",

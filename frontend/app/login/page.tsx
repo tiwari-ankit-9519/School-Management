@@ -195,24 +195,6 @@ const LoginPage = () => {
           <div className="absolute inset-0 bg-linear-to-r from-[#050810] via-[#050810]/30 to-transparent pointer-events-none" />
           <div className="absolute inset-0 bg-linear-to-t from-[#050810]/60 via-transparent to-transparent pointer-events-none" />
         </motion.div>
-
-        {/* Bottom Footer */}
-        <div className="absolute bottom-6 right-6 hidden xl:flex flex-col gap-2">
-          {(["springfield", "greenwood", "sunrise"] as const).map((key, i) => (
-            <motion.div
-              key={key}
-              initial={{ opacity: 0, x: 20 }}
-              animate={{ opacity: 1, x: 0 }}
-              transition={{ delay: 0.8 + i * 0.12, duration: 0.5 }}
-              className="flex items-center gap-2.5 bg-white/5 border border-white/10 rounded-full px-3 py-1.5 backdrop-blur-sm"
-            >
-              <div className="w-4 h-4 rounded-full bg-indigo-500/40 border border-indigo-400/30 shrink-0" />
-              <span className="text-white/50 text-xs font-manrope">
-                {t(key)}
-              </span>
-            </motion.div>
-          ))}
-        </div>
       </div>
 
       {/* Form Section */}
@@ -357,18 +339,6 @@ const LoginPage = () => {
                 {t("contactAdmin")}
               </a>
             </p>
-          </div>
-          <div className="mt-5 flex items-center justify-center gap-1.5">
-            {(["trustedBy1", "trustedBy2", "trustedBy3"] as const).map(
-              (key, i) => (
-                <span
-                  key={i}
-                  className="text-[10px] text-white/20 font-manrope px-2 py-0.5 rounded-full border border-white/6 bg-white/2"
-                >
-                  {t(key)}
-                </span>
-              ),
-            )}
           </div>
         </div>
         <p className="text-center text-[11px] text-white/20 font-manrope mt-5">
