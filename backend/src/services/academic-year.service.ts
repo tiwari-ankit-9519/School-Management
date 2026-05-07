@@ -1,9 +1,10 @@
-import { AcademicYear } from "@prisma/client";
+import { AcademicYear, Prisma } from "@prisma/client";
 import { createModuleLogger } from "../config/logger.config";
 import { AuditContext } from "../middlewares/request-logger.middleware";
 import { AcademicYearInput } from "../validations/input.validations";
 import { prisma } from "@/src/config/database.config";
 import { createAuditLog, createSystemLog } from "../utils/audit.util";
+import { CACHE_KEYS, CACHE_TTL, getCache, setCache } from "../utils/cache.util";
 
 const log = createModuleLogger("AcademicYearService");
 
@@ -97,6 +98,102 @@ export async function createAcademicYearService(
     log.error("Failed to create academic year", {
       error: err.message,
       ipAddress: context.ipAddress,
+    });
+    throw err;
+  }
+}
+
+export async function getAcademicYearService(
+  adminId: string,
+  context: AuditContext,
+  statusCode: number,
+  page: number = 1,
+  limit: number = 10,
+  filters: {
+    isCurrent?: boolean;
+    name?: string;
+  },
+): Promise<{
+  data: AcademicYear[];
+  total: number;
+  page: number;
+  limit: number;
+  totalPages: number;
+}> {
+  try {
+    log.info("Starting service to get academic year", {
+      adminId,
+    });
+    const cacheKey = CACHE_KEYS.allAcademicYear(
+      adminId,
+      filters?.isCurrent !== undefined ? filters.isCurrent : "ALL",
+      filters?.name ?? "ALL",
+    );
+    const cached = await getCache<{
+      data: AcademicYear[];
+      total: number;
+      page: number;
+      limit: number;
+      totalPages: number;
+    }>(cacheKey);
+
+    if (cached) {
+      log.info("Returning academic year from cache", { cacheKey });
+      return cached;
+    }
+
+    const where: Prisma.AcademicYearWhereInput = {};
+    if (filters?.isCurrent !== undefined) where.isCurrent = filters.isCurrent;
+    if (filters?.name) where.name = filters?.name;
+
+    const [academicYear, total] = await prisma.$transaction([
+      prisma.academicYear.findMany({
+        where,
+        skip: (page - 1) * limit,
+        take: limit,
+        orderBy: { createdAt: "desc" },
+      }),
+
+      prisma.academicYear.count({ where }),
+    ]);
+
+    const response = {
+      data: academicYear,
+      total,
+      page,
+      limit,
+      totalPages: Math.ceil(total / limit),
+    };
+
+    await setCache(cacheKey, response, CACHE_TTL.ADMISSION_APPLICATIONS_LIST);
+
+    await createSystemLog({
+      level: "INFO",
+      module: "AcademicYearModule",
+      message: "Fetched academic year",
+      context,
+      statusCode,
+      metadata: {
+        adminId,
+        filters,
+      },
+    });
+
+    log.info("Fetched all admission applications successfully", {
+      page,
+      limit,
+      total,
+      totalPages: Math.ceil(total / limit),
+      status: filters ?? "ALL",
+    });
+
+    return response;
+  } catch (error) {
+    const err = error as Error;
+    log.error("Internal Server Error. Failed to get academic year", {
+      error: err.message,
+      ipAddress: context.ipAddress,
+      adminId,
     });
     throw err;
   }

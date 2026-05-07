@@ -1,4 +1,4 @@
-import { Class } from "@prisma/client";
+import { Class, Prisma } from "@prisma/client";
 import { createModuleLogger } from "../config/logger.config";
 import { AuditContext } from "../middlewares/request-logger.middleware";
 import {
@@ -7,11 +7,11 @@ import {
 } from "../validations/input.validations";
 import { prisma } from "../config/database.config";
 import { createAuditLog, createSystemLog } from "../utils/audit.util";
+import { CACHE_KEYS, getCache, setCache } from "../utils/cache.util";
 
 const log = createModuleLogger("ClassService");
 
 export async function createClassService(
-  academicYearId: string,
   adminId: string,
   data: ClassInput,
   context: AuditContext,
@@ -22,19 +22,18 @@ export async function createClassService(
       ipAddress: context.ipAddress,
       className: data.name,
       capacity: data.capacity,
-      academicYearId,
       adminId,
     });
 
     const academicYear = await prisma.academicYear.findFirst({
       where: {
-        id: academicYearId,
+        isCurrent: true,
       },
     });
 
     if (!academicYear) {
       log.warn("Academic Year not found for this school", {
-        academicYearId,
+        academicYearId: academicYear!.id,
       });
       throw new Error("Academic Year not found for this school");
     }
@@ -43,7 +42,7 @@ export async function createClassService(
       where: {
         name: data.name,
         section: data.section,
-        academicYearId,
+        academicYearId: academicYear.id,
       },
     });
 
@@ -60,7 +59,7 @@ export async function createClassService(
         section: data.section,
         capacity: data.capacity,
         roomNumber: data.roomNumber,
-        academicYearId,
+        academicYearId: academicYear.id,
       },
     });
 
@@ -74,7 +73,7 @@ export async function createClassService(
         ipAddress: context.ipAddress,
         className: data.name,
         capacity: data.capacity,
-        academicYearId,
+        academicYearId: academicYear.id,
         adminId,
       },
     });
@@ -126,6 +125,18 @@ export async function assignClassTeacherService(
         teacherId: data.teacherId,
       },
     );
+
+    const classAlreadyHasTeacher = await prisma.classTeacher.findFirst({
+      where: {
+        classId: data.classId,
+      },
+    });
+    if (classAlreadyHasTeacher) {
+      log.warn(`Class already has a teacher assigned`, {
+        classId: data.classId,
+      });
+      throw new Error("Class already has a teacher assigned");
+    }
 
     const classTeacherExists = await prisma.classTeacher.findUnique({
       where: {
@@ -196,49 +207,130 @@ export async function assignClassTeacherService(
 }
 
 export async function getAllClassesService(
-  academicYearId: string,
   context: AuditContext,
   statusCode: number,
-): Promise<Class[]> {
+  page: number = 1,
+  limit: number = 10,
+  filters: {
+    academicYearId: string;
+    name?: string;
+    section?: string;
+    capacityMin?: number;
+    capacityMax?: number;
+    roomNumber?: string;
+    teacherId?: string;
+  },
+): Promise<{
+  data: Class[];
+  total: number;
+  page: number;
+  limit: number;
+  totalPages: number;
+}> {
   try {
-    log.info(
-      `Getting all classes for school for academicYear ${academicYearId}`,
+    log.info(`Getting all classes for school for academicYear`);
+
+    const { academicYearId, ...restFilters } = filters;
+    const cacheKey = CACHE_KEYS.allClasses(
+      academicYearId,
+      page,
+      limit,
+      restFilters,
     );
 
-    const classes = await prisma.class.findMany({
-      where: {
-        academicYearId,
-      },
-    });
+    const cached = await getCache<{
+      data: Class[];
+      total: number;
+      page: number;
+      limit: number;
+      totalPages: number;
+    }>(cacheKey);
+    if (cached) {
+      log.info(
+        `Returning cached classes for academicYear ${filters.academicYearId}`,
+      );
+      return cached;
+    }
+
+    const where: Prisma.ClassWhereInput = {
+      academicYearId: filters.academicYearId,
+      ...(filters.name && {
+        name: { contains: filters.name, mode: "insensitive" },
+      }),
+      ...(filters.section && {
+        section: { contains: filters.section, mode: "insensitive" },
+      }),
+      ...(filters.roomNumber && {
+        roomNumber: { contains: filters.roomNumber, mode: "insensitive" },
+      }),
+      ...(filters.teacherId && {
+        teacherId: filters.teacherId,
+      }),
+      ...((filters.capacityMin !== undefined ||
+        filters.capacityMax !== undefined) && {
+        capacity: {
+          ...(filters.capacityMin !== undefined && {
+            gte: filters.capacityMin,
+          }),
+          ...(filters.capacityMax !== undefined && {
+            lte: filters.capacityMax,
+          }),
+        },
+      }),
+    };
+
+    const [classes, total] = await prisma.$transaction([
+      prisma.class.findMany({
+        where,
+        skip: (page - 1) * limit,
+        take: limit,
+        orderBy: { createdAt: "desc" },
+        include: {
+          classTeachers: {
+            where: { isPrimary: true },
+            select: { id: true },
+          },
+        },
+      }),
+      prisma.class.count({ where }),
+    ]);
 
     if (classes.length === 0) {
-      log.warn(
-        `No classes found for school for academicYear ${academicYearId}`,
-      );
-      throw new Error(
-        `No classes found for school for academicYear ${academicYearId}`,
-      );
+      log.warn(`No classes found for school for academicYear`);
+      throw new Error(`No classes found for school for academicYear`);
     }
+
+    const result = {
+      data: classes,
+      total,
+      page,
+      limit,
+      totalPages: Math.ceil(total / limit),
+    };
+
+    await setCache(cacheKey, result);
 
     await createSystemLog({
       level: "INFO",
       module: "Class",
-      message: `Fetched all classes for school for academicYear ${academicYearId}`,
+      message: `Fetched all classes for school for academicYear`,
       metadata: {
-        academicYearId,
-        totalClass: classes.length,
+        academicYearId: filters.academicYearId,
+        totalClass: total,
+        page,
+        limit,
+        filters,
       },
       context,
       statusCode,
     });
 
-    return classes;
+    return result;
   } catch (error) {
     const err = error as Error;
     log.error(`Failed to get all classes`, {
       error: err.message,
       ipAddress: context.ipAddress,
-      academicYearId,
     });
     throw err;
   }

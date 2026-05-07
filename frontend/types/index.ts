@@ -176,3 +176,62 @@ export interface StudentWithDetails {
   parent: StudentParent | null;
   enrollments: StudentEnrollment[];
 }
+
+export interface CreateNewAcademicYearInout {
+  name: string;
+  startDate: string;
+  endDate: string;
+  isCurrent: boolean;
+}
+
+export interface AcademicYear {
+  id: string;
+  name: string;
+  startDate: string;
+  endDate: string;
+  isCurrent: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface PaginatedAcademicYear {
+  data: AcademicYear[];
+  total: number;
+  page: number;
+  limit: number;
+  totalPages: number;
+}
+
+export interface CreateClassInput {
+  name: string;
+  section: string;
+  capacity: string;
+  roomNumber?: string;
+}
+
+export interface Class {
+  id: string;
+  academicYearId: string;
+  name: string;
+  section: string;
+  capacity: number;
+  roomNumber: string;
+  createdAt: string;
+  updatedAt: string;
+  classTeacher: {
+    id: string;
+  }[];
+}
+
+export interface PaginatedClass {
+  data: Class[];
+  total: number;
+  page: number;
+  limit: number;
+  totalPages: number;
+}
+
+export interface AssignClassTeacherInput {
+  teacherId: string;
+  classId: string;
+}

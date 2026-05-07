@@ -15,7 +15,7 @@ import { Module } from "@prisma/client";
 const router: Router = Router();
 
 router.post(
-  "/:academicYearId/create",
+  "/create",
   authenticate,
   authorize("ADMIN", "MODERATOR"),
   checkPermission(Module.CLASS, "canCreate"),
@@ -31,7 +31,7 @@ router.post(
 );
 
 router.get(
-  "/:academicYearId/all-classes",
+  "/all",
   authenticate,
   authorize("ADMIN", "MODERATOR"),
   checkPermission(Module.CLASS, "canRead"),

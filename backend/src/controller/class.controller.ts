@@ -21,17 +21,8 @@ export async function createClass(
 ): Promise<void> {
   const auditContext = buildAuditContext(req);
   const adminId = req.user?.id;
-  const academicYearId = req.params.academicYearId as string;
 
   const parsed = ClassSchema.safeParse(req.body);
-
-  if (!academicYearId) {
-    res.status(HTTP_STATUS.BAD_REQUEST).json({
-      success: false,
-      message: "Academic year ID is required",
-    });
-    return;
-  }
 
   if (!parsed.success) {
     res.status(400).json({
@@ -53,7 +44,6 @@ export async function createClass(
   res.status(HTTP_STATUS.CREATED);
 
   const newClass = await createClassService(
-    academicYearId,
     adminId,
     parsed.data,
     auditContext,
@@ -106,21 +96,46 @@ export async function getAllClasses(
   req: AuthenticatedRequest,
   res: Response,
 ): Promise<void> {
-  const auditContext = buildAuditContext(req);
-  const academicYearId = req.params.academicYearId as string;
+  const page = parseInt(req.query.page as string) || 1;
+  const limit = parseInt(req.query.limit as string) || 10;
+  const academicYearId = req.query.academicYearId as string;
+  const name = req.query.name as string | undefined;
+  const section = req.query.section as string | undefined;
+  const roomNumber = req.query.roomNumber as string | undefined;
+  const teacherId = req.query.teacherId as string | undefined;
+  const capacityMin = req.query.capacityMin
+    ? parseInt(req.query.capacityMin as string)
+    : undefined;
+  const capacityMax = req.query.capacityMax
+    ? parseInt(req.query.capacityMax as string)
+    : undefined;
+
   if (!academicYearId) {
-    throw new Error("Academic Year is required");
+    throw new Error("Academic year ID is required");
   }
+
+  const filters = {
+    academicYearId,
+    name,
+    section,
+    roomNumber,
+    teacherId,
+    capacityMin,
+    capacityMax,
+  };
+
+  const auditContext = buildAuditContext(req);
   res.status(HTTP_STATUS.OK);
   const allClasses = await getAllClassesService(
-    academicYearId,
     auditContext,
     res.statusCode,
+    page,
+    limit,
+    filters,
   );
-
   res.json({
     success: true,
-    message: `Fetched all classes for school for academicYear ${academicYearId}`,
+    message: `Fetched all classes for school for academicYear`,
     data: allClasses,
   });
 }

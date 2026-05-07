@@ -44,6 +44,18 @@ export const NAV_CONFIG: Record<UserRole, NavItem[]> = {
           labelKey: "Teacher Applications",
           href: `/admin/teacher-applications`,
         },
+        {
+          labelKey: "academic year",
+          href: `/admin/academic-year`,
+        },
+        {
+          labelKey: "subjects",
+          href: `/admin/subjects`,
+        },
+        {
+          labelKey: "classes",
+          href: `/admin/classes`,
+        },
       ],
     },
     {
@@ -56,11 +68,7 @@ export const NAV_CONFIG: Record<UserRole, NavItem[]> = {
       href: "/admin/teachers",
       icon: UsersRound,
     },
-    {
-      labelKey: "classes",
-      href: "/admin/classes",
-      icon: BookOpen,
-    },
+
     {
       labelKey: "fees",
       href: "/admin/fees",

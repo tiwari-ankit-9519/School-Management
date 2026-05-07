@@ -260,6 +260,25 @@ export const CACHE_KEYS = {
   announcementById: (announcementId: string) =>
     `announcement:${announcementId}`,
   userProfile: (userId: string) => `user:${userId}:profile`,
+  allAcademicYear: (
+    adminId: string,
+    isCurrent: boolean | string,
+    name: string,
+  ) => `user:${adminId}:isCurrent:${isCurrent}:name:${name}`,
+  allClasses: (
+    academicYearId: string,
+    page: number,
+    limit: number,
+    filters: {
+      name?: string;
+      section?: string;
+      capacityMin?: number;
+      capacityMax?: number;
+      roomNumber?: string;
+      teacherId?: string;
+    },
+  ) =>
+    `classes:all:${academicYearId}:page:${page}:limit:${limit}:name:${filters.name ?? ""}:section:${filters.section ?? ""}:capacityMin:${filters.capacityMin ?? ""}:capacityMax:${filters.capacityMax ?? ""}:roomNumber:${filters.roomNumber ?? ""}:teacherId:${filters.teacherId ?? ""}`,
 } as const;
 
 export const CACHE_PATTERNS = {
