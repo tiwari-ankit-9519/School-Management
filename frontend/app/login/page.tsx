@@ -7,7 +7,7 @@ import { ArrowRight, Lock, User } from "lucide-react";
 import AnimatedInput from "@/components/smoothui/animated-input";
 import { motion } from "motion/react";
 import Image from "next/image";
-import { LoginFormValue, loginSchema } from "@/validations/validations";
+import { LoginFormValues, loginSchema } from "@/validations/validations";
 import { useTranslations } from "@/hooks/useTranslations";
 
 const LoginPage = () => {
@@ -18,7 +18,7 @@ const LoginPage = () => {
     formState: { errors },
     control,
     setValue,
-  } = useForm<LoginFormValue>({
+  } = useForm<LoginFormValues>({
     resolver: zodResolver(loginSchema),
     defaultValues: { identifier: "", password: "" },
   });
@@ -26,13 +26,8 @@ const LoginPage = () => {
   const identifierValue = useWatch({ control, name: "identifier" });
   const passwordValue = useWatch({ control, name: "password" });
 
-  const onSubmit = (data: LoginFormValue) => {
-    const isEmail = data.identifier.includes("@");
-    login({
-      email: isEmail ? data.identifier : undefined,
-      regNumber: !isEmail ? data.identifier : undefined,
-      password: data.password,
-    });
+  const onSubmit = (data: LoginFormValues) => {
+    login(data);
   };
 
   return (
@@ -210,7 +205,6 @@ const LoginPage = () => {
             <div className="absolute inset-x-0 bottom-0 h-px bg-linear-to-r from-transparent via-white/5 to-transparent" />
           </div>
           <div className="mb-8">
-            {/* Logo row + toggle */}
             <div className="flex items-center justify-between mb-8">
               <div className="flex items-center gap-3">
                 <div className="w-9 h-9 rounded-xl bg-indigo-500/20 border border-indigo-400/30 flex items-center justify-center shrink-0">

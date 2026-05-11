@@ -26,15 +26,22 @@ import {
 import { useTranslations } from "@/hooks/useTranslations";
 import { useRouter, useSearchParams, usePathname } from "next/navigation";
 
-const academicYearSchema = z
+export const academicYearSchema = z
   .object({
-    name: z.string().min(1, "Name is required"),
-    startDate: z.string().min(1, "Start date is required"),
-    endDate: z.string().min(1, "End date is required"),
+    name: z
+      .string()
+      .min(3, { error: "Name should be of atleast 3 characters" })
+      .max(10, { error: "Name should be of max 10 characters" })
+      .regex(/^\d{4}-\d{2,4}$/, {
+        error: "Name should be in format 2024-25 or 2024-2025",
+      })
+      .trim(),
+    startDate: z.string({ message: "Start date is required" }),
+    endDate: z.string({ message: "End date is required" }),
     isCurrent: z.boolean(),
   })
   .refine((data) => new Date(data.endDate) > new Date(data.startDate), {
-    message: "End date must be after start date",
+    error: "End date must be after start date",
     path: ["endDate"],
   });
 

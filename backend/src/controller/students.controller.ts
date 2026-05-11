@@ -8,7 +8,13 @@ import {
   getSingleStudentDetailService,
 } from "../services/students.service";
 import { HTTP_STATUS } from "../utils/constants";
-import { EnrollmentStatus, Gender } from "@prisma/client";
+import {
+  AttendanceStatus,
+  EnrollmentStatus,
+  FeeStatus,
+  Gender,
+  LeaveStatus,
+} from "@prisma/client";
 
 export async function getAllStudentsList(
   req: AuthenticatedRequest,
@@ -55,18 +61,45 @@ export async function getSingleStudentDetail(
   res: Response,
 ): Promise<void> {
   const studentId = req.params.studentId as string;
-  const academicYearId = req.query.academicYearId as string | undefined;
 
   if (!studentId) {
     throw new Error("Student ID is required");
   }
 
+  const academicYearId = req.query.academicYearId as string | undefined;
+
+  const attendanceStatus = req.query.attendanceStatus as
+    | AttendanceStatus
+    | undefined;
+  const attendanceFromDate = req.query.attendanceFromDate as string | undefined;
+  const attendanceToDate = req.query.attendanceToDate as string | undefined;
+
+  const subjectId = req.query.subjectId as string | undefined;
+  const examScheduleId = req.query.examScheduleId as string | undefined;
+  const grade = req.query.grade as string | undefined;
+  const isAbsent =
+    req.query.isAbsent !== undefined
+      ? req.query.isAbsent === "true"
+      : undefined;
+
+  const feeStatus = req.query.feeStatus as FeeStatus | undefined;
+
+  const leaveStatus = req.query.leaveStatus as LeaveStatus | undefined;
+
   const filters = {
     academicYearId,
+    attendanceStatus,
+    attendanceFromDate,
+    attendanceToDate,
+    subjectId,
+    examScheduleId,
+    grade,
+    isAbsent,
+    feeStatus,
+    leaveStatus,
   };
 
   const auditContext = buildAuditContext(req);
-
   res.status(HTTP_STATUS.OK);
 
   const studentDetail = await getSingleStudentDetailService(

@@ -1,21 +1,22 @@
 import api, { ApiResponse, getErrorMessage } from "@/lib/api";
 import { QUERY_KEYS } from "@/lib/constants";
-import {
-  AcademicYear,
-  CreateNewAcademicYearInout,
-  PaginatedAcademicYear,
-} from "@/types";
+import { PaginatedAcademicYears } from "@/types";
+import { AcademicYearFormValues } from "@/validations/validations";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 
 const academicYearApi = {
   createNewAcademicYear: async (
-    data: CreateNewAcademicYearInout,
-  ): Promise<AcademicYear> => {
-    const response = await api.post<ApiResponse<AcademicYear>>(
+    data: AcademicYearFormValues,
+  ): Promise<{ id: string }> => {
+    const payload = {
+      ...data,
+      startDate: data.startDate.toString(),
+      endDate: data.endDate.toString(),
+    };
+    const response = await api.post<ApiResponse<{ id: string }>>(
       "/school/academic-year/create",
-      data,
+      payload,
     );
     return response.data.data;
   },
@@ -25,7 +26,7 @@ const academicYearApi = {
     name?: string,
     page: number = 1,
     limit: number = 10,
-  ): Promise<PaginatedAcademicYear> => {
+  ): Promise<PaginatedAcademicYears> => {
     const params = new URLSearchParams({
       page: String(page),
       limit: String(limit),
@@ -35,7 +36,7 @@ const academicYearApi = {
     const response = await api.get<{
       success: boolean;
       message: string;
-      data: PaginatedAcademicYear;
+      data: PaginatedAcademicYears;
     }>(`/school/academic-year/all?${params.toString()}`);
     return response.data.data;
   },
@@ -43,16 +44,17 @@ const academicYearApi = {
 
 export const useCreateAcademicYear = () => {
   const queryClient = useQueryClient();
-  const router = useRouter();
   return useMutation({
-    mutationFn: (data: CreateNewAcademicYearInout) =>
+    mutationFn: (data: AcademicYearFormValues) =>
       academicYearApi.createNewAcademicYear(data),
-    onSuccess: (data) => {
+    onSuccess: () => {
       queryClient.invalidateQueries({
         queryKey: QUERY_KEYS.ACADEMIC_YEARS,
       });
+      queryClient.invalidateQueries({
+        queryKey: QUERY_KEYS.ACADEMIC_YEAR,
+      });
       toast.success("Academic year created successfully");
-      router.push(`/admin/academic-year/${data.id}`);
     },
     onError: (error) => {
       toast.error(getErrorMessage(error));

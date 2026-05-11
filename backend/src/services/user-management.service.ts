@@ -8,6 +8,7 @@ import {
 import { createModuleLogger } from "../config/logger.config";
 import { AuditContext } from "../middlewares/request-logger.middleware";
 import {
+  AllTeacherApplication,
   CreateModeratorInput,
   ModeratorWithDetails,
   ResubmitTeacherApplicationInput,
@@ -571,7 +572,7 @@ export async function getAllTeachersApplicationService(
   limit: number = 10,
   status?: ApplicationStatus,
 ): Promise<{
-  data: TeacherApplication[];
+  data: AllTeacherApplication[];
   total: number;
   page: number;
   limit: number;
@@ -613,8 +614,14 @@ export async function getAllTeachersApplicationService(
         orderBy: {
           appliedAt: "desc",
         },
-        include: {
-          documents: true,
+        select: {
+          id: true,
+          firstName: true,
+          lastName: true,
+          email: true,
+          status: true,
+          createdAt: true,
+          appliedAt: true,
         },
       }),
       prisma.teacherApplication.count({ where }),
@@ -690,6 +697,10 @@ export async function getTeacherApplicationService(
     const application = await prisma.teacherApplication.findUnique({
       where: {
         id: applicationId,
+      },
+      include: {
+        documents: true,
+        histories: true,
       },
     });
 

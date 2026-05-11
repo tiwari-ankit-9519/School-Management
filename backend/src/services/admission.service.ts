@@ -10,6 +10,7 @@ import { AuditContext } from "../middlewares/request-logger.middleware";
 import {
   AdmissionApplicationInput,
   ResubmitAdmissionApplicationInput,
+  safeUserSelect,
   StudentWithDetails,
 } from "../validations/input.validations";
 import { prisma } from "../config/database.config";
@@ -30,11 +31,13 @@ import {
   CACHE_KEYS,
   CACHE_TTL,
   deleteCache,
+  deleteCacheByPattern,
   getCache,
   setCache,
 } from "../utils/cache.util";
 import { hashPassword } from "../utils/password";
 import { generateRegistrationNumber } from "../utils/registration.util";
+import { AdmissionApplicationListPayload } from "../types/response-type";
 
 const log = createModuleLogger("AdmissionServiceLogger");
 
@@ -45,7 +48,7 @@ export async function submitAdmissionApplicationService(
   guardianPhotoUrl: Express.Multer.File | undefined,
   context: AuditContext,
   statusCode: number,
-): Promise<AdmissionApplication> {
+): Promise<{ id: string }> {
   try {
     log.info("Starting admission application service", {
       ipAddress: context.ipAddress,
@@ -64,7 +67,11 @@ export async function submitAdmissionApplicationService(
             guardianRelation: data.guardianRelation,
           },
         }),
-        prisma.schoolConfig.findFirst(),
+        prisma.schoolConfig.findFirst({
+          select: {
+            name: true,
+          },
+        }),
         prisma.academicYear.findFirst({
           where: { isCurrent: true },
         }),
@@ -222,10 +229,10 @@ export async function submitAdmissionApplicationService(
           guardianEmail: data.guardianEmail ?? "",
           guardianPhone: data.guardianPhone,
           appliedForClass: data.appliedForClass,
-          schoolName: school!.name,
+          schoolName: school?.name ?? "",
           applicationId: resubmittedAdmissionApplication.id,
         });
-        return resubmittedAdmissionApplication;
+        return { id: resubmittedAdmissionApplication.id };
       }
       log.warn("Admission application already exists", {
         existingAdmissionApplicationId: admissionApplicationExists.id,
@@ -355,7 +362,7 @@ export async function submitAdmissionApplicationService(
       schoolName: school!.name,
       applicationId: newAdmissionApplication.id,
     });
-    return newAdmissionApplication;
+    return { id: newAdmissionApplication.id };
   } catch (error) {
     const err = error as Error;
     log.error("Failed to submit admission application", {
@@ -375,7 +382,7 @@ export async function getAllAdmissionApplicationService(
   limit: number = 10,
   status?: AdmissionStatus,
 ): Promise<{
-  data: AdmissionApplication[];
+  data: AdmissionApplicationListPayload[];
   total: number;
   page: number;
   limit: number;
@@ -416,7 +423,19 @@ export async function getAllAdmissionApplicationService(
         skip: (page - 1) * limit,
         take: limit,
         orderBy: { appliedAt: "desc" },
-        include: { documents: true },
+        select: {
+          id: true,
+          firstName: true,
+          lastName: true,
+          gender: true,
+          appliedForClass: true,
+          guardianFirstName: true,
+          guardianLastName: true,
+          guardianPhone: true,
+          status: true,
+          appliedAt: true,
+          createdAt: true,
+        },
       }),
       prisma.admissionApplication.count({ where }),
     ]);
@@ -491,6 +510,10 @@ export async function getAdmissionApplicationService(
       where: {
         id: applicationId,
       },
+      include: {
+        documents: true,
+        histories: true,
+      },
     });
 
     if (!application) {
@@ -540,30 +563,24 @@ export async function approveAdmissionApplicationService(
   context: AuditContext,
   classId: string,
   statusCode: number,
-): Promise<StudentWithDetails> {
+): Promise<{ id: string }> {
   try {
     log.info(
-      `Starting service to approve admission applicaiton with applicationId ${applicationId}`,
-      {
-        ipAddress: context.ipAddress,
-        reviewerId,
-      },
+      `Starting service to approve admission application with applicationId ${applicationId}`,
+      { ipAddress: context.ipAddress, reviewerId },
     );
+
     const [admissionApplicationExists, currentAcademicYear] = await Promise.all(
       [
         prisma.admissionApplication.findUnique({
-          where: {
-            id: applicationId,
-          },
+          where: { id: applicationId },
         }),
-
         prisma.academicYear.findFirst({
-          where: {
-            isCurrent: true,
-          },
+          where: { isCurrent: true },
         }),
       ],
     );
+
     if (!admissionApplicationExists) {
       log.warn(
         `No admission application found with applicationId ${applicationId}`,
@@ -574,30 +591,35 @@ export async function approveAdmissionApplicationService(
     if (!currentAcademicYear) {
       throw new Error(`No active academic year found for this school`);
     }
+
     if (admissionApplicationExists.status !== "PENDING") {
       log.warn(
-        `Application cannot accepted as it is in ${admissionApplicationExists.status}`,
+        `Application cannot be accepted as it is in ${admissionApplicationExists.status}`,
       );
       throw new Error(
-        `Application cannot accepted as it is in ${admissionApplicationExists.status}`,
+        `Application cannot be accepted as it is in ${admissionApplicationExists.status}`,
       );
     }
+
     const classExists = await prisma.class.findUnique({
       where: { id: classId },
     });
+
     if (!classExists || classExists.academicYearId !== currentAcademicYear.id) {
       log.warn(`Class not found or does not belong to current academic year`);
       throw new Error(
         `Class not found or does not belong to current academic year`,
       );
     }
+
     const response = await prisma.$transaction(async (tx) => {
       const studentRegNumber = await generateRegistrationNumber(Role.STUDENT);
       const parentRegNumber = await generateRegistrationNumber(Role.PARENT);
       const studentTempPassword = `STUDENT@${Math.random().toString(36).slice(-8)}`;
       const parentTempPassword = `PARENT@${Math.random().toString(36).slice(-8)}`;
-      const hasedPasswordStudent = await hashPassword(studentTempPassword);
-      const hasedPasswordParent = await hashPassword(parentTempPassword);
+      const hashedPasswordStudent = await hashPassword(studentTempPassword);
+      const hashedPasswordParent = await hashPassword(parentTempPassword);
+
       const enrollmentCount = await tx.$queryRaw<[{ count: bigint }]>`
         SELECT COUNT(*) as count FROM (
           SELECT id FROM "Enrollment"
@@ -607,6 +629,7 @@ export async function approveAdmissionApplicationService(
           FOR UPDATE
         ) sub
       `;
+
       if (Number(enrollmentCount[0].count) >= classExists.capacity) {
         log.warn(
           `Class ${classExists.name}-${classExists.section} is at full capacity`,
@@ -615,17 +638,19 @@ export async function approveAdmissionApplicationService(
           `Class ${classExists.name}-${classExists.section} is at full capacity`,
         );
       }
+
       const studentUser = await tx.user.create({
         data: {
           regNumber: studentRegNumber,
           email: null,
           phone: null,
-          passwordHash: hasedPasswordStudent,
+          passwordHash: hashedPasswordStudent,
           isActive: true,
           isVerified: false,
           role: "STUDENT",
         },
       });
+
       const student = await tx.student.create({
         data: {
           userId: studentUser.id,
@@ -640,21 +665,24 @@ export async function approveAdmissionApplicationService(
           pincode: admissionApplicationExists.pincode,
         },
       });
-      log.info("Student created succesfully", {
+
+      log.info("Student created successfully", {
         studentName: `${student.firstName} ${student.lastName}`,
         studentRegNumber,
       });
+
       const parentUser = await tx.user.create({
         data: {
           regNumber: parentRegNumber,
           email: admissionApplicationExists.guardianEmail,
           phone: admissionApplicationExists.guardianPhone,
-          passwordHash: hasedPasswordParent,
+          passwordHash: hashedPasswordParent,
           isActive: true,
           isVerified: false,
           role: "PARENT",
         },
       });
+
       const parent = await tx.parent.create({
         data: {
           userId: parentUser.id,
@@ -664,10 +692,12 @@ export async function approveAdmissionApplicationService(
           parentType: admissionApplicationExists.guardianRelation,
         },
       });
-      log.info("Parent created succesfully", {
+
+      log.info("Parent created successfully", {
         parentName: `${parent.firstName} ${parent.lastName}`,
         parentRegNumber,
       });
+
       const enrollment = await tx.enrollment.create({
         data: {
           studentId: student.id,
@@ -676,22 +706,23 @@ export async function approveAdmissionApplicationService(
           status: "ACTIVE",
         },
       });
+
       log.info("Enrollment created successfully", {
         enrollmentId: enrollment.id,
         studentId: student.id,
         classId: classExists.id,
         academicYearId: currentAcademicYear.id,
       });
+
       await tx.admissionApplication.update({
-        where: {
-          id: applicationId,
-        },
+        where: { id: applicationId },
         data: {
           status: "APPROVED",
           reviewedBy: reviewerId,
           reviewedAt: new Date(),
         },
       });
+
       await tx.admissonApplicationHistory.create({
         data: {
           applicationId,
@@ -700,60 +731,30 @@ export async function approveAdmissionApplicationService(
           changedBy: reviewerId,
         },
       });
+
+      const updatedStudent = await tx.student.findUniqueOrThrow({
+        where: { id: student.id },
+        include: {
+          user: { select: safeUserSelect },
+          parent: true,
+          enrollments: true,
+        },
+      });
+
       return {
-        student: await tx.student.findUniqueOrThrow({
-          where: { id: student.id },
-          include: {
-            user: {
-              select: {
-                id: true,
-                regNumber: true,
-                email: true,
-                phone: true,
-                role: true,
-                isActive: true,
-                isVerified: true,
-                createdAt: true,
-              },
-            },
-            parent: {
-              select: {
-                id: true,
-                userId: true,
-                studentId: true,
-                firstName: true,
-                lastName: true,
-                parentType: true,
-                alternatePhone: true,
-                createdAt: true,
-                updatedAt: true,
-              },
-            },
-            enrollments: {
-              select: {
-                id: true,
-                classId: true,
-                academicYearId: true,
-                rollNumber: true,
-                status: true,
-                enrolledAt: true,
-                class: true,
-              },
-            },
-          },
-        }),
+        student: updatedStudent,
         studentTempPassword,
         parentTempPassword,
         parentRegNumber,
       };
     });
-    await Promise.all([
-      deleteCache(CACHE_KEYS.admissionApplication(applicationId)),
-      deleteCache(CACHE_KEYS.admissionApplications("ALL", 1, 10)),
-      deleteCache(CACHE_KEYS.admissionApplications("PENDING", 1, 10)),
-      deleteCache(CACHE_KEYS.admissionApplications("APPROVED", 1, 10)),
-      deleteCache(CACHE_KEYS.admissionApplications("SHORTLISTED", 1, 10)),
-    ]);
+
+    await deleteCache(CACHE_KEYS.admissionApplication(applicationId));
+
+    await deleteCacheByPattern(`admission-applications:*`);
+
+    await deleteCacheByPattern(`students:*`);
+
     await createAuditLog({
       performedById: reviewerId,
       action: "APPROVE",
@@ -774,6 +775,7 @@ export async function approveAdmissionApplicationService(
       isSuccessful: true,
       statusCode,
     });
+
     await createSystemLog({
       level: "INFO",
       module: "StudentCreation",
@@ -788,6 +790,7 @@ export async function approveAdmissionApplicationService(
         guardianEmail: admissionApplicationExists.guardianEmail,
       },
     });
+
     await sendAdmissionApprovedEmailService({
       studentFirstName: admissionApplicationExists.firstName,
       studentLastName: admissionApplicationExists.lastName,
@@ -803,15 +806,13 @@ export async function approveAdmissionApplicationService(
       applicationId: admissionApplicationExists.id,
       appliedForClass: admissionApplicationExists.appliedForClass,
     });
-    return response.student;
+
+    return { id: response.student.id };
   } catch (error) {
     const err = error as Error;
     log.error(
       `Failed to approve admission application with applicationId ${applicationId}`,
-      {
-        error: err.message,
-        ipAddress: context.ipAddress,
-      },
+      { error: err.message, ipAddress: context.ipAddress },
     );
     throw err;
   }
@@ -990,7 +991,7 @@ export async function resubmitAdmissionApplicationService(
   files: Express.Multer.File[],
   context: AuditContext,
   statusCode: number,
-): Promise<AdmissionApplication> {
+): Promise<{ id: string }> {
   const uploadedFiles: Array<{
     uploadResult: CloudinaryUploadResult;
     documentType: DocumentType;
@@ -1034,7 +1035,7 @@ export async function resubmitAdmissionApplicationService(
         const documentMeta = data.documents?.[i];
         const uploadResult = await uploadToCloudinary(
           file,
-          "teacher-applications",
+          "admission-applications",
         );
         uploadedFiles.push({
           uploadResult,
@@ -1053,26 +1054,21 @@ export async function resubmitAdmissionApplicationService(
       const updated = await tx.admissionApplication.update({
         where: { id: applicationId },
         data: {
-          ...(data.previousClass && {
-            previousClass: data.previousClass,
-          }),
-          ...(data.previousSchool && {
-            previousSchool: data.previousSchool,
-          }),
-          ...(data.guardianEmail && {
-            guardianEmail: data.guardianEmail,
-          }),
+          ...(data.previousClass && { previousClass: data.previousClass }),
+          ...(data.previousSchool && { previousSchool: data.previousSchool }),
+          ...(data.guardianEmail && { guardianEmail: data.guardianEmail }),
           status: "PENDING",
           reviewedAt: null,
           reviewedBy: null,
         },
+        select: { id: true },
       });
 
       if (uploadedFiles.length > 0) {
         const existingDocs = await tx.document.findMany({
           where: {
             ownerId: applicationId,
-            ownerType: "TEACHER_APPLICATION",
+            ownerType: "ADMISSION_APPLICATION",
           },
           select: { cloudinaryId: true },
         });
@@ -1080,7 +1076,7 @@ export async function resubmitAdmissionApplicationService(
         await tx.document.deleteMany({
           where: {
             ownerId: applicationId,
-            ownerType: "TEACHER_APPLICATION",
+            ownerType: "ADMISSION_APPLICATION",
           },
         });
 
@@ -1096,8 +1092,8 @@ export async function resubmitAdmissionApplicationService(
         await tx.document.createMany({
           data: uploadedFiles.map(({ uploadResult, documentType, title }) => ({
             ownerId: applicationId,
-            ownerType: "TEACHER_APPLICATION" as DocumentOwnerType,
-            schoolApplicationId: applicationId,
+            ownerType: "ADMISSION_APPLICATION" as DocumentOwnerType,
+            admissionId: applicationId,
             documentType,
             title,
             originalFileName: uploadResult.originalFileName,
@@ -1122,6 +1118,11 @@ export async function resubmitAdmissionApplicationService(
 
       return updated;
     });
+
+    await Promise.all([
+      deleteCache(CACHE_KEYS.admissionApplication(applicationId)),
+      deleteCacheByPattern(`admission-applications:*`),
+    ]);
 
     await createSystemLog({
       level: "INFO",
@@ -1153,7 +1154,8 @@ export async function resubmitAdmissionApplicationService(
       schoolName: null as unknown as string,
       applicationId,
     });
-    return updatedApplication;
+
+    return { id: updatedApplication.id };
   } catch (error) {
     if (uploadedFiles.length > 0) {
       log.warn("Cleaning up orphaned Cloudinary uploads", {
@@ -1165,14 +1167,12 @@ export async function resubmitAdmissionApplicationService(
         ),
       );
     }
-
     const err = error as Error;
     log.error("Failed to resubmit admission application", {
       error: err.message,
       applicationId,
       ipAddress: context.ipAddress,
     });
-
     throw err;
   }
 }

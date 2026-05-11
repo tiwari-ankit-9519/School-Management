@@ -4,7 +4,13 @@ import { AuditContext } from "../middlewares/request-logger.middleware";
 import { AcademicYearInput } from "../validations/input.validations";
 import { prisma } from "@/src/config/database.config";
 import { createAuditLog, createSystemLog } from "../utils/audit.util";
-import { CACHE_KEYS, CACHE_TTL, getCache, setCache } from "../utils/cache.util";
+import {
+  CACHE_KEYS,
+  CACHE_TTL,
+  deleteCacheByPattern,
+  getCache,
+  setCache,
+} from "../utils/cache.util";
 
 const log = createModuleLogger("AcademicYearService");
 
@@ -13,7 +19,7 @@ export async function createAcademicYearService(
   adminId: string,
   context: AuditContext,
   statusCode: number,
-): Promise<AcademicYear> {
+): Promise<{ id: string }> {
   try {
     log.info("Starting academic year creation service", {
       ipAddress: context.ipAddress,
@@ -23,9 +29,8 @@ export async function createAcademicYearService(
     });
 
     const academicYearExists = await prisma.academicYear.findFirst({
-      where: {
-        name: data.name,
-      },
+      where: { name: data.name },
+      select: { id: true },
     });
 
     if (academicYearExists) {
@@ -38,15 +43,10 @@ export async function createAcademicYearService(
     const result = await prisma.$transaction(async (tx) => {
       if (data.isCurrent) {
         await tx.academicYear.updateMany({
-          where: {
-            isCurrent: true,
-          },
-          data: {
-            isCurrent: false,
-          },
+          where: { isCurrent: true },
+          data: { isCurrent: false },
         });
       }
-
       const newAcademicYear = await tx.academicYear.create({
         data: {
           name: data.name,
@@ -55,9 +55,14 @@ export async function createAcademicYearService(
           isCurrent: data.isCurrent,
         },
       });
-
       return { newAcademicYear };
     });
+
+    await deleteCacheByPattern(`user:${adminId}:isCurrent:*`);
+
+    if (data.isCurrent) {
+      await deleteCacheByPattern(`user:*:isCurrent:*`);
+    }
 
     await createSystemLog({
       level: "INFO",
@@ -92,7 +97,7 @@ export async function createAcademicYearService(
       newAcademicYear: result.newAcademicYear,
     });
 
-    return result.newAcademicYear;
+    return { id: result.newAcademicYear.id };
   } catch (error) {
     const err = error as Error;
     log.error("Failed to create academic year", {

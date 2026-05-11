@@ -5,14 +5,14 @@ import {
   createAcademicYearService,
   getAcademicYearService,
 } from "../services/academic-year.service";
-import { AcademicYearInput } from "../validations/input.validations";
 import { HTTP_STATUS } from "../utils/constants";
+import { AcademicYearSchema } from "../validations/input.validations";
 
 export async function createAcademicYear(
   req: AuthenticatedRequest,
   res: Response,
 ): Promise<void> {
-  const parsed = AcademicYearInput.safeParse(req.body);
+  const parsed = AcademicYearSchema.safeParse(req.body);
   if (!parsed.success) {
     res.status(400).json({
       success: false,

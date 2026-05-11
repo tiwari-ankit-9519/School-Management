@@ -4,6 +4,7 @@ import { createModuleLogger } from "../config/logger.config";
 import { CACHE_KEYS, CACHE_TTL, getCache, setCache } from "../utils/cache.util";
 import { prisma } from "../config/database.config";
 import { createSystemLog } from "../utils/audit.util";
+import { TeacherListPayload } from "../types/response-type";
 
 const log = createModuleLogger("TeacherService");
 
@@ -21,7 +22,7 @@ export async function getAllTeachersService(
     experience?: number;
   },
 ): Promise<{
-  data: Teacher[];
+  data: TeacherListPayload[];
   total: number;
   page: number;
   limit: number;
@@ -45,7 +46,7 @@ export async function getAllTeachersService(
     if (filters?.experience !== undefined)
       where.experience = { gte: filters.experience };
 
-    const cacheKey = CACHE_KEYS.teachers(page, limit);
+    const cacheKey = CACHE_KEYS.teachers(page, limit, filters);
 
     const cached = await getCache<{
       data: Teacher[];
@@ -67,6 +68,21 @@ export async function getAllTeachersService(
         take: limit,
         orderBy: {
           createdAt: "desc",
+        },
+        select: {
+          id: true,
+          userId: true,
+          firstName: true,
+          lastName: true,
+          gender: true,
+          city: true,
+          state: true,
+          qualification: true,
+          experience: true,
+          specialization: true,
+          employmentStatus: true,
+          joiningDate: true,
+          createdAt: true,
         },
       }),
       prisma.teacher.count({ where }),
@@ -125,6 +141,14 @@ export async function getSingleTeacherService(
     const teacherExists = await prisma.teacher.findUnique({
       where: {
         id: teacherId,
+      },
+      include: {
+        subjects: true,
+        timetables: true,
+        classTeachers: true,
+        attendances: true,
+        leaveRequests: true,
+        examSchedules: true,
       },
     });
 

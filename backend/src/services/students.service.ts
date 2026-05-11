@@ -1,10 +1,23 @@
-import { Enrollment, EnrollmentStatus, Gender, Prisma } from "@prisma/client";
+import {
+  AttendanceStatus,
+  Enrollment,
+  EnrollmentStatus,
+  FeeStatus,
+  Gender,
+  LeaveStatus,
+  Prisma,
+} from "@prisma/client";
 import { createModuleLogger } from "../config/logger.config";
 import { AuditContext } from "../middlewares/request-logger.middleware";
 import { CACHE_KEYS, CACHE_TTL, getCache, setCache } from "../utils/cache.util";
 import { prisma } from "../config/database.config";
 import { createSystemLog } from "../utils/audit.util";
-import { StudentWithClassDetailsReturn } from "../validations/input.validations";
+import {
+  safeUserSelect,
+  StudentWithClassDetailsReturn,
+  StudentWithDetails,
+} from "../validations/input.validations";
+import { StudentList, StudentListPayload } from "../types/response-type";
 
 const log = createModuleLogger("StudentModule");
 
@@ -21,7 +34,7 @@ export async function getAllStudentsListService(
     gender?: Gender;
   },
 ): Promise<{
-  data: Enrollment[];
+  data: StudentListPayload[];
   total: number;
   page: number;
   limit: number;
@@ -40,7 +53,7 @@ export async function getAllStudentsListService(
     );
 
     const cached = await getCache<{
-      data: Enrollment[];
+      data: StudentListPayload[];
       total: number;
       page: number;
       limit: number;
@@ -62,13 +75,11 @@ export async function getAllStudentsListService(
     const [allStudents, total] = await prisma.$transaction([
       prisma.enrollment.findMany({
         where,
+        select: StudentList.select,
         skip: (page - 1) * limit,
         take: limit,
-        orderBy: {
-          enrolledAt: "desc",
-        },
+        orderBy: { enrolledAt: "desc" },
       }),
-
       prisma.enrollment.count({ where }),
     ]);
 
@@ -107,62 +118,133 @@ export async function getSingleStudentDetailService(
   studentId: string,
   context: AuditContext,
   statusCode: number,
-  filters: {
+  filters?: {
     academicYearId?: string;
+    attendanceStatus?: AttendanceStatus;
+    attendanceFromDate?: string;
+    attendanceToDate?: string;
+    subjectId?: string;
+    examScheduleId?: string;
+    grade?: string;
+    isAbsent?: boolean;
+    feeStatus?: FeeStatus;
+    leaveStatus?: LeaveStatus;
   },
-): Promise<StudentWithClassDetailsReturn> {
+): Promise<StudentWithDetails> {
   try {
-    log.info(
-      `Starting service to fectch student attendance record with id ${studentId}`,
-      {
-        ipAddress: context.ipAddress,
-        studentId,
-      },
-    );
+    log.info(`Starting service to fetch student detail with id ${studentId}`, {
+      ipAddress: context.ipAddress,
+      studentId,
+    });
 
-    const studentDetail = await prisma.enrollment.findFirst({
-      where: {
-        studentId,
-        ...(filters?.academicYearId && {
-          academicYearId: filters.academicYearId,
-        }),
-      },
+    const studentDetail = await prisma.student.findFirst({
+      where: { id: studentId },
       include: {
-        student: {
+        user: { select: safeUserSelect },
+        parent: true,
+        documents: true,
+
+        enrollments: {
+          where: {
+            ...(filters?.academicYearId && {
+              academicYearId: filters.academicYearId,
+            }),
+          },
           include: {
-            user: {
+            class: {
               select: {
                 id: true,
-                regNumber: true,
-                email: true,
-                phone: true,
-                role: true,
-                isActive: true,
-                isVerified: true,
-                createdAt: true,
+                name: true,
+                section: true,
+                roomNumber: true,
+                capacity: true,
               },
             },
-            parent: true,
-            documents: true,
+            academicYear: {
+              select: {
+                id: true,
+                name: true,
+                startDate: true,
+                endDate: true,
+                isCurrent: true,
+              },
+            },
           },
+          orderBy: { enrolledAt: "desc" },
         },
-        class: {
-          select: {
-            id: true,
-            name: true,
-            section: true,
-            roomNumber: true,
-            capacity: true,
+
+        attendances: {
+          where: {
+            ...(filters?.attendanceStatus && {
+              status: filters.attendanceStatus,
+            }),
+            ...(filters?.attendanceFromDate || filters?.attendanceToDate
+              ? {
+                  date: {
+                    ...(filters.attendanceFromDate && {
+                      gte: new Date(filters.attendanceFromDate),
+                    }),
+                    ...(filters.attendanceToDate && {
+                      lte: new Date(filters.attendanceToDate),
+                    }),
+                  },
+                }
+              : {}),
           },
+          orderBy: { date: "desc" },
+          take: 30,
         },
-        academicYear: {
-          select: {
-            id: true,
-            name: true,
-            startDate: true,
-            endDate: true,
-            isCurrent: true,
+
+        marks: {
+          where: {
+            ...(filters?.subjectId && { subjectId: filters.subjectId }),
+            ...(filters?.examScheduleId && {
+              examScheduleId: filters.examScheduleId,
+            }),
+            ...(filters?.grade && { grade: filters.grade }),
+            ...(filters?.isAbsent !== undefined && {
+              isAbsent: filters.isAbsent,
+            }),
           },
+          include: {
+            subject: { select: { id: true, name: true, code: true } },
+            examSchedule: {
+              select: {
+                id: true,
+                title: true,
+                examType: true,
+                date: true,
+                totalMarks: true,
+                passingMarks: true,
+              },
+            },
+          },
+          orderBy: { createdAt: "desc" },
+        },
+
+        feePayments: {
+          where: {
+            ...(filters?.feeStatus && { status: filters.feeStatus }),
+          },
+          include: {
+            feeStructure: {
+              select: {
+                id: true,
+                name: true,
+                amount: true,
+                dueDate: true,
+              },
+            },
+          },
+          orderBy: { createdAt: "desc" },
+        },
+
+        leaveRequests: {
+          where: {
+            ...(filters?.leaveStatus && { status: filters.leaveStatus }),
+          },
+          orderBy: { createdAt: "desc" },
+          take: 10,
         },
       },
     });
@@ -174,14 +256,11 @@ export async function getSingleStudentDetailService(
 
     await createSystemLog({
       level: "INFO",
-      module: "GetSingleStudentDetais",
+      module: "GetSingleStudentDetails",
       message: `Fetched details of student with id ${studentId}`,
       context,
       statusCode,
-      metadata: {
-        studentId,
-        filters,
-      },
+      metadata: { studentId, filters },
     });
 
     log.info(`Fetched details of student with id ${studentId}`);
@@ -189,12 +268,8 @@ export async function getSingleStudentDetailService(
   } catch (error) {
     const err = error as Error;
     log.error(
-      `Internal Server Error. Failed to fetch the student with id ${studentId}`,
-      {
-        error: err.message,
-        ipAddress: context.ipAddress,
-        studentId,
-      },
+      `Internal Server Error. Failed to fetch student with id ${studentId}`,
+      { error: err.message, ipAddress: context.ipAddress, studentId },
     );
     throw err;
   }

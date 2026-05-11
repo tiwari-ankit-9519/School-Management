@@ -4,16 +4,20 @@ import { toast } from "sonner";
 import api, { ApiResponse, getErrorMessage } from "@/lib/api";
 import { useAuthStore } from "@/stores/useAuthStore";
 import { QUERY_KEYS } from "@/lib/constants";
-import type { User, LoginFormData } from "@/types";
+import type { User } from "@/types";
+import { LoginFormValues } from "@/validations/validations";
 
 const authApi = {
-  login: async (data: LoginFormData) => {
+  login: async (data: LoginFormValues) => {
+    const isEmail = data.identifier.includes("@"); // ✅ transform here
+    const payload = {
+      email: isEmail ? data.identifier : undefined,
+      regNumber: !isEmail ? data.identifier : undefined,
+      password: data.password,
+    };
     const response = await api.post<
-      ApiResponse<{
-        user: User;
-        accessToken: string;
-      }>
-    >("/auth/login", data);
+      ApiResponse<{ user: User; accessToken: string }>
+    >("/auth/login", payload);
     return response.data.data;
   },
 
@@ -35,14 +39,24 @@ export const useLogin = () => {
       setAccessToken(data.accessToken);
       queryClient.invalidateQueries({ queryKey: QUERY_KEYS.CURRENT_USER });
       toast.success("Welcome Back!");
-      if (data.user.role === "ADMIN") {
-        router.push("/admin/dashboard");
-      } else if (data.user.role === "STUDENT") {
-        router.push("/student-dashboard");
-      } else if (data.user.role === "PARENT") {
-        router.push("/parent-dashboard");
-      } else {
-        router.push("/teacher-dashboard");
+      switch (data.user.role) {
+        case "ADMIN":
+          router.push("/admin/dashboard");
+          break;
+        case "STUDENT":
+          router.push("/student/dashboard");
+          break;
+        case "PARENT":
+          router.push("/parent/dashboard");
+          break;
+        case "TEACHER":
+          router.push("/teacher/dashboard");
+          break;
+        case "MODERATOR":
+          router.push("/moderator/dashboard");
+          break;
+        default:
+          router.push("/dashboard");
       }
     },
     onError: (error) => {

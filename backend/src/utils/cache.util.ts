@@ -1,6 +1,6 @@
 import { redis } from "@/src/config/redis.config";
 import { createModuleLogger } from "@/src/config/logger.config";
-import { DayOfWeek } from "@prisma/client";
+import { DayOfWeek, EmploymentStatus, Gender } from "@prisma/client";
 
 const log = createModuleLogger("CacheService");
 const DEFAULT_TTL = 60 * 5;
@@ -78,8 +78,19 @@ export const CACHE_KEYS = {
   subjects: (page: number, limit: number) =>
     `subjects:page:${page}:limit:${limit}`,
   subject: (subjectId: string) => `subject:${subjectId}`,
-  teachers: (page: number, limit: number) =>
-    `teachers:page:${page}:limit:${limit}`,
+  teachers: (
+    page: number,
+    limit: number,
+    filters?: {
+      status?: EmploymentStatus;
+      gender?: Gender;
+      city?: string;
+      state?: string;
+      qualification?: string;
+      experience?: number;
+    },
+  ) =>
+    `teachers:page:${page}:limit:${limit}:status:${filters?.status ?? "ALL"}:gender:${filters?.gender ?? "ALL"}:city:${filters?.city ?? "ALL"}:state:${filters?.state ?? "ALL"}:qualification:${filters?.qualification ?? "ALL"}:experience:${filters?.experience ?? "ALL"}`,
   teacher: (teacherId: string) => `teacher:${teacherId}`,
   timetable: (
     classId: string,

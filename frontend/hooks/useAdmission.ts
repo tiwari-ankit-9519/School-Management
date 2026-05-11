@@ -1,19 +1,17 @@
 import api, { ApiResponse, getErrorMessage } from "@/lib/api";
 import { QUERY_KEYS } from "@/lib/constants";
+import { AdmissionApplication, PaginatedAdmissionApplications } from "@/types";
 import {
-  AdmissionApplication,
-  AdmissionApplicationInput,
-  PaginatedAdmissionApplications,
-  ResubmitAdmissionApplicationInput,
-  StudentWithDetails,
-} from "@/types";
+  AdmissionApplicationFormValues,
+  ResubmitAdmissionApplicationFormValues,
+} from "@/validations/validations";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 
 const admissionApi = {
   submitAdmissionApplication: async (
-    data: AdmissionApplicationInput,
+    data: AdmissionApplicationFormValues,
     photoFile?: File,
     guardianPhotoFile?: File,
     files: File[] = [],
@@ -22,15 +20,14 @@ const admissionApi = {
     Object.entries(data).forEach(([key, value]) => {
       if (value === undefined || value === null) return;
       if (key === "documents" && Array.isArray(value)) {
-        formData.append("documents", JSON.stringify(value));
+        formData.append("documentsMetadata", JSON.stringify(value));
       } else {
         formData.append(key, String(value));
       }
     });
     if (photoFile) formData.append("photoUrl", photoFile);
-    if (guardianPhotoFile)
-      formData.append("guardianPhotoUrl", guardianPhotoFile);
-    files.forEach((file) => formData.append("files", file));
+    if (guardianPhotoFile) formData.append("guardianPhoto", guardianPhotoFile);
+    files.forEach((file) => formData.append("documents", file));
     const response = await api.post<ApiResponse<AdmissionApplication>>(
       "/school/admission/",
       formData,
@@ -57,49 +54,69 @@ const admissionApi = {
   },
 
   getAdmissionApplication: async (applicationId: string) => {
-    const response = await api.get<ApiResponse<AdmissionApplicationInput>>(
+    const response = await api.get<ApiResponse<AdmissionApplication>>(
       `/school/admission/${applicationId}`,
     );
     return response.data.data;
   },
 
-  approveAdmissionApplication: async (applicationId: string) => {
-    const response = await api.patch<ApiResponse<StudentWithDetails>>(
+  approveAdmissionApplication: async (
+    applicationId: string,
+    classId: string,
+  ) => {
+    const response = await api.patch<ApiResponse<{ id: string }>>(
       `/school/admission/${applicationId}/approve`,
+      { classId },
     );
     return response.data.message;
   },
 
-  rejectAdmissionApplication: async (applicationId: string) => {
+  rejectAdmissionApplication: async (
+    applicationId: string,
+    rejectionReason: string,
+  ) => {
     const response = await api.patch<ApiResponse<null>>(
-      `/school/admission/${applicationId}/rejcet`,
+      `/school/admission/${applicationId}/reject`, // fixed typo "rejcet"
+      { rejectionReason },
     );
     return response.data.message;
   },
 
-  waitlistAdmissionApplication: async (applicationId: string) => {
+  waitlistAdmissionApplication: async (
+    applicationId: string,
+    waitlistReason: string,
+  ) => {
     const response = await api.patch<ApiResponse<null>>(
       `/school/admission/${applicationId}/waitlist`,
+      { waitlistReason },
     );
     return response.data.message;
   },
 
   resubmitAdmissionApplication: async (
     applicationId: string,
-    data: ResubmitAdmissionApplicationInput,
+    data: ResubmitAdmissionApplicationFormValues,
+    files: File[] = [], // ✅ separate files param
   ): Promise<string | undefined> => {
     const formData = new FormData();
-    Object.entries(data).forEach(([key, value]) => {
-      if (value === undefined || value === null) return;
-      if (key === "documents" && Array.isArray(value)) {
-        value.forEach((file: File) => {
-          formData.append("documents", file);
-        });
-      } else {
-        formData.append(key, value as string);
-      }
-    });
-    const response = await api.patch<ApiResponse<null>>(
+
+    // Append text fields
+    if (data.previousSchool)
+      formData.append("previousSchool", data.previousSchool);
+    if (data.previousClass)
+      formData.append("previousClass", data.previousClass);
+    if (data.guardianEmail)
+      formData.append("guardianEmail", data.guardianEmail);
+
+    // Append document metadata as JSON
+    if (data.documents && data.documents.length > 0) {
+      formData.append("documentsMetadata", JSON.stringify(data.documents));
+    }
+
+    // Append actual files
+    files.forEach((file) => formData.append("documents", file));
+
+    const response = await api.patch<ApiResponse<{ id: string }>>(
       `/school/admission/${applicationId}/resubmit`,
       formData,
     );
@@ -117,7 +134,7 @@ export const useCreateAdmissionApplication = () => {
       guardianPhotoFile,
       files,
     }: {
-      formData: AdmissionApplicationInput;
+      formData: AdmissionApplicationFormValues;
       photoFile?: File;
       guardianPhotoFile?: File;
       files: File[];
@@ -163,8 +180,13 @@ export const useGetAdmissionApplication = (applicationId: string) => {
 export const useApproveAdmissionApplication = () => {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: (applicationId: string) =>
-      admissionApi.approveAdmissionApplication(applicationId),
+    mutationFn: ({
+      applicationId,
+      classId,
+    }: {
+      applicationId: string;
+      classId: string;
+    }) => admissionApi.approveAdmissionApplication(applicationId, classId),
     onSuccess: (message, applicationId) => {
       queryClient.invalidateQueries({
         queryKey: QUERY_KEYS.SCHOOL_APPLICATIONS,
@@ -183,8 +205,14 @@ export const useApproveAdmissionApplication = () => {
 export const useRejectAdmissionApplication = () => {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: (applicationId: string) =>
-      admissionApi.rejectAdmissionApplication(applicationId),
+    mutationFn: ({
+      applicationId,
+      rejectionReason,
+    }: {
+      applicationId: string;
+      rejectionReason: string;
+    }) =>
+      admissionApi.rejectAdmissionApplication(applicationId, rejectionReason),
     onSuccess: (message, applicationId) => {
       queryClient.invalidateQueries({
         queryKey: QUERY_KEYS.SCHOOL_APPLICATIONS,
@@ -203,8 +231,14 @@ export const useRejectAdmissionApplication = () => {
 export const useWaitlistAdmissionApplication = () => {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: (applicationId: string) =>
-      admissionApi.waitlistAdmissionApplication(applicationId),
+    mutationFn: ({
+      applicationId,
+      waitlistReason,
+    }: {
+      applicationId: string;
+      waitlistReason: string;
+    }) =>
+      admissionApi.waitlistAdmissionApplication(applicationId, waitlistReason),
     onSuccess: (message, applicationId) => {
       queryClient.invalidateQueries({
         queryKey: QUERY_KEYS.SCHOOL_APPLICATIONS,
@@ -226,10 +260,12 @@ export const useResubmitAdmissionApplication = () => {
     mutationFn: ({
       applicationId,
       data,
+      files,
     }: {
       applicationId: string;
-      data: ResubmitAdmissionApplicationInput;
-    }) => admissionApi.resubmitAdmissionApplication(applicationId, data),
+      data: ResubmitAdmissionApplicationFormValues;
+      files: File[];
+    }) => admissionApi.resubmitAdmissionApplication(applicationId, data, files),
     onSuccess: (message, { applicationId }) => {
       queryClient.invalidateQueries({
         queryKey: QUERY_KEYS.SCHOOL_APPLICATIONS,
