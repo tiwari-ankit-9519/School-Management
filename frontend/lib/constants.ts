@@ -5,6 +5,8 @@ export const QUERY_KEYS = {
   CURRENT_USER: ["currentUser"],
   SCHOOL_APPLICATION: ["schoolApplication"],
   SCHOOL_APPLICATIONS: ["schoolApplications"],
+  TEACHER_APPLICATION: ["teacherApplication"],
+  TEACHER_APPLICATIONS: ["teacherApplications"],
   USER_APPLICATION_STATUS: ["user-application-status"],
   SCHOOL_CREATE: ["created-school-application"],
   ACADEMIC_YEARS: ["academicYears"],

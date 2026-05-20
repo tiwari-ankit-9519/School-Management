@@ -5,8 +5,7 @@ import {
 import { Response } from "express";
 import {
   ModeratorSchema,
-  RejectTeacherApplicationSchema,
-  ResubmitApplicationSchema,
+  RejectAdmissionApplicationSchema,
   ResubmitTeacherApplicationSchema,
   TeacherApplicationSchema,
   UpdateUserPermissionSchema,
@@ -174,7 +173,8 @@ export async function shortlistTeacherApplication(
   );
   res.json({
     success: true,
-    message: "Application is shortlisted",
+    message:
+      "Application is shortlisted for further process. Please check with admin",
     data: updatedApplication,
   });
 }
@@ -215,7 +215,7 @@ export async function rejectTeacherApplication(
   res: Response,
 ): Promise<void> {
   const auditContext = buildAuditContext(req);
-  const parsed = RejectTeacherApplicationSchema.safeParse(req.body);
+  const parsed = RejectAdmissionApplicationSchema.safeParse(req.body);
   if (!parsed.success) {
     res.status(400).json({
       success: false,

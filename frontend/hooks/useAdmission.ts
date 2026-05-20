@@ -76,7 +76,7 @@ const admissionApi = {
     rejectionReason: string,
   ) => {
     const response = await api.patch<ApiResponse<null>>(
-      `/school/admission/${applicationId}/reject`, // fixed typo "rejcet"
+      `/school/admission/${applicationId}/reject`,
       { rejectionReason },
     );
     return response.data.message;
@@ -96,11 +96,10 @@ const admissionApi = {
   resubmitAdmissionApplication: async (
     applicationId: string,
     data: ResubmitAdmissionApplicationFormValues,
-    files: File[] = [], // ✅ separate files param
+    files: File[] = [],
   ): Promise<string | undefined> => {
     const formData = new FormData();
 
-    // Append text fields
     if (data.previousSchool)
       formData.append("previousSchool", data.previousSchool);
     if (data.previousClass)
@@ -108,12 +107,10 @@ const admissionApi = {
     if (data.guardianEmail)
       formData.append("guardianEmail", data.guardianEmail);
 
-    // Append document metadata as JSON
     if (data.documents && data.documents.length > 0) {
       formData.append("documentsMetadata", JSON.stringify(data.documents));
     }
 
-    // Append actual files
     files.forEach((file) => formData.append("documents", file));
 
     const response = await api.patch<ApiResponse<{ id: string }>>(
@@ -239,7 +236,7 @@ export const useWaitlistAdmissionApplication = () => {
       waitlistReason: string;
     }) =>
       admissionApi.waitlistAdmissionApplication(applicationId, waitlistReason),
-    onSuccess: (message, applicationId) => {
+    onSuccess: (message, { applicationId }) => {
       queryClient.invalidateQueries({
         queryKey: QUERY_KEYS.SCHOOL_APPLICATIONS,
       });
@@ -273,7 +270,7 @@ export const useResubmitAdmissionApplication = () => {
       queryClient.invalidateQueries({
         queryKey: [...QUERY_KEYS.SCHOOL_APPLICATION, applicationId],
       });
-      toast.success(message ?? "Application resubmitted successfully");
+      toast.success(message ?? "Application rejected successfully");
     },
     onError: (error) => {
       toast.error(getErrorMessage(error));

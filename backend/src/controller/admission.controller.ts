@@ -255,7 +255,7 @@ export async function waitlistAdmissionApplication(
   req: AuthenticatedRequest,
   res: Response,
 ): Promise<void> {
-  const applicaitonId = req.params.applicationId as string;
+  const applicationId = req.params.applicationId as string;
   const { waitlistReason } = req.body;
   if (!waitlistReason) {
     throw new Error("Reason is required");
@@ -267,7 +267,7 @@ export async function waitlistAdmissionApplication(
   const auditContext = buildAuditContext(req);
   res.status(HTTP_STATUS.OK);
   await waitlistAdmissionApplicationService(
-    applicaitonId,
+    applicationId,
     waitlistReason,
     moderatorId,
     auditContext,

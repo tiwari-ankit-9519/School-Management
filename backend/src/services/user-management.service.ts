@@ -8,7 +8,6 @@ import {
 import { createModuleLogger } from "../config/logger.config";
 import { AuditContext } from "../middlewares/request-logger.middleware";
 import {
-  AllTeacherApplication,
   CreateModeratorInput,
   ModeratorWithDetails,
   ResubmitTeacherApplicationInput,
@@ -36,6 +35,7 @@ import {
   CACHE_KEYS,
   CACHE_TTL,
   deleteCache,
+  deleteCacheByPattern,
   getCache,
   setCache,
 } from "../utils/cache.util";
@@ -44,6 +44,7 @@ import {
   mergePermissions,
 } from "../utils/permission.util";
 import { generateRegistrationNumber } from "../utils/registration.util";
+import { TeacherApplicationListPayload } from "../types/response-type";
 
 const log = createModuleLogger("UserManagement");
 
@@ -248,7 +249,7 @@ export async function teacherApplicationService(
   files: Express.Multer.File[],
   context: AuditContext,
   statusCode: number,
-): Promise<TeacherApplication> {
+): Promise<{ id: string }> {
   try {
     log.info("Teacher Application service starting", {
       teacherEmail: data.email,
@@ -370,7 +371,7 @@ export async function teacherApplicationService(
             });
           }
 
-          return updated;
+          return { id: updated.id };
         });
 
         await createSystemLog({
@@ -553,7 +554,7 @@ export async function teacherApplicationService(
       applicationId: newApplication.id,
     });
 
-    return newApplication;
+    return { id: newApplication.id };
   } catch (error) {
     const err = error as Error;
     log.error("Failed to create teacher application", {
@@ -572,7 +573,7 @@ export async function getAllTeachersApplicationService(
   limit: number = 10,
   status?: ApplicationStatus,
 ): Promise<{
-  data: AllTeacherApplication[];
+  data: TeacherApplicationListPayload[];
   total: number;
   page: number;
   limit: number;
@@ -594,7 +595,7 @@ export async function getAllTeachersApplicationService(
     );
 
     const cached = await getCache<{
-      data: TeacherApplication[];
+      data: TeacherApplicationListPayload[];
       total: number;
       page: number;
       limit: number;
@@ -619,9 +620,14 @@ export async function getAllTeachersApplicationService(
           firstName: true,
           lastName: true,
           email: true,
+          phone: true,
+          gender: true,
+          qualification: true,
+          experience: true,
+          specialization: true,
           status: true,
-          createdAt: true,
           appliedAt: true,
+          createdAt: true,
         },
       }),
       prisma.teacherApplication.count({ where }),
@@ -747,7 +753,7 @@ export async function shortlistApplicationService(
   moderatorId: string,
   context: AuditContext,
   statusCode: number,
-): Promise<TeacherApplication> {
+): Promise<void> {
   try {
     log.info("Starting Shortlisting application service", {
       applicationId,
@@ -783,8 +789,10 @@ export async function shortlistApplicationService(
       },
     });
 
-    await deleteCache(CACHE_KEYS.teacherApplications("ALL", 1, 10));
-    await deleteCache(CACHE_KEYS.teacherApplication(applicationId));
+    await Promise.all([
+      deleteCache(CACHE_KEYS.teacherApplication(applicationId)),
+      deleteCacheByPattern(`teacher-applications:*`),
+    ]);
 
     await createSystemLog({
       level: "INFO",
@@ -824,8 +832,6 @@ export async function shortlistApplicationService(
     log.info("Application shortlisted for further process", {
       updatedApplication,
     });
-
-    return updatedApplication;
   } catch (error) {
     const err = error as Error;
     log.error("Failed to shortlist teacher application", {
@@ -1141,7 +1147,7 @@ export async function resubmitTeacherApplicationService(
   files: Express.Multer.File[],
   context: AuditContext,
   statusCode: number,
-): Promise<TeacherApplication> {
+): Promise<{ id: string }> {
   const uploadedFiles: Array<{
     uploadResult: CloudinaryUploadResult;
     documentType: DocumentType;
@@ -1267,7 +1273,7 @@ export async function resubmitTeacherApplicationService(
         });
       }
 
-      return updated;
+      return { id: updated.id };
     });
 
     await createSystemLog({
@@ -1300,7 +1306,7 @@ export async function resubmitTeacherApplicationService(
       schoolName: "",
       applicationId,
     });
-    return updatedApplication;
+    return { id: updatedApplication.id };
   } catch (error) {
     if (uploadedFiles.length > 0) {
       log.warn("Cleaning up orphaned Cloudinary uploads", {

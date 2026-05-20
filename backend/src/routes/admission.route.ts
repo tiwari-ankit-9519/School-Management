@@ -45,7 +45,7 @@ router.get(
 );
 
 router.patch(
-  "/:id/waitlist",
+  "/:applicationId/waitlist",
   authenticate,
   authorize("ADMIN", "MODERATOR"),
   checkPermission(Module.ADMISSION_APPLICATION, "canApprove"),

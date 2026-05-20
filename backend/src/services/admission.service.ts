@@ -833,9 +833,7 @@ export async function rejectAdmissionnApplicationService(
 
     const [admissionApplication] = await Promise.all([
       await prisma.admissionApplication.findUnique({
-        where: {
-          id: applicationId,
-        },
+        where: { id: applicationId },
       }),
     ]);
 
@@ -861,7 +859,7 @@ export async function rejectAdmissionnApplicationService(
       );
     }
 
-    await prisma.$transaction(async (tx) => {
+    const { promotedApplicationId } = await prisma.$transaction(async (tx) => {
       await tx.admissionApplication.update({
         where: { id: applicationId },
         data: {
@@ -895,9 +893,7 @@ export async function rejectAdmissionnApplicationService(
         const promotedPosition = nextWaitListed.waitlistPosition;
 
         await tx.admissionApplication.update({
-          where: {
-            id: nextWaitListed.id,
-          },
+          where: { id: nextWaitListed.id },
           data: {
             status: "APPROVED",
             waitlistPosition: null,
@@ -926,8 +922,21 @@ export async function rejectAdmissionnApplicationService(
             previousStatus: "WAITLISTED",
           },
         });
+
+        return { promotedApplicationId: nextWaitListed.id };
       }
+
+      return { promotedApplicationId: null };
     });
+
+    if (promotedApplicationId) {
+      await deleteCache(CACHE_KEYS.admissionApplication(promotedApplicationId));
+    }
+
+    await Promise.all([
+      deleteCache(CACHE_KEYS.admissionApplication(applicationId)),
+      deleteCacheByPattern(`admission-applications:*`),
+    ]);
 
     await createAuditLog({
       performedById: moderatorId,
@@ -935,13 +944,8 @@ export async function rejectAdmissionnApplicationService(
       module: "AdmissionApplication",
       resourceId: admissionApplication.id,
       resourceType: "AdmissionApplication",
-      oldValues: {
-        status: admissionApplication.status,
-      },
-      newValues: {
-        status: "REJECTED",
-        rejectionReason,
-      },
+      oldValues: { status: admissionApplication.status },
+      newValues: { status: "REJECTED", rejectionReason },
       context,
       isSuccessful: true,
       statusCode,
@@ -960,6 +964,7 @@ export async function rejectAdmissionnApplicationService(
         previousStatus: admissionApplication.status,
       },
     });
+
     await sendAdmissionApplicationRejectedEmailService({
       studentFirstName: admissionApplication.firstName,
       studentLastName: admissionApplication.lastName,
@@ -1251,6 +1256,11 @@ export async function waitlistAdmissionApplicationService(
         },
       });
     });
+
+    await Promise.all([
+      deleteCache(CACHE_KEYS.admissionApplication(applicationId)),
+      deleteCacheByPattern(`admission-applications:*`),
+    ]);
 
     await createSystemLog({
       level: "INFO",

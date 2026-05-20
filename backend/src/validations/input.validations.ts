@@ -10,10 +10,6 @@ import {
   Prisma,
 } from "@prisma/client";
 
-// ─────────────────────────────────────────────
-// AUTH
-// ─────────────────────────────────────────────
-
 export const LoginInputSchema = z
   .object({
     email: z.string().email({ error: "Please provide valid email" }).optional(),

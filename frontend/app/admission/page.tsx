@@ -32,7 +32,6 @@ import {
   admissionApplicationSchema,
   AdmissionApplicationFormValues,
 } from "@/validations/validations";
-// import { AdmissionApplicationInput } from "@/validations/validations";
 import { Gender, ParentType, DocumentType } from "@/types";
 import { useTranslations } from "@/hooks/useTranslations";
 
@@ -110,6 +109,7 @@ const AdmissionApplicationPage = () => {
     control,
     setValue,
     trigger,
+    clearErrors,
     formState: { errors },
   } = useForm<
     AdmissionApplicationFormValues,
@@ -119,6 +119,8 @@ const AdmissionApplicationPage = () => {
     resolver: zodResolver(
       admissionApplicationSchema,
     ) as Resolver<AdmissionApplicationFormValues>,
+    mode: "onChange", // ✅ clears errors as soon as field becomes valid
+    reValidateMode: "onChange",
     defaultValues: {
       firstName: "",
       lastName: "",
@@ -176,10 +178,16 @@ const AdmissionApplicationPage = () => {
 
   const handleNext = async () => {
     const valid = await trigger(STEP_FIELDS[currentStep]);
-    if (valid) setCurrentStep((p) => Math.min(STEPS.length - 1, p + 1));
+    if (valid) {
+      clearErrors();
+      setCurrentStep((p) => Math.min(STEPS.length - 1, p + 1));
+    }
   };
 
-  const handleBack = () => setCurrentStep((p) => Math.max(0, p - 1));
+  const handleBack = () => {
+    clearErrors();
+    setCurrentStep((p) => Math.max(0, p - 1));
+  };
 
   const handlePhotoChange = (file: File, type: "student" | "guardian") => {
     const url = URL.createObjectURL(file);
@@ -447,7 +455,10 @@ const AdmissionApplicationPage = () => {
                             <button
                               key={opt.value}
                               type="button"
-                              onClick={() => field.onChange(opt.value)}
+                              onClick={() => {
+                                field.onChange(opt.value);
+                                clearErrors("gender"); // ✅ explicitly clear on selection
+                              }}
                               className={`flex-1 rounded-xl border py-2.5 font-manrope text-xs font-medium transition-all duration-200 ${
                                 field.value === opt.value
                                   ? "border-indigo-500/40 bg-indigo-500/15 text-indigo-300"
@@ -760,7 +771,10 @@ const AdmissionApplicationPage = () => {
                             <button
                               key={opt.value}
                               type="button"
-                              onClick={() => field.onChange(opt.value)}
+                              onClick={() => {
+                                field.onChange(opt.value);
+                                clearErrors("guardianRelation"); // ✅ explicitly clear on selection
+                              }}
                               className={`flex-1 rounded-xl border py-2.5 font-manrope text-xs font-medium transition-all duration-200 ${
                                 field.value === opt.value
                                   ? "border-indigo-500/40 bg-indigo-500/15 text-indigo-300"
