@@ -11,12 +11,16 @@ import {
 import { HTTP_STATUS } from "../utils/constants";
 import {
   approveAdmissionApplicationService,
+  confirmSlotOfferService,
+  declineSlotOfferService,
   getAdmissionApplicationService,
+  getAdmissionClassService,
   getAllAdmissionApplicationService,
   rejectAdmissionnApplicationService,
   resubmitAdmissionApplicationService,
   submitAdmissionApplicationService,
   waitlistAdmissionApplicationService,
+  withdrawStudentService,
 } from "../services/admission.service";
 import { AdmissionStatus } from "@prisma/client";
 
@@ -36,8 +40,10 @@ export async function submitAdmissionApplication(
       return;
     }
   }
+
   const auditContext = buildAuditContext(req);
   const parsed = AdmissionApplicationSchema.safeParse(req.body);
+
   if (!parsed.success) {
     res.status(400).json({
       success: false,
@@ -81,13 +87,13 @@ export async function getAllAdmissionApplication(
   res: Response,
 ): Promise<void> {
   const auditContext = buildAuditContext(req);
-
   const page = parseInt(req.query.page as string) || 1;
   const limit = parseInt(req.query.limit as string) || 10;
   const status = req.query.status as AdmissionStatus | undefined;
 
   res.status(HTTP_STATUS.OK);
-  const applicaitons = await getAllAdmissionApplicationService(
+
+  const applications = await getAllAdmissionApplicationService(
     auditContext,
     res.statusCode,
     page,
@@ -97,8 +103,8 @@ export async function getAllAdmissionApplication(
 
   res.json({
     success: true,
-    message: `Applications fetched successfully`,
-    data: applicaitons,
+    message: "Applications fetched successfully",
+    data: applications,
   });
 }
 
@@ -108,11 +114,13 @@ export async function getAdmissionApplication(
 ): Promise<void> {
   const applicationId = req.params.applicationId as string;
   const auditContext = buildAuditContext(req);
+
   if (!applicationId) {
     throw new Error("Application ID is required");
   }
 
   res.status(HTTP_STATUS.OK);
+
   const application = await getAdmissionApplicationService(
     applicationId,
     auditContext,
@@ -126,7 +134,7 @@ export async function getAdmissionApplication(
   });
 }
 
-export async function rejectAdmissionnApplication(
+export async function rejectAdmissionApplication(
   req: AuthenticatedRequest,
   res: Response,
 ): Promise<void> {
@@ -134,6 +142,7 @@ export async function rejectAdmissionnApplication(
   const moderatorId = req.user?.id;
   const applicationId = req.params.applicationId as string;
   const parsed = RejectAdmissionApplicationSchema.safeParse(req.body);
+
   if (!parsed.success) {
     res.status(400).json({
       success: false,
@@ -146,6 +155,7 @@ export async function rejectAdmissionnApplication(
   if (!applicationId) {
     throw new Error("Application ID is required");
   }
+
   if (!moderatorId) {
     throw new Error("Moderator ID is required");
   }
@@ -172,6 +182,7 @@ export async function resubmitAdmissionApplication(
 ): Promise<void> {
   const auditContext = buildAuditContext(req);
   const applicationId = req.params.applicationId as string;
+
   if (req.body.documents && typeof req.body.documents === "string") {
     try {
       req.body.documents = JSON.parse(req.body.documents);
@@ -190,7 +201,9 @@ export async function resubmitAdmissionApplication(
   if (!applicationId) {
     throw new Error("Application ID is required");
   }
+
   const parsed = ResubmitAdmissionApplicationSchema.safeParse(req.body);
+
   if (!parsed.success) {
     res.status(400).json({
       success: false,
@@ -199,7 +212,9 @@ export async function resubmitAdmissionApplication(
     });
     return;
   }
+
   res.status(HTTP_STATUS.OK);
+
   const updatedAdmissionApplication = await resubmitAdmissionApplicationService(
     applicationId,
     parsed.data,
@@ -225,13 +240,15 @@ export async function approveAdmissionApplication(
   const auditContext = buildAuditContext(req);
 
   if (!applicationId) {
-    throw new Error(`Applicaiton ID is required`);
+    throw new Error("Application ID is required");
   }
+
   if (!reviewerId) {
-    throw new Error(`Reviewer ID is required`);
+    throw new Error("Reviewer ID is required");
   }
+
   if (!classId) {
-    throw new Error(`Class ID is required`);
+    throw new Error("Class ID is required");
   }
 
   res.status(HTTP_STATUS.CREATED);
@@ -257,15 +274,23 @@ export async function waitlistAdmissionApplication(
 ): Promise<void> {
   const applicationId = req.params.applicationId as string;
   const { waitlistReason } = req.body;
+  const moderatorId = req.user?.id;
+  const auditContext = buildAuditContext(req);
+
+  if (!applicationId) {
+    throw new Error("Application ID is required");
+  }
+
   if (!waitlistReason) {
     throw new Error("Reason is required");
   }
-  const moderatorId = req.user?.id;
+
   if (!moderatorId) {
     throw new Error("Moderator ID is required");
   }
-  const auditContext = buildAuditContext(req);
+
   res.status(HTTP_STATUS.OK);
+
   await waitlistAdmissionApplicationService(
     applicationId,
     waitlistReason,
@@ -277,5 +302,111 @@ export async function waitlistAdmissionApplication(
   res.json({
     success: true,
     message: "Application is put to waitlist",
+  });
+}
+
+export async function withdrawStudent(
+  req: AuthenticatedRequest,
+  res: Response,
+): Promise<void> {
+  const enrollmentId = req.params.enrollmentId as string;
+  const { withdrawalReason } = req.body;
+  const moderatorId = req.user?.id;
+  const auditContext = buildAuditContext(req);
+
+  if (!enrollmentId) {
+    throw new Error("Enrollment ID is required");
+  }
+
+  if (!withdrawalReason) {
+    throw new Error("Withdrawal reason is required");
+  }
+
+  if (!moderatorId) {
+    throw new Error("Moderator ID is required");
+  }
+
+  res.status(HTTP_STATUS.OK);
+
+  await withdrawStudentService(
+    enrollmentId,
+    moderatorId,
+    withdrawalReason,
+    auditContext,
+    res.statusCode,
+  );
+
+  res.json({
+    success: true,
+    message: `Enrollment ${enrollmentId} withdrawn successfully`,
+  });
+}
+
+export async function confirmSlotOffer(
+  req: AuthenticatedRequest,
+  res: Response,
+): Promise<void> {
+  const applicationId = req.params.applicationId as string;
+  const auditContext = buildAuditContext(req);
+
+  if (!applicationId) {
+    throw new Error("Application ID is required");
+  }
+
+  res.status(HTTP_STATUS.OK);
+
+  await confirmSlotOfferService(applicationId, auditContext, res.statusCode);
+
+  res.json({
+    success: true,
+    message: `Slot offer confirmed for applicationId ${applicationId}`,
+  });
+}
+
+export async function declineSlotOffer(
+  req: AuthenticatedRequest,
+  res: Response,
+): Promise<void> {
+  const applicationId = req.params.applicationId as string;
+  const auditContext = buildAuditContext(req);
+
+  if (!applicationId) {
+    throw new Error("Application ID is required");
+  }
+
+  res.status(HTTP_STATUS.OK);
+
+  await declineSlotOfferService(applicationId, auditContext, res.statusCode);
+
+  res.json({
+    success: true,
+    message: `Slot offer declined for applicationId ${applicationId}`,
+  });
+}
+
+export async function getAdmissionClass(
+  req: AuthenticatedRequest,
+  res: Response,
+): Promise<void> {
+  const auditContext = buildAuditContext(req);
+  const name = req.query.name as string;
+  const adminId = req.user?.id;
+  if (!adminId) {
+    throw new Error("Admin ID is required");
+  }
+
+  res.status(HTTP_STATUS.OK);
+
+  const classes = await getAdmissionClassService(
+    name,
+    adminId,
+    auditContext,
+    res.statusCode,
+  );
+
+  res.json({
+    success: true,
+    message: "Retrieved classes successfully",
+    data: classes,
   });
 }

@@ -19,6 +19,7 @@ import {
   sendPasswordResetEmail,
   sendResetPasswordSuccessEmail,
 } from "./email.service";
+import { deleteCacheByPattern } from "../utils/cache.util";
 
 const log = createModuleLogger("LoginService");
 
@@ -70,30 +71,6 @@ export async function login(
       throw new Error("Account is deactivated. Please contact support.");
     }
 
-    if (user.role !== "SUPER_ADMIN" && user.schoolId) {
-      const school = await prisma.school.findUnique({
-        where: { id: user.schoolId },
-        select: { isActive: true },
-      });
-
-      if (!school?.isActive) {
-        log.warn("Login failed. School is deactivated", {
-          userId: user.id,
-          schoolId: user.schoolId,
-        });
-        await createSystemLog({
-          level: "ERROR",
-          module: "LoginService",
-          message: "Login failed. School is deactivated",
-          context,
-          metadata: { userId: user.id, schoolId: user.schoolId },
-        });
-        throw new Error(
-          "Your school account has been deactivated. Please contact support.",
-        );
-      }
-    }
-
     const isPasswordValid = await verifyPassword(
       data.password,
       user.passwordHash,
@@ -128,7 +105,6 @@ export async function login(
     const token = generateAccessToken({
       userId: user.id,
       role: user.role,
-      schoolId: user.schoolId ?? undefined,
       sessionId: session.id,
     });
 
@@ -180,52 +156,65 @@ export async function login(
 
 export async function logout(
   userId: string,
-  token: string,
+  sessionId: string,
   context: AuditContext,
   statusCode: number,
 ) {
   try {
-    log.info("Trying to logout the user", {
-      user: userId,
-    });
+    log.info("Trying to logout the user", { userId });
 
     const userSession = await prisma.session.findUnique({
-      where: { token },
+      where: { id: sessionId },
     });
 
     if (!userSession || userSession.userId !== userId) {
-      log.warn("Invalid session", {
-        userSession,
-      });
+      log.warn("Invalid session", { sessionId });
       throw new Error("Invalid session");
     }
 
     await prisma.session.update({
-      where: { token },
+      where: { id: userSession.id },
       data: {
         isActive: false,
         updatedAt: new Date(),
       },
     });
 
+    await Promise.all([
+      deleteCacheByPattern(`user:${userId}:*`),
+      deleteCacheByPattern(`admission-applications:*`),
+      deleteCacheByPattern(`admission-application:*`),
+      deleteCacheByPattern(`students:*`),
+      deleteCacheByPattern(`classes:*`),
+      deleteCacheByPattern(`teachers:*`),
+      deleteCacheByPattern(`parents:*`),
+      deleteCacheByPattern(`enrollments:*`),
+    ]);
+
+    log.info("Cache cleared successfully on logout", { userId });
+
     await createSystemLog({
       level: "INFO",
       module: "LoginService",
-      message: "User logged in successfully",
+      message: "User logged out successfully",
       context,
       statusCode,
       metadata: {
         userId,
-        userSession,
+        sessionId: userSession.id,
       },
       userId,
     });
+
+    log.info("User logged out successfully", { userId });
   } catch (error) {
     const err = error as Error;
     log.error("Internal Server Error. Failed to logout", {
       error: err.message,
       ipAddress: context.ipAddress,
+      userId,
     });
+    throw err;
   }
 }
 

@@ -2,12 +2,16 @@ import { Router } from "express";
 import { upload } from "../config/cloudinary.config";
 import {
   approveAdmissionApplication,
+  confirmSlotOffer,
+  declineSlotOffer,
   getAdmissionApplication,
+  getAdmissionClass,
   getAllAdmissionApplication,
-  rejectAdmissionnApplication,
+  rejectAdmissionApplication,
   resubmitAdmissionApplication,
   submitAdmissionApplication,
   waitlistAdmissionApplication,
+  withdrawStudent,
 } from "../controller/admission.controller";
 import {
   authenticate,
@@ -36,6 +40,21 @@ router.get(
   getAllAdmissionApplication,
 );
 
+router.patch(
+  "/withdraw/:enrollmentId",
+  authenticate,
+  authorize("ADMIN", "MODERATOR"),
+  checkPermission(Module.ADMISSION_APPLICATION, "canApprove"),
+  withdrawStudent,
+);
+
+router.get(
+  "/class-name",
+  authenticate,
+  authorize("ADMIN", "MODERATOR"),
+  getAdmissionClass,
+);
+
 router.get(
   "/:applicationId",
   authenticate,
@@ -57,7 +76,7 @@ router.patch(
   authenticate,
   authorize("ADMIN", "MODERATOR"),
   checkPermission(Module.ADMISSION_APPLICATION, "canApprove"),
-  rejectAdmissionnApplication,
+  rejectAdmissionApplication,
 );
 
 router.patch(
@@ -77,5 +96,9 @@ router.patch(
   ]),
   resubmitAdmissionApplication,
 );
+
+router.patch("/:applicationId/confirm-slot", confirmSlotOffer);
+
+router.patch("/:applicationId/decline-slot", declineSlotOffer);
 
 export default router;

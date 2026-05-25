@@ -1,6 +1,10 @@
 import api, { ApiResponse, getErrorMessage } from "@/lib/api";
 import { QUERY_KEYS } from "@/lib/constants";
-import { AdmissionApplication, PaginatedAdmissionApplications } from "@/types";
+import {
+  AdmissionApplication,
+  AdmissionClass,
+  PaginatedAdmissionApplications,
+} from "@/types";
 import {
   AdmissionApplicationFormValues,
   ResubmitAdmissionApplicationFormValues,
@@ -60,6 +64,14 @@ const admissionApi = {
     return response.data.data;
   },
 
+  getAdmissionClasses: async (name: string): Promise<AdmissionClass[]> => {
+    const params = new URLSearchParams({ name });
+    const response = await api.get<ApiResponse<AdmissionClass[]>>(
+      `/school/admission/class-name?${params.toString()}`,
+    );
+    return response.data.data;
+  },
+
   approveAdmissionApplication: async (
     applicationId: string,
     classId: string,
@@ -99,23 +111,48 @@ const admissionApi = {
     files: File[] = [],
   ): Promise<string | undefined> => {
     const formData = new FormData();
-
     if (data.previousSchool)
       formData.append("previousSchool", data.previousSchool);
     if (data.previousClass)
       formData.append("previousClass", data.previousClass);
     if (data.guardianEmail)
       formData.append("guardianEmail", data.guardianEmail);
-
     if (data.documents && data.documents.length > 0) {
       formData.append("documentsMetadata", JSON.stringify(data.documents));
     }
-
     files.forEach((file) => formData.append("documents", file));
-
     const response = await api.patch<ApiResponse<{ id: string }>>(
       `/school/admission/${applicationId}/resubmit`,
       formData,
+    );
+    return response.data.message;
+  },
+
+  confirmSlotOffer: async (
+    applicationId: string,
+  ): Promise<string | undefined> => {
+    const response = await api.patch<ApiResponse<null>>(
+      `/school/admission/${applicationId}/confirm-slot`,
+    );
+    return response.data.message;
+  },
+
+  declineSlotOffer: async (
+    applicationId: string,
+  ): Promise<string | undefined> => {
+    const response = await api.patch<ApiResponse<null>>(
+      `/school/admission/${applicationId}/decline-slot`,
+    );
+    return response.data.message;
+  },
+
+  withdrawStudent: async (
+    enrollmentId: string,
+    withdrawalReason: string,
+  ): Promise<string | undefined> => {
+    const response = await api.patch<ApiResponse<null>>(
+      `/school/admission/withdraw/${enrollmentId}`,
+      { withdrawalReason },
     );
     return response.data.message;
   },
@@ -174,6 +211,14 @@ export const useGetAdmissionApplication = (applicationId: string) => {
   });
 };
 
+export const useGetAdmissionClasses = (name: string) => {
+  return useQuery({
+    queryKey: [...QUERY_KEYS.ADMISSION_CLASSES, name],
+    queryFn: () => admissionApi.getAdmissionClasses(name),
+    enabled: !!name,
+  });
+};
+
 export const useApproveAdmissionApplication = () => {
   const queryClient = useQueryClient();
   return useMutation({
@@ -184,7 +229,7 @@ export const useApproveAdmissionApplication = () => {
       applicationId: string;
       classId: string;
     }) => admissionApi.approveAdmissionApplication(applicationId, classId),
-    onSuccess: (message, applicationId) => {
+    onSuccess: (message, { applicationId }) => {
       queryClient.invalidateQueries({
         queryKey: QUERY_KEYS.SCHOOL_APPLICATIONS,
       });
@@ -210,7 +255,7 @@ export const useRejectAdmissionApplication = () => {
       rejectionReason: string;
     }) =>
       admissionApi.rejectAdmissionApplication(applicationId, rejectionReason),
-    onSuccess: (message, applicationId) => {
+    onSuccess: (message, { applicationId }) => {
       queryClient.invalidateQueries({
         queryKey: QUERY_KEYS.SCHOOL_APPLICATIONS,
       });
@@ -270,7 +315,72 @@ export const useResubmitAdmissionApplication = () => {
       queryClient.invalidateQueries({
         queryKey: [...QUERY_KEYS.SCHOOL_APPLICATION, applicationId],
       });
-      toast.success(message ?? "Application rejected successfully");
+      toast.success(message ?? "Application resubmitted successfully");
+    },
+    onError: (error) => {
+      toast.error(getErrorMessage(error));
+    },
+  });
+};
+
+export const useConfirmSlotOffer = () => {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ applicationId }: { applicationId: string }) =>
+      admissionApi.confirmSlotOffer(applicationId),
+    onSuccess: (message, { applicationId }) => {
+      queryClient.invalidateQueries({
+        queryKey: QUERY_KEYS.SCHOOL_APPLICATIONS,
+      });
+      queryClient.invalidateQueries({
+        queryKey: [...QUERY_KEYS.SCHOOL_APPLICATION, applicationId],
+      });
+      toast.success(message ?? "Slot offer confirmed successfully");
+    },
+    onError: (error) => {
+      toast.error(getErrorMessage(error));
+    },
+  });
+};
+
+export const useDeclineSlotOffer = () => {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ applicationId }: { applicationId: string }) =>
+      admissionApi.declineSlotOffer(applicationId),
+    onSuccess: (message, { applicationId }) => {
+      queryClient.invalidateQueries({
+        queryKey: QUERY_KEYS.SCHOOL_APPLICATIONS,
+      });
+      queryClient.invalidateQueries({
+        queryKey: [...QUERY_KEYS.SCHOOL_APPLICATION, applicationId],
+      });
+      toast.success(message ?? "Slot offer declined successfully");
+    },
+    onError: (error) => {
+      toast.error(getErrorMessage(error));
+    },
+  });
+};
+
+export const useWithdrawStudent = () => {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({
+      enrollmentId,
+      withdrawalReason,
+    }: {
+      enrollmentId: string;
+      withdrawalReason: string;
+    }) => admissionApi.withdrawStudent(enrollmentId, withdrawalReason),
+    onSuccess: (message) => {
+      queryClient.invalidateQueries({
+        queryKey: QUERY_KEYS.SCHOOL_APPLICATIONS,
+      });
+      queryClient.invalidateQueries({
+        queryKey: QUERY_KEYS.STUDENTS,
+      });
+      toast.success(message ?? "Student withdrawn successfully");
     },
     onError: (error) => {
       toast.error(getErrorMessage(error));

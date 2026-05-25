@@ -1,5 +1,4 @@
 "use client";
-
 import { useState } from "react";
 import { useParams } from "next/navigation";
 import { motion, AnimatePresence } from "motion/react";
@@ -21,6 +20,9 @@ import {
   Mail,
   School,
   BookOpen,
+  Timer,
+  Ban,
+  DoorOpen,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
@@ -28,8 +30,9 @@ import {
   useApproveAdmissionApplication,
   useRejectAdmissionApplication,
   useWaitlistAdmissionApplication,
+  useGetAdmissionClasses,
 } from "@/hooks/useAdmission";
-import { AdmissionStatus } from "@/types";
+import { AdmissionClass, AdmissionStatus } from "@/types";
 
 const formatDate = (iso: string) =>
   new Date(iso).toLocaleDateString("en-IN", {
@@ -66,9 +69,25 @@ const STATUS_CONFIG: Record<
     bg: "bg-indigo-400/10 border-indigo-400/20",
     icon: <Clock className="h-3.5 w-3.5" />,
   },
+  SLOT_OFFERED: {
+    label: "Slot Offered",
+    color: "text-cyan-400",
+    bg: "bg-cyan-400/10 border-cyan-400/20",
+    icon: <Timer className="h-3.5 w-3.5" />,
+  },
+  OFFER_EXPIRED: {
+    label: "Offer Expired",
+    color: "text-orange-400",
+    bg: "bg-orange-400/10 border-orange-400/20",
+    icon: <Timer className="h-3.5 w-3.5" />,
+  },
+  OFFER_DECLINED: {
+    label: "Offer Declined",
+    color: "text-rose-400",
+    bg: "bg-rose-400/10 border-rose-400/20",
+    icon: <Ban className="h-3.5 w-3.5" />,
+  },
 };
-
-// ─── Sub-components ───────────────────────────────────────────────────────────
 
 const InfoRow = ({
   icon,
@@ -107,31 +126,141 @@ const Section = ({
   </div>
 );
 
-// ─── Action Modals ────────────────────────────────────────────────────────────
-
 type ActionType = "approve" | "reject" | "waitlist" | null;
+
+const ClassDropdown = ({
+  classes,
+  selectedId,
+  onSelect,
+  isLoading,
+  borderClass,
+}: {
+  classes: AdmissionClass[];
+  selectedId: string;
+  onSelect: (id: string) => void;
+  isLoading: boolean;
+  borderClass: string;
+}) => {
+  const [open, setOpen] = useState(false);
+  const selected = classes.find((c) => c.id === selectedId);
+
+  return (
+    <div className="relative">
+      <button
+        type="button"
+        onClick={() => setOpen((p) => !p)}
+        className={`flex h-11 w-full items-center justify-between rounded-xl border bg-white/5 px-4 font-manrope text-sm text-white focus:outline-none ${borderClass}`}
+      >
+        {isLoading ? (
+          <span className="flex items-center gap-2 text-white/40">
+            <Loader2 className="h-3.5 w-3.5 animate-spin" />
+            Loading classes...
+          </span>
+        ) : selected ? (
+          <span className="flex items-center gap-2">
+            <GraduationCap className="h-3.5 w-3.5 text-indigo-400" />
+            <span className="font-medium">
+              Class {selected.name}
+              {selected.section ? ` - ${selected.section}` : ""}
+            </span>
+            <span className="ml-1 rounded-md border border-white/10 bg-white/5 px-1.5 py-0.5 text-[11px] text-white/40">
+              {selected.capacity} seats
+            </span>
+          </span>
+        ) : (
+          <span className="text-white/20">Select a section</span>
+        )}
+        <ChevronDown
+          className={`h-4 w-4 shrink-0 text-white/30 transition-transform duration-200 ${open ? "rotate-180" : ""}`}
+        />
+      </button>
+
+      <AnimatePresence>
+        {open && !isLoading && (
+          <motion.div
+            initial={{ opacity: 0, y: 6, scale: 0.97 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            exit={{ opacity: 0, y: 6, scale: 0.97 }}
+            transition={{ duration: 0.15 }}
+            className="absolute left-0 top-12 z-30 w-full overflow-hidden rounded-xl border border-white/10 bg-[#0d1424] shadow-2xl shadow-black/50 backdrop-blur-xl"
+          >
+            <div className="absolute inset-x-0 top-0 h-px bg-linear-to-r from-transparent via-white/15 to-transparent" />
+            {classes.length === 0 ? (
+              <div className="px-4 py-3 font-manrope text-sm text-white/30">
+                No sections found for this class
+              </div>
+            ) : (
+              classes.map((cls) => (
+                <button
+                  key={cls.id}
+                  type="button"
+                  onClick={() => {
+                    onSelect(cls.id);
+                    setOpen(false);
+                  }}
+                  className={`flex w-full items-center justify-between px-4 py-3 font-manrope text-sm transition-colors duration-150 ${
+                    cls.id === selectedId
+                      ? "bg-indigo-500/15 text-indigo-300"
+                      : "text-white/60 hover:bg-white/5 hover:text-white"
+                  }`}
+                >
+                  <div className="flex items-center gap-2">
+                    <GraduationCap className="h-3.5 w-3.5 shrink-0 text-indigo-400" />
+                    <span className="font-medium">
+                      Class {cls.name}
+                      {cls.section ? ` - Section ${cls.section}` : ""}
+                    </span>
+                    {cls.roomNumber && (
+                      <span className="flex items-center gap-1 text-[11px] text-white/30">
+                        <DoorOpen className="h-3 w-3" />
+                        {cls.roomNumber}
+                      </span>
+                    )}
+                  </div>
+                  <div className="flex items-center gap-1 rounded-md border border-white/10 bg-white/5 px-2 py-0.5">
+                    <Users className="h-3 w-3 text-white/30" />
+                    <span
+                      className={`text-[11px] ${cls.remaining === 0 ? "text-red-400" : "text-white/50"}`}
+                    >
+                      {cls.remaining === 0 ? "Full" : `${cls.remaining} left`}
+                    </span>
+                  </div>
+                </button>
+              ))
+            )}
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </div>
+  );
+};
 
 const ActionModal = ({
   type,
+  appliedForClass,
   onClose,
   onConfirm,
   isPending,
 }: {
   type: ActionType;
+  appliedForClass: string;
   onClose: () => void;
   onConfirm: (reason?: string, classId?: string) => void;
   isPending: boolean;
 }) => {
   const [reason, setReason] = useState("");
-  const [classId, setClassId] = useState("");
+  const [selectedClassId, setSelectedClassId] = useState("");
   const [error, setError] = useState("");
+
+  const { data: admissionClasses = [], isLoading: isClassesLoading } =
+    useGetAdmissionClasses(type === "approve" ? appliedForClass : "");
 
   if (!type) return null;
 
   const config = {
     approve: {
       title: "Approve Application",
-      subtitle: "Assign a class to enroll the student.",
+      subtitle: "Select a section to enroll the student.",
       color: "indigo",
       confirmLabel: "Approve & Enroll",
     },
@@ -162,8 +291,8 @@ const ActionModal = ({
   };
 
   const handleConfirm = () => {
-    if (type === "approve" && !classId.trim()) {
-      setError("Class ID is required");
+    if (type === "approve" && !selectedClassId) {
+      setError("Please select a section");
       return;
     }
     if (
@@ -174,7 +303,7 @@ const ActionModal = ({
       return;
     }
     setError("");
-    onConfirm(reason || undefined, classId || undefined);
+    onConfirm(reason || undefined, selectedClassId || undefined);
   };
 
   return (
@@ -191,7 +320,7 @@ const ActionModal = ({
         exit={{ opacity: 0, scale: 0.95, y: 16 }}
         transition={{ duration: 0.2 }}
         onClick={(e) => e.stopPropagation()}
-        className="w-full max-w-md rounded-2xl border border-white/10 bg-[#0b1120] p-6 shadow-2xl"
+        className="relative w-full max-w-md rounded-2xl border border-white/10 bg-[#0b1120] p-6 shadow-2xl"
       >
         <div className="absolute inset-x-0 top-0 h-px rounded-t-2xl bg-linear-to-r from-transparent via-white/15 to-transparent" />
         <h3 className="font-jakarta text-lg font-bold text-white">
@@ -200,25 +329,24 @@ const ActionModal = ({
         <p className="mt-1 font-manrope text-sm text-white/40">
           {config.subtitle}
         </p>
-
         <div className="mt-5 space-y-3">
           {type === "approve" && (
             <div>
               <label className="mb-1.5 block font-manrope text-xs text-white/40">
-                Class ID
+                Select Section
               </label>
-              <input
-                value={classId}
-                onChange={(e) => {
-                  setClassId(e.target.value);
+              <ClassDropdown
+                classes={admissionClasses}
+                selectedId={selectedClassId}
+                onSelect={(id) => {
+                  setSelectedClassId(id);
                   setError("");
                 }}
-                placeholder="Enter class ID"
-                className={`h-11 w-full rounded-xl border bg-white/5 px-4 font-manrope text-sm text-white placeholder:text-white/20 focus:outline-none ${colorMap[config.color]}`}
+                isLoading={isClassesLoading}
+                borderClass={colorMap[config.color]}
               />
             </div>
           )}
-
           {(type === "reject" || type === "waitlist") && (
             <div>
               <label className="mb-1.5 block font-manrope text-xs text-white/40">
@@ -232,11 +360,10 @@ const ActionModal = ({
                 }}
                 placeholder="Enter reason (min 10 characters)"
                 rows={3}
-                className={`w-full rounded-xl border bg-white/5 px-4 py-3 font-manrope text-sm text-white placeholder:text-white/20 focus:outline-none resize-none ${colorMap[config.color]}`}
+                className={`w-full resize-none rounded-xl border bg-white/5 px-4 py-3 font-manrope text-sm text-white placeholder:text-white/20 focus:outline-none ${colorMap[config.color]}`}
               />
             </div>
           )}
-
           {error && (
             <p className="flex items-center gap-1.5 font-manrope text-xs text-red-400">
               <AlertCircle className="h-3.5 w-3.5 shrink-0" />
@@ -244,20 +371,19 @@ const ActionModal = ({
             </p>
           )}
         </div>
-
         <div className="mt-5 flex gap-3">
           <Button
             type="button"
             onClick={onClose}
-            className="flex-1 h-11 rounded-xl border border-white/10 bg-white/5 font-jakarta text-sm font-bold text-white/60 hover:bg-white/8 hover:text-white"
+            className="h-11 flex-1 rounded-xl border border-white/10 bg-white/5 font-jakarta text-sm font-bold text-white/60 hover:bg-white/8 hover:text-white"
           >
             Cancel
           </Button>
           <Button
             type="button"
             onClick={handleConfirm}
-            disabled={isPending}
-            className={`flex-1 h-11 rounded-xl border-0 font-jakarta text-sm font-bold text-white shadow-lg transition-all ${btnMap[config.color]}`}
+            disabled={isPending || (type === "approve" && isClassesLoading)}
+            className={`h-11 flex-1 rounded-xl border-0 font-jakarta text-sm font-bold text-white shadow-lg transition-all ${btnMap[config.color]}`}
           >
             {isPending ? (
               <span className="flex items-center gap-2">
@@ -285,6 +411,7 @@ const AdmissionApplicationDetailPage = () => {
     isLoading,
     isError,
   } = useGetAdmissionApplication(applicationId);
+
   const { mutate: approve, isPending: isApproving } =
     useApproveAdmissionApplication();
   const { mutate: reject, isPending: isRejecting } =
@@ -332,6 +459,9 @@ const AdmissionApplicationDetailPage = () => {
   }
 
   const status = STATUS_CONFIG[application.status as AdmissionStatus];
+  const isPending = application.status === "PENDING";
+  const isWaitlisted = application.status === "WAITLISTED";
+  const showActions = isPending || isWaitlisted;
 
   return (
     <div className="relative min-h-screen w-full bg-[#050810] px-3 py-6 sm:px-6 sm:py-10">
@@ -342,9 +472,7 @@ const AdmissionApplicationDetailPage = () => {
             "radial-gradient(ellipse at 20% 20%, #1e3a5f18 0%, transparent 55%), radial-gradient(ellipse at 80% 70%, #6366f10a 0%, transparent 50%)",
         }}
       />
-
       <div className="relative z-10 mx-auto max-w-2xl space-y-5">
-        {/* Header */}
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
@@ -371,7 +499,6 @@ const AdmissionApplicationDetailPage = () => {
           </div>
         </motion.div>
 
-        {/* Photos */}
         {(application.photoUrl || application.guardianPhotoUrl) && (
           <motion.div
             initial={{ opacity: 0, y: 16 }}
@@ -412,7 +539,6 @@ const AdmissionApplicationDetailPage = () => {
           </motion.div>
         )}
 
-        {/* Student Info */}
         <motion.div
           initial={{ opacity: 0, y: 16 }}
           animate={{ opacity: 1, y: 0 }}
@@ -442,7 +568,6 @@ const AdmissionApplicationDetailPage = () => {
           </Section>
         </motion.div>
 
-        {/* Address */}
         <motion.div
           initial={{ opacity: 0, y: 16 }}
           animate={{ opacity: 1, y: 0 }}
@@ -474,7 +599,6 @@ const AdmissionApplicationDetailPage = () => {
           </Section>
         </motion.div>
 
-        {/* Academic */}
         {(application.previousSchool || application.previousClass) && (
           <motion.div
             initial={{ opacity: 0, y: 16 }}
@@ -496,7 +620,6 @@ const AdmissionApplicationDetailPage = () => {
           </motion.div>
         )}
 
-        {/* Guardian */}
         <motion.div
           initial={{ opacity: 0, y: 16 }}
           animate={{ opacity: 1, y: 0 }}
@@ -526,7 +649,6 @@ const AdmissionApplicationDetailPage = () => {
           </Section>
         </motion.div>
 
-        {/* Documents */}
         {application.documents && application.documents.length > 0 && (
           <motion.div
             initial={{ opacity: 0, y: 16 }}
@@ -567,8 +689,50 @@ const AdmissionApplicationDetailPage = () => {
           </motion.div>
         )}
 
-        {/* Rejection / Waitlist reason */}
-        {(application.rejectionReason || application.waitlistReason) && (
+        {application.waitlistPosition && (
+          <motion.div
+            initial={{ opacity: 0, y: 16 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.4, delay: 0.3 }}
+            className="rounded-2xl border border-indigo-500/20 bg-indigo-500/5 p-5"
+          >
+            <p className="mb-2 font-manrope text-[10px] font-semibold uppercase tracking-widest text-indigo-400/60">
+              Waitlist Position
+            </p>
+            <p className="font-jakarta text-2xl font-extrabold text-indigo-400">
+              #{application.waitlistPosition}
+            </p>
+          </motion.div>
+        )}
+
+        {application.slotOfferedAt && application.slotExpiresAt && (
+          <motion.div
+            initial={{ opacity: 0, y: 16 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.4, delay: 0.3 }}
+            className="rounded-2xl border border-cyan-500/20 bg-cyan-500/5 p-5"
+          >
+            <p className="mb-3 font-manrope text-[10px] font-semibold uppercase tracking-widest text-cyan-400/60">
+              Slot Offer Details
+            </p>
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+              <InfoRow
+                icon={<Timer className="h-3.5 w-3.5" />}
+                label="Offered On"
+                value={formatDate(application.slotOfferedAt)}
+              />
+              <InfoRow
+                icon={<Timer className="h-3.5 w-3.5" />}
+                label="Offer Expires On"
+                value={formatDate(application.slotExpiresAt)}
+              />
+            </div>
+          </motion.div>
+        )}
+
+        {(application.rejectionReason ||
+          (application.waitlistReason &&
+            application.waitlistReason !== "CLASS_FULL")) && (
           <motion.div
             initial={{ opacity: 0, y: 16 }}
             animate={{ opacity: 1, y: 0 }}
@@ -596,7 +760,6 @@ const AdmissionApplicationDetailPage = () => {
           </motion.div>
         )}
 
-        {/* History */}
         {application.histories && application.histories.length > 0 && (
           <motion.div
             initial={{ opacity: 0, y: 16 }}
@@ -652,50 +815,62 @@ const AdmissionApplicationDetailPage = () => {
           </motion.div>
         )}
 
-        {/* Action Buttons — only show for PENDING */}
-        {application.status === "PENDING" && (
+        {showActions && (
           <motion.div
             initial={{ opacity: 0, y: 16 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.4, delay: 0.4 }}
-            className="flex flex-col gap-3 sm:flex-row"
+            className="space-y-3"
           >
-            <Button
-              type="button"
-              onClick={() => setActiveModal("approve")}
-              disabled={isActionPending}
-              className="flex-1 h-11 rounded-xl border-0 bg-emerald-600 font-jakarta text-sm font-bold text-white shadow-lg shadow-emerald-500/20 hover:bg-emerald-500"
-            >
-              <Check className="mr-2 h-4 w-4" />
-              Approve
-            </Button>
-            <Button
-              type="button"
-              onClick={() => setActiveModal("waitlist")}
-              disabled={isActionPending}
-              className="flex-1 h-11 rounded-xl border border-yellow-500/30 bg-yellow-500/10 font-jakarta text-sm font-bold text-yellow-400 hover:bg-yellow-500/20"
-            >
-              <Clock className="mr-2 h-4 w-4" />
-              Waitlist
-            </Button>
-            <Button
-              type="button"
-              onClick={() => setActiveModal("reject")}
-              disabled={isActionPending}
-              className="flex-1 h-11 rounded-xl border border-red-500/30 bg-red-500/10 font-jakarta text-sm font-bold text-red-400 hover:bg-red-500/20"
-            >
-              <X className="mr-2 h-4 w-4" />
-              Reject
-            </Button>
+            {isWaitlisted && (
+              <div className="rounded-2xl border border-indigo-500/20 bg-indigo-500/5 px-4 py-3">
+                <p className="font-manrope text-xs text-indigo-400/70">
+                  This application is waitlisted. You can approve it by
+                  assigning a section directly, or reject it to remove it from
+                  the waitlist and notify the guardian.
+                </p>
+              </div>
+            )}
+            <div className="flex flex-col gap-3 sm:flex-row">
+              <Button
+                type="button"
+                onClick={() => setActiveModal("approve")}
+                disabled={isActionPending}
+                className="h-11 flex-1 rounded-xl border-0 bg-emerald-600 font-jakarta text-sm font-bold text-white shadow-lg shadow-emerald-500/20 hover:bg-emerald-500"
+              >
+                <Check className="mr-2 h-4 w-4" />
+                Approve
+              </Button>
+              {isPending && (
+                <Button
+                  type="button"
+                  onClick={() => setActiveModal("waitlist")}
+                  disabled={isActionPending}
+                  className="h-11 flex-1 rounded-xl border border-yellow-500/30 bg-yellow-500/10 font-jakarta text-sm font-bold text-yellow-400 hover:bg-yellow-500/20"
+                >
+                  <Clock className="mr-2 h-4 w-4" />
+                  Waitlist
+                </Button>
+              )}
+              <Button
+                type="button"
+                onClick={() => setActiveModal("reject")}
+                disabled={isActionPending}
+                className="h-11 flex-1 rounded-xl border border-red-500/30 bg-red-500/10 font-jakarta text-sm font-bold text-red-400 hover:bg-red-500/20"
+              >
+                <X className="mr-2 h-4 w-4" />
+                Reject
+              </Button>
+            </div>
           </motion.div>
         )}
       </div>
 
-      {/* Modal */}
       <AnimatePresence>
         {activeModal && (
           <ActionModal
             type={activeModal}
+            appliedForClass={application.appliedForClass}
             onClose={() => setActiveModal(null)}
             onConfirm={handleConfirm}
             isPending={isActionPending}

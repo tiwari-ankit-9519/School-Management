@@ -21,6 +21,7 @@ import {
   sendAdmissionApplicationRejectedEmail,
   sendAdmissionApplicationWaitlistedEmail,
   sendAdmissionApprovedEmail,
+  sendSlotOfferedEmail,
 } from "@/src/template/email.template";
 
 const log = createModuleLogger("EmailService");
@@ -624,5 +625,41 @@ export async function sendAdmissionApprovedEmailService(data: {
   log.info("Admission approved email queued successfully", {
     email: data.guardianEmail,
     schoolName: data.schoolName,
+  });
+}
+
+// Service to queue a slot offer email to the guardian notifying them of an available seat and confirmation deadline
+export async function sendSlotOfferedEmailService(data: {
+  studentFirstName: string;
+  studentLastName: string;
+  guardianFirstName: string;
+  guardianLastName: string;
+  guardianEmail: string;
+  appliedForClass: string;
+  schoolName: string;
+  applicationId: string;
+  slotExpiresAt: Date;
+}): Promise<void> {
+  log.info("Queuing slot offered email", {
+    email: data.guardianEmail,
+    schoolName: data.schoolName,
+    applicationId: data.applicationId,
+  });
+
+  const { subject, html, text } = sendSlotOfferedEmail(data);
+
+  await addEmailToQueue({
+    to: data.guardianEmail,
+    subject,
+    html,
+    text,
+    priority: 1,
+  });
+
+  log.info("Slot offered email queued successfully", {
+    email: data.guardianEmail,
+    schoolName: data.schoolName,
+    applicationId: data.applicationId,
+    slotExpiresAt: data.slotExpiresAt,
   });
 }

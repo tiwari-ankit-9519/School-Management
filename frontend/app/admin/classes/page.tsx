@@ -28,7 +28,7 @@ import AnimatedInput from "@/components/smoothui/animated-input";
 import { useGetAllClasses, useCreateClass } from "@/hooks/useClass";
 import { useGetAllAcademicYears } from "@/hooks/useAcademicYear";
 import { useTranslations } from "@/hooks/useTranslations";
-import { CreateClassInput } from "@/types";
+import { ClassFormValues } from "@/validations/validations";
 
 const createClassSchema = z.object({
   name: z
@@ -158,8 +158,12 @@ const ClassesPage = () => {
     setIsCreateModalOpen(false);
   };
 
-  const onSubmit = (data: CreateClassFormValues) => {
-    createClass(data as CreateClassInput, {
+  const onSubmit = (formData: CreateClassFormValues) => {
+    const payload: ClassFormValues = {
+      ...formData,
+      capacity: parseInt(formData.capacity, 10),
+    };
+    createClass(payload, {
       onSuccess: () => handleCloseModal(),
     });
   };
@@ -175,7 +179,6 @@ const ClassesPage = () => {
       />
 
       <div className="relative z-10 mx-auto max-w-6xl">
-        {/* Header */}
         <motion.div
           initial={{ opacity: 0, y: 24 }}
           animate={{ opacity: 1, y: 0 }}
@@ -212,7 +215,6 @@ const ClassesPage = () => {
             </Button>
           </div>
 
-          {/* Controls row */}
           <div className="mt-4 flex flex-wrap items-center gap-2">
             <div className="relative">
               <button
@@ -287,7 +289,6 @@ const ClassesPage = () => {
           </div>
         </motion.div>
 
-        {/* Filter Panel */}
         <AnimatePresence>
           {isFiltersOpen && (
             <motion.div
@@ -376,7 +377,6 @@ const ClassesPage = () => {
           )}
         </AnimatePresence>
 
-        {/* Table */}
         <motion.div
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
@@ -458,7 +458,6 @@ const ClassesPage = () => {
                   onClick={() => router.push(`/admin/classes/${cls.id}`)}
                   className="cursor-pointer transition-colors duration-150 hover:bg-white/3 group"
                 >
-                  {/* Mobile card */}
                   <div className="flex md:hidden items-start justify-between gap-3 px-4 py-4">
                     <div className="flex items-start gap-3 min-w-0">
                       <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-indigo-500/20 bg-indigo-500/10 mt-0.5">
@@ -488,7 +487,7 @@ const ClassesPage = () => {
                           )}
                         </div>
                         <div className="mt-2">
-                          {cls.classTeacher?.length > 0 ? (
+                          {(cls.classTeachers?.length ?? 0) > 0 ? (
                             <span className="inline-flex items-center gap-1 rounded-full border border-emerald-500/20 bg-emerald-500/10 px-2 py-0.5 font-manrope text-[11px] font-medium text-emerald-400">
                               <UserCheck className="h-2.5 w-2.5" />
                               {t("assigned")}
@@ -505,7 +504,6 @@ const ClassesPage = () => {
                     <ArrowRight className="h-4 w-4 shrink-0 mt-1 text-white/20 transition-all duration-200 group-hover:translate-x-0.5 group-hover:text-indigo-400" />
                   </div>
 
-                  {/* Desktop row */}
                   <div className="hidden md:grid md:grid-cols-[2fr_1fr_1fr_1fr_1fr_0.5fr] gap-4 px-6 py-4">
                     <div className="flex items-center gap-3">
                       <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-indigo-500/20 bg-indigo-500/10">
@@ -533,7 +531,7 @@ const ClassesPage = () => {
                       </span>
                     </div>
                     <div className="flex items-center">
-                      {cls.classTeacher?.length > 0 ? (
+                      {(cls.classTeachers?.length ?? 0) > 0 ? (
                         <span className="flex items-center gap-1.5 rounded-full border border-emerald-500/20 bg-emerald-500/10 px-2.5 py-1 font-manrope text-xs font-medium text-emerald-400">
                           <UserCheck className="h-3 w-3" />
                           {t("assigned")}
@@ -582,7 +580,6 @@ const ClassesPage = () => {
         </motion.div>
       </div>
 
-      {/* Create Class Modal */}
       <AnimatePresence>
         {isCreateModalOpen && (
           <>

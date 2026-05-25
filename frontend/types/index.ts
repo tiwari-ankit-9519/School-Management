@@ -17,6 +17,9 @@ export enum AdmissionStatus {
   APPROVED = "APPROVED",
   REJECTED = "REJECTED",
   WAITLISTED = "WAITLISTED",
+  SLOT_OFFERED = "SLOT_OFFERED",
+  OFFER_EXPIRED = "OFFER_EXPIRED",
+  OFFER_DECLINED = "OFFER_DECLINED",
 }
 
 export enum ApplicationStatus {
@@ -33,6 +36,7 @@ export enum EnrollmentStatus {
   GRADUATED = "GRADUATED",
   TRANSFERRED = "TRANSFERRED",
   EXPELLED = "EXPELLED",
+  WITHDRAWN = "WITHDRAWN",
 }
 
 export enum EmploymentStatus {
@@ -204,6 +208,18 @@ export enum Module {
 // CORE MODELS
 // ─────────────────────────────────────────────
 
+export type AdmissionClass = {
+  id: string;
+  name: string;
+  section: string | null;
+  capacity: number;
+  roomNumber: string | null;
+  academicYearId: string;
+  enrolled: number;
+  pending: number;
+  remaining: number;
+};
+
 export interface SchoolConfig {
   id: string;
   name: string;
@@ -245,6 +261,11 @@ export interface Class {
   createdAt: string;
   updatedAt: string;
   academicYear?: AcademicYear;
+  classTeachers?: ClassTeacher[];
+  enrollments?: Enrollment[];
+  timetables?: Timetable[];
+  examSchedules?: ExamSchedule[];
+  leaveRequest?: LeaveRequest[];
 }
 
 export interface Subject {
@@ -592,6 +613,9 @@ export interface AdmissionApplication {
   guardianPhotoUrl: string | null;
   documents?: Document[];
   histories?: AdmissionApplicationHistory[];
+  slotOfferedAt?: string | null;
+  slotExpiresAt?: string | null;
+  slotOfferedClass?: string | null;
 }
 
 export interface AdmissionApplicationHistory {

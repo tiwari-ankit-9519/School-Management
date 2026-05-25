@@ -126,6 +126,17 @@ export async function assignClassTeacherService(
       },
     );
 
+    const teacherExists = await prisma.teacher.findUnique({
+      where: { id: data.teacherId },
+    });
+
+    if (!teacherExists) {
+      log.warn(`Teacher does not exists with teacherId ${data.teacherId}`);
+      throw new Error(
+        `Teacher does not exists with teacherId ${data.teacherId}`,
+      );
+    }
+
     const classAlreadyHasTeacher = await prisma.classTeacher.findFirst({
       where: {
         classId: data.classId,
@@ -347,6 +358,36 @@ export async function getSingleClassService(
     const classExists = await prisma.class.findUnique({
       where: {
         id: classId,
+      },
+      include: {
+        classTeachers: {
+          select: {
+            id: true,
+            isPrimary: true,
+            teacherId: true,
+            teacher: {
+              select: { firstName: true, lastName: true },
+            },
+          },
+        },
+        enrollments: {
+          select: {
+            rollNumber: true,
+            status: true,
+            student: {
+              select: {
+                firstName: true,
+                lastName: true,
+                user: {
+                  select: { regNumber: true },
+                },
+              },
+            },
+          },
+        },
+        timetables: true,
+        examSchedules: true,
+        leaveRequest: true,
       },
     });
 

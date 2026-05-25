@@ -123,19 +123,14 @@ export const classSchema = z.object({
     .min(1, { error: "Section should be of atleast 1 character" })
     .max(2, { error: "Section should be of atmost 2 characters" })
     .trim(),
-  capacity: z.coerce
+  capacity: z
     .number({ error: "Capacity must be a number" })
     .min(10, { error: "Minimum capacity is 10" })
     .max(50, {
       error: "Maximum of 50 students can be enrolled in a single class",
     }),
-  roomNumber: z
-    .string()
-    .min(3, { error: "Room number should be of atleast three characters" })
-    .max(10, { error: "Room number should be atmost 10 characters" })
-    .optional()
-    .or(z.literal(""))
-    .transform((val) => (val === "" ? null : val)),
+  roomNumber: z.string().optional().or(z.literal("")),
+  // .transform((val) => (val === "" ? null : val)),
 });
 
 export const subjectSchema = z.object({

@@ -2367,3 +2367,176 @@ For any queries, please contact the school administration with your reference ID
 
   return { subject, html, text };
 }
+
+export function sendSlotOfferedEmail(data: {
+  studentFirstName: string;
+  studentLastName: string;
+  guardianFirstName: string;
+  guardianLastName: string;
+  guardianEmail: string;
+  appliedForClass: string;
+  schoolName: string;
+  applicationId: string;
+  slotExpiresAt: Date;
+}): { subject: string; html: string; text: string } {
+  const subject = `Seat Available for ${data.studentFirstName} ${data.studentLastName} | ${data.schoolName}`;
+
+  const formattedExpiry = data.slotExpiresAt.toLocaleString("en-IN", {
+    dateStyle: "full",
+    timeStyle: "short",
+  });
+
+  const confirmUrl = `${process.env.FRONTEND_URL}/admission/confirm-slot/${data.applicationId}`;
+  const declineUrl = `${process.env.FRONTEND_URL}/admission/decline-slot/${data.applicationId}`;
+
+  const html = `
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Seat Available</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background-color: #f4f6f9; color: #333; }
+    .wrapper { max-width: 600px; margin: 40px auto; background: #ffffff; border-radius: 12px; overflow: hidden; box-shadow: 0 4px 20px rgba(0,0,0,0.08); }
+    .header { background: linear-gradient(135deg, #1e3a5f 0%, #2563eb 100%); padding: 40px 32px; text-align: center; }
+    .header h1 { color: #ffffff; font-size: 26px; font-weight: 700; margin-bottom: 6px; }
+    .header p { color: rgba(255,255,255,0.85); font-size: 14px; }
+    .body { padding: 36px 32px; }
+    .greeting { font-size: 18px; font-weight: 600; margin-bottom: 12px; color: #1e3a5f; }
+    .text { font-size: 15px; line-height: 1.7; color: #555; margin-bottom: 24px; }
+    .slot-box { background: #f0fdf4; border: 2px dashed #16a34a; border-radius: 10px; padding: 28px 24px; margin-bottom: 28px; text-align: center; }
+    .slot-box p.label { font-size: 13px; font-weight: 600; color: #14532d; text-transform: uppercase; letter-spacing: 0.8px; margin-bottom: 4px; }
+    .slot-box p.class-name { font-size: 28px; font-weight: 800; color: #16a34a; margin-bottom: 4px; }
+    .slot-box p.app-id { font-size: 13px; color: #6b7280; margin-bottom: 16px; }
+    .slot-box p.expires { font-size: 13px; color: #6b7280; margin-top: 16px; }
+    .slot-box p.expires span { font-weight: 700; color: #dc2626; }
+    .btn-group { display: flex; justify-content: center; gap: 12px; margin-top: 8px; flex-wrap: wrap; }
+    .btn-confirm { display: inline-block; background: linear-gradient(135deg, #15803d, #16a34a); color: #ffffff !important; text-decoration: none; padding: 14px 32px; border-radius: 8px; font-size: 15px; font-weight: 600; }
+    .btn-decline { display: inline-block; background: linear-gradient(135deg, #b91c1c, #dc2626); color: #ffffff !important; text-decoration: none; padding: 14px 32px; border-radius: 8px; font-size: 15px; font-weight: 600; }
+    .link-fallback { background: #f9fafb; border: 1px solid #e5e7eb; border-radius: 8px; padding: 16px 20px; margin-bottom: 28px; }
+    .link-fallback p.label { font-size: 12px; color: #6b7280; margin-bottom: 6px; font-weight: 500; }
+    .link-fallback p.link { font-size: 13px; color: #2563eb; font-family: 'Courier New', Courier, monospace; word-break: break-all; }
+    .warning-box { background: #fff7ed; border-left: 4px solid #f97316; border-radius: 4px; padding: 16px 20px; margin-bottom: 28px; }
+    .warning-box p { font-size: 14px; color: #7c2d12; line-height: 1.6; }
+    .info-box { background: #eff6ff; border: 1px solid #bfdbfe; border-radius: 8px; padding: 20px 24px; margin-bottom: 28px; }
+    .info-box p { font-size: 14px; color: #1e40af; line-height: 1.7; }
+    .detail-row { display: flex; justify-content: space-between; padding: 10px 0; border-bottom: 1px solid #f3f4f6; font-size: 14px; }
+    .detail-row:last-child { border-bottom: none; }
+    .detail-row .detail-label { color: #6b7280; font-weight: 500; }
+    .detail-row .detail-value { color: #111827; font-weight: 600; }
+    .divider { border: none; border-top: 1px solid #eee; margin: 24px 0; }
+    .footer { background: #f9fafb; padding: 24px 32px; text-align: center; }
+    .footer p { font-size: 12px; color: #aaa; line-height: 1.8; }
+  </style>
+</head>
+<body>
+  <div class="wrapper">
+    <div class="header">
+      <h1>🎉 A Seat is Available!</h1>
+      <p>${data.schoolName}</p>
+    </div>
+    <div class="body">
+      <p class="greeting">Dear ${data.guardianFirstName} ${data.guardianLastName},</p>
+      <p class="text">
+        Great news! A seat has become available for your child
+        <strong>${data.studentFirstName} ${data.studentLastName}</strong>
+        in <strong>Class ${data.appliedForClass}</strong> at ${data.schoolName}.
+        Please confirm or decline this offer before the deadline below.
+      </p>
+
+      <div class="slot-box">
+        <p class="label">Seat Available In</p>
+        <p class="class-name">Class ${data.appliedForClass}</p>
+        <p class="app-id">Application ID: ${data.applicationId}</p>
+        <div class="btn-group">
+          <a href="${confirmUrl}" class="btn-confirm">✓ Confirm Seat</a>
+          <a href="${declineUrl}" class="btn-decline">✕ Decline Seat</a>
+        </div>
+        <p class="expires">
+          This offer expires on <span>${formattedExpiry}</span>
+        </p>
+      </div>
+
+      <div class="detail-row">
+        <span class="detail-label">Student Name</span>
+        <span class="detail-value">${data.studentFirstName} ${data.studentLastName}</span>
+      </div>
+      <div class="detail-row">
+        <span class="detail-label">Class Applied For</span>
+        <span class="detail-value">Class ${data.appliedForClass}</span>
+      </div>
+      <div class="detail-row">
+        <span class="detail-label">School</span>
+        <span class="detail-value">${data.schoolName}</span>
+      </div>
+      <div class="detail-row">
+        <span class="detail-label">Offer Expires</span>
+        <span class="detail-value">${formattedExpiry}</span>
+      </div>
+
+      <hr class="divider" />
+
+      <div class="link-fallback">
+        <p class="label">If the Confirm button doesn't work, copy and paste this link:</p>
+        <p class="link">${confirmUrl}</p>
+      </div>
+
+      <div class="warning-box">
+        <p>
+          <strong>Important:</strong> This offer is only valid until
+          <strong>${formattedExpiry}</strong>. If you do not confirm by this
+          time, the seat will automatically be offered to the next applicant
+          on the waitlist.
+        </p>
+      </div>
+
+      <div class="info-box">
+        <p>
+          <strong>Already enrolled elsewhere?</strong> Please click Decline so
+          we can offer this seat to another waiting family as quickly as
+          possible. We appreciate your cooperation.
+        </p>
+      </div>
+
+      <p class="text">
+        If you have any questions, please contact the school administration
+        directly.
+      </p>
+    </div>
+    <div class="footer">
+      <p>This is an automated email. Please do not reply directly to this message.</p>
+      <p>© ${new Date().getFullYear()} ${data.schoolName}. All rights reserved.</p>
+    </div>
+  </div>
+</body>
+</html>
+  `;
+
+  const text = `
+Dear ${data.guardianFirstName} ${data.guardianLastName},
+
+Great news! A seat has become available for ${data.studentFirstName} ${data.studentLastName} in Class ${data.appliedForClass} at ${data.schoolName}.
+
+Application ID : ${data.applicationId}
+Class          : ${data.appliedForClass}
+Offer Expires  : ${formattedExpiry}
+
+Confirm your seat here:
+${confirmUrl}
+
+Decline the seat here:
+${declineUrl}
+
+IMPORTANT: This offer expires on ${formattedExpiry}. If you do not confirm, the seat will be offered to the next applicant.
+
+Already enrolled elsewhere? Please click Decline so we can offer this seat to another waiting family.
+
+If you have any questions, please contact the school administration.
+
+© ${new Date().getFullYear()} ${data.schoolName}
+  `.trim();
+
+  return { subject, html, text };
+}

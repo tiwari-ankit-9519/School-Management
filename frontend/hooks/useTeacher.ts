@@ -128,7 +128,7 @@ const teacherApi = {
       params.set("experience", String(experience));
 
     const response = await api.get<ApiResponse<PaginatedTeachers>>(
-      `/school/teachers/all-teachers?${params.toString()}`,
+      `/school/teacher/all-teachers?${params.toString()}`,
     );
 
     return response.data.data;
@@ -151,8 +151,6 @@ export const useCreateTeacherApplication = () => {
       files,
     }: {
       formData: TeacherApplicationFormValues;
-      photoFile?: File;
-      guardianPhotoFile?: File;
       files: File[];
     }) => teacherApi.createTeacherApplication(formData, files),
     onSuccess: (data) => {
@@ -264,7 +262,7 @@ export const useResubmitTeacherApplication = () => {
       data: ResubmitTeacherApplicationFormValues;
       files: File[];
     }) => teacherApi.resubmitTeacherApplication(applicationId, data, files),
-    onSuccess: (applicationId) => {
+    onSuccess: (_, { applicationId }) => {
       queryClient.invalidateQueries({
         queryKey: QUERY_KEYS.TEACHER_APPLICATIONS,
       });

@@ -45,6 +45,8 @@ export async function logoutUser(
 ): Promise<void> {
   const auditContext = buildAuditContext(req);
 
+  res.status(200);
+
   await logout(req.user!.id, req.user!.sessionId, auditContext, res.statusCode);
 
   res.clearCookie("accessToken", {
@@ -54,7 +56,7 @@ export async function logoutUser(
     path: "/",
   });
 
-  res.status(200).json({
+  res.json({
     success: true,
     message: "Logged out successfully",
   });

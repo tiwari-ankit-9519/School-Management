@@ -1445,3 +1445,25 @@ CREATE TRIGGER trg_prevent_reg_change
 CREATE UNIQUE INDEX "TeacherSubject_teacherId_subjectId_no_class_key" ON "TeacherSubject" ("teacherId", "subjectId")
 WHERE
     "classId" IS NULL;
+
+-- AlterEnum
+-- This migration adds more than one value to an enum.
+-- With PostgreSQL versions 11 and earlier, this is not possible
+-- in a single migration. This can be worked around by creating
+-- multiple migrations, each migration adding only one value to
+-- the enum.
+
+ALTER TYPE "AdmissionStatus" ADD VALUE 'SLOT_OFFERED';
+
+ALTER TYPE "AdmissionStatus" ADD VALUE 'OFFER_EXPIRED';
+
+ALTER TYPE "AdmissionStatus" ADD VALUE 'OFFER_DECLINED';
+
+-- AlterTable
+ALTER TABLE "AdmissionApplication"
+ADD COLUMN "slotExpiresAt" TIMESTAMP(3),
+ADD COLUMN "slotOfferedAt" TIMESTAMP(3),
+ADD COLUMN "slotOfferedClass" TEXT;
+
+-- AlterEnum
+ALTER TYPE "EnrollmentStatus" ADD VALUE 'WITHDRAWN';

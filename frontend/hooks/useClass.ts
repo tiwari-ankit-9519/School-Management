@@ -1,17 +1,16 @@
 import api, { ApiResponse, getErrorMessage } from "@/lib/api";
 import { QUERY_KEYS } from "@/lib/constants";
+import { Class, PaginatedClasses } from "@/types";
 import {
-  AssignClassTeacherInput,
-  Class,
-  CreateClassInput,
-  PaginatedClass,
-} from "@/types";
+  AssignTeacherToSubjectFormValues,
+  ClassFormValues,
+} from "@/validations/validations";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 
 const classApi = {
-  createClass: async (data: CreateClassInput): Promise<Class> => {
+  createClass: async (data: ClassFormValues): Promise<Class> => {
     const response = await api.post<ApiResponse<Class>>(
       `/school/class/create`,
       data,
@@ -31,7 +30,7 @@ const classApi = {
     },
     page: number = 1,
     limit: number = 10,
-  ): Promise<PaginatedClass> => {
+  ): Promise<PaginatedClasses> => {
     const params = new URLSearchParams({
       page: String(page),
       limit: String(limit),
@@ -48,7 +47,7 @@ const classApi = {
     const response = await api.get<{
       success: boolean;
       message: string;
-      data: PaginatedClass;
+      data: PaginatedClasses;
     }>(`/school/class/all?${params.toString()}`);
     return response.data.data;
   },
@@ -60,7 +59,7 @@ const classApi = {
     return response.data.data;
   },
 
-  assignClassTeacher: async (data: AssignClassTeacherInput) => {
+  assignClassTeacher: async (data: AssignTeacherToSubjectFormValues) => {
     const response = await api.post<Promise<null>>(
       `/school/class/assign-class-teacher`,
       data,
@@ -73,7 +72,7 @@ export const useCreateClass = () => {
   const router = useRouter();
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: (data: CreateClassInput) => classApi.createClass(data),
+    mutationFn: (data: ClassFormValues) => classApi.createClass(data),
     onSuccess: (data) => {
       queryClient.invalidateQueries({
         queryKey: QUERY_KEYS.CLASSES,
@@ -121,7 +120,7 @@ export const useGetAllClasses = (
 export const useAssignClassTeacher = () => {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: (data: AssignClassTeacherInput) =>
+    mutationFn: (data: AssignTeacherToSubjectFormValues) =>
       classApi.assignClassTeacher(data),
     onSuccess: () => {
       queryClient.invalidateQueries({
