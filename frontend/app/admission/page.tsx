@@ -359,7 +359,6 @@ const AdmissionApplicationPage = () => {
                       {t("stepStudentSub")}
                     </p>
                   </div>
-
                   <div className="flex items-center gap-4">
                     <div
                       onClick={() => photoInputRef.current?.click()}
@@ -412,7 +411,6 @@ const AdmissionApplicationPage = () => {
                       )}
                     </div>
                   </div>
-
                   <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                     <div className="space-y-1">
                       <AnimatedInput
@@ -441,7 +439,6 @@ const AdmissionApplicationPage = () => {
                       <ErrorMsg errors={errors} field="lastName" />
                     </div>
                   </div>
-
                   <div className="space-y-1">
                     <p className="font-manrope text-xs text-white/40 mb-2">
                       {t("gender")}
@@ -473,27 +470,29 @@ const AdmissionApplicationPage = () => {
                     />
                     <ErrorMsg errors={errors} field="gender" />
                   </div>
-
                   <div className="space-y-1">
-                    <AnimatedInput
-                      label={t("dateOfBirth")}
-                      icon={<User className="h-4 w-4 text-indigo-400" />}
-                      type="date"
-                      value={
-                        dateOfBirthValue
-                          ? new Date(dateOfBirthValue)
-                              .toISOString()
-                              .split("T")[0]
-                          : ""
-                      }
-                      onChange={(v) =>
-                        setValue("dateOfBirth", new Date(v), {
-                          shouldValidate: true,
-                        })
-                      }
-                      inputClassName={inputClass}
-                      labelClassName={labelClass}
-                    />
+                    <label className="font-manrope text-xs text-white/40">
+                      {t("dateOfBirth")}
+                    </label>
+                    <div className="flex h-12 items-center gap-3 rounded-xl border border-white/10 bg-white/5 px-4 focus-within:border-indigo-500/50">
+                      <User className="h-4 w-4 shrink-0 text-indigo-400" />
+                      <input
+                        type="date"
+                        value={
+                          dateOfBirthValue
+                            ? new Date(dateOfBirthValue)
+                                .toISOString()
+                                .split("T")[0]
+                            : ""
+                        }
+                        onChange={(e) =>
+                          setValue("dateOfBirth", new Date(e.target.value), {
+                            shouldValidate: true,
+                          })
+                        }
+                        className="flex-1 bg-transparent font-manrope text-sm text-white focus:outline-none scheme-dark"
+                      />
+                    </div>
                     <ErrorMsg errors={errors} field="dateOfBirth" />
                   </div>
                 </motion.div>

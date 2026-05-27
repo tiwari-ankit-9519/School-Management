@@ -7,7 +7,12 @@ import {
 } from "../validations/input.validations";
 import { prisma } from "../config/database.config";
 import { createAuditLog, createSystemLog } from "../utils/audit.util";
-import { CACHE_KEYS, getCache, setCache } from "../utils/cache.util";
+import {
+  CACHE_KEYS,
+  deleteCacheByPattern,
+  getCache,
+  setCache,
+} from "../utils/cache.util";
 
 const log = createModuleLogger("ClassService");
 
@@ -62,6 +67,8 @@ export async function createClassService(
         academicYearId: academicYear.id,
       },
     });
+
+    await deleteCacheByPattern(`classes:*`);
 
     await createSystemLog({
       level: "INFO",

@@ -257,5 +257,32 @@
     "leaveRequestsTitle": "Leave Requests",
     "noLeaveTitle": "No leave requests",
     "noLeaveSub": "There isn't any leave requests"
+  },
+  "subjects": {
+    "pageTitle": "Subjects",
+    "pageSubtitle": "Manage and organize all subjects in your school",
+    "newSubjectBtn": "New Subject",
+    "newSubjectBtnShort": "New",
+    "filters": "Filters",
+    "clearFilters": "Clear filters",
+    "applyFilters": "Apply Filters",
+    "filterName": "Subject name",
+    "filterCode": "Subject code",
+    "colName": "Name",
+    "colCode": "Code",
+    "colAction": "",
+    "loading": "Loading subjects...",
+    "emptyTitle": "No subjects found",
+    "emptySubtitle": "Create your first subject to get started",
+    "modalTitle": "Create Subject",
+    "modalSubtitle": "Add a new subject to your school",
+    "fieldName": "Subject Name",
+    "fieldCode": "Subject Code",
+    "cancelBtn": "Cancel",
+    "createBtn": "Create Subject",
+    "creating": "Creating...",
+    "page": "Page",
+    "of": "of",
+    "total": "total"
   }
 }

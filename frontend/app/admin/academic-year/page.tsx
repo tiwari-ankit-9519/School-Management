@@ -52,7 +52,6 @@ const AcademicYearPage = () => {
   const pathname = usePathname();
   const searchParams = useSearchParams();
 
-  // Read filters from URL
   const urlIsCurrent = searchParams.get("isCurrent");
   const urlName = searchParams.get("name") ?? undefined;
   const urlPage = parseInt(searchParams.get("page") ?? "1");
@@ -495,19 +494,25 @@ const AcademicYearPage = () => {
                       </motion.p>
                     )}
                   </div>
+                  {/* <div className="grid grid-cols-2 gap-3"> */}
                   <div className="grid grid-cols-2 gap-3">
                     <div className="space-y-1.5">
-                      <AnimatedInput
-                        label={t("fieldStartDate")}
-                        icon={<Calendar className="h-4 w-4 text-indigo-400" />}
-                        type="date"
-                        value={startDateValue}
-                        onChange={(val) =>
-                          setValue("startDate", val, { shouldValidate: true })
-                        }
-                        inputClassName="h-12 rounded-xl border-white/10 bg-white/5 text-white placeholder:text-white/20 focus-visible:ring-indigo-500/50 focus-visible:border-indigo-500/50"
-                        labelClassName="text-white/40"
-                      />
+                      <label className="font-manrope text-xs text-white/40">
+                        {t("fieldStartDate")}
+                      </label>
+                      <div className="flex h-12 items-center gap-3 rounded-xl border border-white/10 bg-white/5 px-4 focus-within:border-indigo-500/50">
+                        <Calendar className="h-4 w-4 shrink-0 text-indigo-400" />
+                        <input
+                          type="date"
+                          value={startDateValue}
+                          onChange={(e) =>
+                            setValue("startDate", e.target.value, {
+                              shouldValidate: true,
+                            })
+                          }
+                          className="flex-1 bg-transparent font-manrope text-sm text-white focus:outline-none scheme-dark"
+                        />
+                      </div>
                       {errors.startDate && (
                         <motion.p
                           initial={{ opacity: 0, y: -4 }}
@@ -518,18 +523,24 @@ const AcademicYearPage = () => {
                         </motion.p>
                       )}
                     </div>
+
                     <div className="space-y-1.5">
-                      <AnimatedInput
-                        label={t("fieldEndDate")}
-                        icon={<Calendar className="h-4 w-4 text-indigo-400" />}
-                        type="date"
-                        value={endDateValue}
-                        onChange={(val) =>
-                          setValue("endDate", val, { shouldValidate: true })
-                        }
-                        inputClassName="h-12 rounded-xl border-white/10 bg-white/5 text-white placeholder:text-white/20 focus-visible:ring-indigo-500/50 focus-visible:border-indigo-500/50"
-                        labelClassName="text-white/40"
-                      />
+                      <label className="font-manrope text-xs text-white/40">
+                        {t("fieldEndDate")}
+                      </label>
+                      <div className="flex h-12 items-center gap-3 rounded-xl border border-white/10 bg-white/5 px-4 focus-within:border-indigo-500/50">
+                        <Calendar className="h-4 w-4 shrink-0 text-indigo-400" />
+                        <input
+                          type="date"
+                          value={endDateValue}
+                          onChange={(e) =>
+                            setValue("endDate", e.target.value, {
+                              shouldValidate: true,
+                            })
+                          }
+                          className="flex-1 bg-transparent font-manrope text-sm text-white focus:outline-none scheme-dark"
+                        />
+                      </div>
                       {errors.endDate && (
                         <motion.p
                           initial={{ opacity: 0, y: -4 }}
@@ -541,6 +552,7 @@ const AcademicYearPage = () => {
                       )}
                     </div>
                   </div>
+                  {/* </div> */}
                   <Controller
                     control={control}
                     name="isCurrent"

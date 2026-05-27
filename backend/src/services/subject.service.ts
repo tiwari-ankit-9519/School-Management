@@ -7,7 +7,13 @@ import {
 import { createModuleLogger } from "../config/logger.config";
 import { prisma } from "../config/database.config";
 import { createAuditLog, createSystemLog } from "../utils/audit.util";
-import { CACHE_KEYS, CACHE_TTL, getCache, setCache } from "../utils/cache.util";
+import {
+  CACHE_KEYS,
+  CACHE_TTL,
+  deleteCacheByPattern,
+  getCache,
+  setCache,
+} from "../utils/cache.util";
 
 const log = createModuleLogger("SubjectSerivce");
 
@@ -44,6 +50,8 @@ export async function createSubjectService(
         code: data.code,
       },
     });
+
+    await deleteCacheByPattern(`subjects:*`);
 
     await createSystemLog({
       level: "INFO",
@@ -381,6 +389,7 @@ export async function getSingleSubjectService(
       },
       include: {
         teacherSubjects: true,
+        timetables: true,
       },
     });
 
