@@ -292,6 +292,8 @@ export const CACHE_KEYS = {
     `classes:all:${academicYearId}:page:${page}:limit:${limit}:name:${filters.name ?? ""}:section:${filters.section ?? ""}:capacityMin:${filters.capacityMin ?? ""}:capacityMax:${filters.capacityMax ?? ""}:roomNumber:${filters.roomNumber ?? ""}:teacherId:${filters.teacherId ?? ""}`,
   classes: (name: string, adminId: string) =>
     `classes:name:${name}:admin:${adminId}`,
+  admins: (adminId: string, gender?: string) =>
+    `adminId:${adminId}:gender:${gender}`,
 } as const;
 
 export const CACHE_PATTERNS = {

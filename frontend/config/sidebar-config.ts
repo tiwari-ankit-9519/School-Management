@@ -68,6 +68,11 @@ export const NAV_CONFIG: Record<UserRole, NavItem[]> = {
       href: "/admin/teachers",
       icon: UsersRound,
     },
+    {
+      labelKey: "moderators",
+      href: "/admin/moderators",
+      icon: UsersRound,
+    },
 
     {
       labelKey: "fees",

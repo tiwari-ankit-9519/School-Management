@@ -60,10 +60,6 @@ export const ResetPasswordSchema = z
     error: "Either email, registration number or phone is required",
   });
 
-// ─────────────────────────────────────────────
-// ACADEMIC YEAR
-// ─────────────────────────────────────────────
-
 export const AcademicYearSchema = z
   .object({
     name: z
@@ -247,10 +243,6 @@ export const UpdateUserPermissionSchema = z.object({
       { error: "Duplicate modules are not allowed" },
     ),
 });
-
-// ─────────────────────────────────────────────
-// TEACHER APPLICATION
-// ─────────────────────────────────────────────
 
 export const TeacherApplicationSchema = z.object({
   firstName: z

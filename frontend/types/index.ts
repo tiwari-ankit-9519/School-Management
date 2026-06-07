@@ -277,6 +277,8 @@ export interface Subject {
   isActive: boolean;
   createdAt: string;
   updatedAt: string;
+  teacherSubjects: TeacherSubject[];
+  timetables: Timetable[];
 }
 
 // ─────────────────────────────────────────────
@@ -356,18 +358,13 @@ export interface PasswordReset {
 
 export interface Admin {
   id: string;
-  userId: string;
   firstName: string;
   lastName: string;
   gender: Gender;
-  dateOfBirth: string | null;
   photoUrl: string | null;
   designation: string | null;
   department: string | null;
   joiningDate: string;
-  createdAt: string;
-  updatedAt: string;
-  user?: SafeUser;
 }
 
 export interface AdminAttendance {
@@ -962,6 +959,7 @@ export interface TeacherListItem {
   employmentStatus: EmploymentStatus;
   joiningDate: string;
   createdAt: string;
+  user: SafeUser;
 }
 
 export interface TeacherApplicationListItem {
@@ -1174,10 +1172,6 @@ export interface IPBlacklistListItem {
   createdAt: string;
 }
 
-// ─────────────────────────────────────────────
-// PAGINATED RESPONSES
-// ─────────────────────────────────────────────
-
 export interface PaginatedResponse<T> {
   data: T[];
   total: number;
@@ -1186,7 +1180,27 @@ export interface PaginatedResponse<T> {
   totalPages: number;
 }
 
+export interface SingleAdminInfo {
+  id: string;
+  userId: string;
+  firstName: string;
+  lastName: string;
+  gender: Gender;
+  dateOfBirth: string;
+  photoUrl: string | null;
+  designation: string | null;
+  department: string | null;
+  joiningDate: string;
+  createdAt: string;
+  updatedAt: string;
+  adminAttendance: AdminAttendance[];
+  user: User & {
+    userPermission: UserPermission[];
+  };
+}
+
 export type PaginatedTeachers = PaginatedResponse<TeacherListItem>;
+export type PaginatedAdmins = PaginatedResponse<Admin>;
 export type PaginatedTeacherApplications =
   PaginatedResponse<TeacherApplicationListItem>;
 export type PaginatedStudents = PaginatedResponse<StudentListItem>;

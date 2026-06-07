@@ -1,6 +1,5 @@
 import {
   AttendanceStatus,
-  Enrollment,
   EnrollmentStatus,
   FeeStatus,
   Gender,
@@ -14,7 +13,6 @@ import { prisma } from "../config/database.config";
 import { createSystemLog } from "../utils/audit.util";
 import {
   safeUserSelect,
-  StudentWithClassDetailsReturn,
   StudentWithDetails,
 } from "../validations/input.validations";
 import { StudentList, StudentListPayload } from "../types/response-type";
@@ -143,7 +141,6 @@ export async function getSingleStudentDetailService(
         user: { select: safeUserSelect },
         parent: true,
         documents: true,
-
         enrollments: {
           where: {
             ...(filters?.academicYearId && {
@@ -156,8 +153,6 @@ export async function getSingleStudentDetailService(
                 id: true,
                 name: true,
                 section: true,
-                roomNumber: true,
-                capacity: true,
               },
             },
             academicYear: {

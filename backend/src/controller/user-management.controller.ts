@@ -14,7 +14,9 @@ import { HTTP_STATUS } from "../utils/constants";
 import {
   approveTeacherApplicationService,
   createModeratorService,
+  getAllAdminService,
   getAllTeachersApplicationService,
+  getSingleAdminService,
   getTeacherApplicationService,
   rejectTeacherApplicaitonService,
   resubmitTeacherApplicationService,
@@ -22,7 +24,7 @@ import {
   teacherApplicationService,
   updateUserPermissionsService,
 } from "../services/user-management.service";
-import { ApplicationStatus } from "@prisma/client";
+import { ApplicationStatus, Gender } from "@prisma/client";
 
 export async function createModerator(
   req: AuthenticatedRequest,
@@ -57,6 +59,62 @@ export async function createModerator(
     success: true,
     message: "Moderator created successfully",
     data: moderator,
+  });
+}
+
+export async function getAllAdmins(
+  req: AuthenticatedRequest,
+  res: Response,
+): Promise<void> {
+  const adminId = req.user?.id;
+  if (!adminId) {
+    throw new Error("Admin ID is required");
+  }
+  const gender = req.params.gender as Gender | undefined;
+  const page = parseInt(req.params.page as string) || 1;
+  const limit = parseInt(req.params.limit as string) || 10;
+  const auditContext = buildAuditContext(req);
+  res.status(HTTP_STATUS.OK);
+  const allAdmins = await getAllAdminService(
+    adminId,
+    auditContext,
+    res.statusCode,
+    page,
+    limit,
+    gender,
+  );
+
+  res.json({
+    success: true,
+    message: "All admins fetched successfully",
+    data: allAdmins,
+  });
+}
+
+export async function getSingleAdmin(
+  req: AuthenticatedRequest,
+  res: Response,
+): Promise<void> {
+  const adminId = req.user?.id;
+  const moderatorId = req.params.moderatorId as string;
+  if (!adminId) {
+    throw new Error("Admin ID is required");
+  }
+  if (!moderatorId) {
+    throw new Error("Moderator ID is required");
+  }
+  const auditContext = buildAuditContext(req);
+  res.status(HTTP_STATUS.OK);
+  const admin = await getSingleAdminService(
+    adminId,
+    moderatorId,
+    auditContext,
+    res.statusCode,
+  );
+  res.json({
+    success: true,
+    message: "Fetched details of moderator",
+    data: admin,
   });
 }
 

@@ -426,3 +426,8 @@ export async function getSingleClassService(
     throw err;
   }
 }
+
+export async function assignRollNumberToStudentsService(
+  context: AuditContext,
+  statusCode: number,
+) {}

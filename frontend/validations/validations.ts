@@ -282,7 +282,7 @@ export const teacherApplicationSchema = z.object({
       error: "Phone number must be 7 to 15 digits and can start with +",
     }),
   gender: z.enum(enumValues(Gender)),
-  dateOfBirth: z.coerce
+  dateOfBirth: z
     .date({ error: "Date is required" })
     .refine((date) => date < new Date(), {
       error: "Date of birth should be in past",
@@ -310,12 +310,9 @@ export const teacherApplicationSchema = z.object({
     .trim()
     .min(2, { error: "Qualification should be of atleast 2 characters" })
     .max(40, { error: "Qualification should be of atmost 40 characters" }),
-  experience: z.coerce.number({ error: "Experience is required" }),
+  experience: z.number({ error: "Experience is required" }),
   specialization: z.string().optional(),
-  photoUrl: z
-    .string()
-    .url({ error: "Please provide a valid photo URL" })
-    .optional(),
+  photoUrl: z.string().url().optional(),
   documents: z
     .array(
       z.object({
@@ -702,7 +699,7 @@ export const createHolidaySchema = z.object({
 
 export const assignTeacherToSubjectSchema = z.object({
   teacherId: z.string({ error: "Teacher ID is required" }),
-  classId: z.string({ error: "Class ID is required" }),
+  classId: z.string().optional(),
 });
 
 export const assignClassTeacherSchema = z.object({

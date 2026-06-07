@@ -27,4 +27,6 @@ export const QUERY_KEYS = {
   GRADE: ["grade"],
   NOTIFICATIONS: ["notifications"],
   DASHBOARD: ["dashboard"],
+  ADMINS: ["admins"],
+  ADMIN: ["admin"],
 };

@@ -31,7 +31,7 @@ const teacherApi = {
     });
     files.forEach((file) => formData.append("files", file));
     const response = await api.post<ApiResponse<{ id: string }>>(
-      "/school/user/teacher/apply",
+      "/school/users/teacher/apply",
       formData,
     );
     return response.data.data;
@@ -158,7 +158,7 @@ export const useCreateTeacherApplication = () => {
         queryKey: QUERY_KEYS.TEACHER_APPLICATIONS,
       });
       toast.success("Teacher Application submitted successfully");
-      router.push(`/teacher/application/${data.id}`);
+      router.push(`/teacher-application/${data.id}`);
     },
     onError: (error) => {
       toast.error(getErrorMessage(error));

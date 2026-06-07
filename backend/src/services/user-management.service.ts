@@ -1,7 +1,10 @@
 import {
+  Admin,
   ApplicationStatus,
   DocumentOwnerType,
   DocumentType,
+  Gender,
+  Prisma,
   Role,
   TeacherApplication,
 } from "@prisma/client";
@@ -44,7 +47,11 @@ import {
   mergePermissions,
 } from "../utils/permission.util";
 import { generateRegistrationNumber } from "../utils/registration.util";
-import { TeacherApplicationListPayload } from "../types/response-type";
+import {
+  AdminListPayload,
+  PaginatedAdmins,
+  TeacherApplicationListPayload,
+} from "../types/response-type";
 
 const log = createModuleLogger("UserManagement");
 
@@ -176,6 +183,8 @@ export async function createModeratorService(
       };
     });
 
+    await deleteCacheByPattern(`admins:*`);
+
     await createSystemLog({
       level: "INFO",
       module: "ModeratorCreation",
@@ -239,6 +248,163 @@ export async function createModeratorService(
       adminId,
       ipAddress: context.ipAddress,
       error: err.message,
+    });
+    throw err;
+  }
+}
+
+export async function getAllAdminService(
+  adminId: string,
+  context: AuditContext,
+  statusCode: number,
+  page: number = 1,
+  limit: number = 10,
+  gender?: Gender,
+): Promise<{
+  data: PaginatedAdmins[];
+  total: number;
+  page: number;
+  limit: number;
+  totalPages: number;
+}> {
+  try {
+    log.info(`Starting service to get all the admins of the school`, {
+      ipAddress: context.ipAddress,
+      adminId,
+      gender,
+    });
+
+    const where: Prisma.AdminWhereInput = gender ? { gender } : {};
+
+    const cacheKey = CACHE_KEYS.admins(adminId, gender);
+    const cached = await getCache<{
+      data: Admin[];
+      total: number;
+      page: number;
+      limit: number;
+      totalPages: number;
+    }>(cacheKey);
+    if (cached) {
+      log.info(`Returning from cache`, { cacheKey });
+      return cached;
+    }
+
+    const [allAdmins, total] = await Promise.all([
+      prisma.admin.findMany({
+        where,
+        select: {
+          id: true,
+          firstName: true,
+          lastName: true,
+          photoUrl: true,
+          designation: true,
+          joiningDate: true,
+          gender: true,
+          department: true,
+        },
+        skip: (page - 1) * limit,
+        take: limit,
+        orderBy: {
+          createdAt: "desc",
+        },
+      }),
+
+      prisma.admin.count({ where }),
+    ]);
+
+    await createSystemLog({
+      level: "INFO",
+      module: "GetAllAdmins",
+      message: `Fetched all admins for school`,
+      context,
+      statusCode,
+      metadata: {
+        gender,
+        page,
+        limit,
+      },
+    });
+
+    const response = {
+      data: allAdmins,
+      total,
+      page,
+      limit,
+      totalPages: Math.ceil(total / limit),
+    };
+
+    await setCache(cacheKey, response, CACHE_TTL.ADMISSION_APPLICATIONS_LIST);
+    log.info(`Fetched all admins for school`);
+    return response;
+  } catch (error) {
+    const err = error as Error;
+    log.error(`Internal Server Error.`, {
+      ipAddress: context.ipAddress,
+      error: err.message,
+      adminId,
+      gender,
+    });
+    throw err;
+  }
+}
+
+export async function getSingleAdminService(
+  adminId: string,
+  moderatorId: string,
+  context: AuditContext,
+  statusCode: number,
+): Promise<AdminListPayload> {
+  try {
+    log.info(
+      `Starting service to get the details of moderator with id ${moderatorId}`,
+    );
+
+    const adminExists = await prisma.admin.findUnique({
+      where: { id: moderatorId },
+      include: {
+        user: {
+          include: {
+            userPermission: true,
+          },
+        },
+        adminAttendance: true,
+      },
+    });
+
+    if (!adminExists) {
+      log.warn(`Moderator does not exists for the id ${moderatorId}`);
+      throw new Error(`Moderator does not exists for the id ${moderatorId}`);
+    }
+
+    const {
+      user: { passwordHash, ...userWithoutPassword },
+      ...adminWithoutPassword
+    } = adminExists;
+
+    log.info(`Fetched moderator with id ${moderatorId}`);
+
+    await createSystemLog({
+      level: "INFO",
+      module: "GetSingleAdmin",
+      message: `Fetched single admin for school`,
+      context,
+      statusCode,
+      metadata: {
+        moderatorId,
+      },
+    });
+
+    return {
+      ...adminWithoutPassword,
+      user: userWithoutPassword,
+    };
+  } catch (error) {
+    const err = error as Error;
+    log.error(`Internal Server Error. Failed to get the details of moderator`, {
+      ipAddress: context.ipAddress,
+      errror: err.message,
+      adminId,
+      moderatorId,
     });
     throw err;
   }

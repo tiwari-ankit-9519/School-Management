@@ -10,6 +10,8 @@ import {
   viewAllTeacherApplications,
   viewTeacherApplication,
   updateUserPermissions,
+  getAllAdmins,
+  getSingleAdmin,
 } from "../controller/user-management.controller";
 import { upload } from "../config/cloudinary.config";
 import { checkPermission } from "../middlewares/auth.middleware";
@@ -71,6 +73,10 @@ router.get(
   authorize("ADMIN", "MODERATOR"),
   viewAllTeacherApplications,
 );
+
+router.get("/all-admins", authenticate, authorize("ADMIN"), getAllAdmins);
+
+router.get("/:moderatorId", authenticate, authorize("ADMIN"), getSingleAdmin);
 
 router.get(
   "/teacher/:applicationId",
