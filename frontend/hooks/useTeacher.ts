@@ -29,7 +29,7 @@ const teacherApi = {
         formData.append(key, String(value));
       }
     });
-    files.forEach((file) => formData.append("files", file));
+    files.forEach((file) => formData.append("documents", file));
     const response = await api.post<ApiResponse<{ id: string }>>(
       "/school/users/teacher/apply",
       formData,
