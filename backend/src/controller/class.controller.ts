@@ -9,6 +9,7 @@ import {
   createClassService,
   getAllClassesService,
   getSingleClassService,
+  unassignClassTeacherService,
 } from "../services/class.service";
 import {
   AssignClassTeacherSchema,
@@ -161,5 +162,39 @@ export async function getSingleClass(
     success: true,
     message: `Class with id ${classId} fetched successfully`,
     data: fetchedClass,
+  });
+}
+
+export async function unassignClassTeacher(
+  req: AuthenticatedRequest,
+  res: Response,
+): Promise<void> {
+  const parsed = AssignClassTeacherSchema.safeParse(req.body);
+  if (!parsed.success) {
+    res.json({
+      success: false,
+      message: "Validation Failed",
+      errors: parsed.error.issues,
+    });
+    return;
+  }
+
+  const adminId = req.user?.id;
+  if (!adminId) {
+    throw new Error("Admin ID is required");
+  }
+
+  const auditContext = buildAuditContext(req);
+
+  await unassignClassTeacherService(
+    parsed.data,
+    adminId,
+    auditContext,
+    res.statusCode,
+  );
+
+  res.json({
+    success: true,
+    message: "Class Teacher unassigned successfully",
   });
 }

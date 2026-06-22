@@ -9,6 +9,7 @@ import {
   ParentType,
   Prisma,
 } from "@prisma/client";
+import { error } from "console";
 
 export const LoginInputSchema = z
   .object({
@@ -905,9 +906,28 @@ export const userPermissionWithDetails =
     },
   });
 
-// ─────────────────────────────────────────────
-// INFERRED TYPES
-// ─────────────────────────────────────────────
+export const FeesStructurePayload = z.object({
+  name: z
+    .string({ error: "Name is required" })
+    .min(1, { error: "Name should be of atleast one character" }),
+  amount: z.coerce.number({ error: "Amount is required" }),
+  recurringMonth: z.coerce.number().nullable().optional(),
+  description: z.string().optional(),
+  isRecurring: z.boolean().optional(),
+});
+
+export const FeesStructureUpdatePayload = z.object({
+  name: z.string().optional(),
+  amount: z.coerce.number().optional(),
+  recurringMonth: z.coerce.number().nullable().optional(),
+  description: z.string().optional(),
+  isRecurring: z.coerce.boolean().optional(),
+});
+
+export type FeesStructureType = z.infer<typeof FeesStructurePayload>;
+export type FeesStructureUpdateType = z.infer<
+  typeof FeesStructureUpdatePayload
+>;
 
 export type TeacherListPayload = Prisma.TeacherGetPayload<typeof TeacherList>;
 

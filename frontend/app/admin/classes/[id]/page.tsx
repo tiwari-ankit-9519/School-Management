@@ -23,9 +23,14 @@ import {
   Calendar,
   ClipboardList,
   FileText,
+  UserMinus,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { useGetSingleClass, useAssignClassTeacher } from "@/hooks/useClass";
+import {
+  useGetSingleClass,
+  useAssignClassTeacher,
+  useUnAssignClassTeacher,
+} from "@/hooks/useClass";
 import { useGetAllTeachers } from "@/hooks/useTeacher";
 import { useTranslations } from "@/hooks/useTranslations";
 import {
@@ -416,6 +421,11 @@ const ClassDetailPage = () => {
   const t = useTranslations("classDetail");
 
   const { data: classData, isLoading, isError } = useGetSingleClass(classId);
+  const { mutate: unassignTeacher, isPending: isUnassigning } =
+    useUnAssignClassTeacher();
+
+  const hasTeacher =
+    classData?.classTeachers && classData.classTeachers.length > 0;
 
   const formatDate = (dateStr: string) =>
     new Date(dateStr).toLocaleDateString("en-IN", {
@@ -423,6 +433,10 @@ const ClassDetailPage = () => {
       month: "short",
       year: "numeric",
     });
+
+  const handleUnassign = (teacherId: string) => {
+    unassignTeacher({ teacherId, classId });
+  };
 
   if (isLoading) {
     return (
@@ -535,17 +549,18 @@ const ClassDetailPage = () => {
                   </p>
                 </div>
               </div>
-              <Button
-                onClick={() => setIsModalOpen(true)}
-                className="flex h-9 items-center gap-2 rounded-xl border-0 bg-indigo-600 px-4 font-jakarta text-xs font-bold text-white shadow-lg shadow-indigo-500/20 transition-all duration-200 hover:bg-indigo-500"
-              >
-                <Plus className="h-3.5 w-3.5" />
-                {t("assignBtn")}
-              </Button>
+              {!hasTeacher && (
+                <Button
+                  onClick={() => setIsModalOpen(true)}
+                  className="flex h-9 items-center gap-2 rounded-xl border-0 bg-indigo-600 px-4 font-jakarta text-xs font-bold text-white shadow-lg shadow-indigo-500/20 transition-all duration-200 hover:bg-indigo-500"
+                >
+                  <Plus className="h-3.5 w-3.5" />
+                  {t("assignBtn")}
+                </Button>
+              )}
             </div>
 
-            {!classData.classTeachers ||
-            classData.classTeachers.length === 0 ? (
+            {!hasTeacher ? (
               <EmptyState
                 icon={<UserCheck className="h-5 w-5 text-white/20" />}
                 title={t("noTeachersTitle")}
@@ -553,7 +568,7 @@ const ClassDetailPage = () => {
               />
             ) : (
               <div className="divide-y divide-white/6">
-                {classData.classTeachers.map((ct, i) => (
+                {(classData.classTeachers ?? []).map((ct, i) => (
                   <motion.div
                     key={ct.id}
                     initial={{ opacity: 0, x: -8 }}
@@ -576,12 +591,26 @@ const ClassDetailPage = () => {
                         </p>
                       </div>
                     </div>
-                    {ct.isPrimary && (
-                      <span className="flex items-center gap-1.5 rounded-full border border-yellow-500/20 bg-yellow-500/10 px-2.5 py-1 font-manrope text-xs font-medium text-yellow-400">
-                        <Crown className="h-3 w-3" />
-                        {t("primaryBadge")}
-                      </span>
-                    )}
+                    <div className="flex items-center gap-3">
+                      {ct.isPrimary && (
+                        <span className="flex items-center gap-1.5 rounded-full border border-yellow-500/20 bg-yellow-500/10 px-2.5 py-1 font-manrope text-xs font-medium text-yellow-400">
+                          <Crown className="h-3 w-3" />
+                          {t("primaryBadge")}
+                        </span>
+                      )}
+                      <Button
+                        onClick={() => handleUnassign(ct.teacherId)}
+                        disabled={isUnassigning}
+                        className="flex h-8 items-center gap-1.5 rounded-lg border border-red-500/20 bg-red-500/10 px-3 font-jakarta text-xs font-bold text-red-400 transition-all duration-200 hover:bg-red-500/20 hover:text-red-300 disabled:opacity-50"
+                      >
+                        {isUnassigning ? (
+                          <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                        ) : (
+                          <UserMinus className="h-3.5 w-3.5" />
+                        )}
+                        {t("unassignBtn")}
+                      </Button>
+                    </div>
                   </motion.div>
                 ))}
               </div>

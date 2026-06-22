@@ -42,10 +42,6 @@ import {
 import { Gender, Module } from "@/types";
 import { useTranslations } from "@/hooks/useTranslations";
 
-// ─────────────────────────────────────────────
-// CONSTANTS
-// ─────────────────────────────────────────────
-
 const STEPS = [
   { id: 0, labelKey: "stepPersonal", icon: User },
   { id: 1, labelKey: "stepPermissions", icon: ShieldCheck },

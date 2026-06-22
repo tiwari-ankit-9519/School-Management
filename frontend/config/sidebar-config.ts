@@ -1,26 +1,25 @@
 import {
   LayoutDashboard,
   School,
+  FileCheck,
+  UserPlus,
+  CalendarRange,
   BookOpen,
-  ClipboardList,
-  CalendarDays,
-  Banknote,
   GraduationCap,
   UsersRound,
+  UserCog,
+  Banknote,
+  Settings,
+  ClipboardList,
+  CalendarDays,
   Baby,
   type LucideIcon,
 } from "lucide-react";
 
-export interface NavChild {
-  labelKey: string;
-  href: string;
-}
-
 export interface NavItem {
   labelKey: string;
-  href?: string;
+  href: string;
   icon: LucideIcon;
-  children?: NavChild[];
 }
 
 export type UserRole = "ADMIN" | "STUDENT" | "TEACHER" | "PARENT";
@@ -33,115 +32,116 @@ export const NAV_CONFIG: Record<UserRole, NavItem[]> = {
       icon: LayoutDashboard,
     },
     {
-      labelKey: "schools",
-      icon: School,
-      children: [
-        {
-          labelKey: "Admission Applications",
-          href: "/admin/admission-applications",
-        },
-        {
-          labelKey: "Teacher Applications",
-          href: `/admin/teacher-applications`,
-        },
-        {
-          labelKey: "academic year",
-          href: `/admin/academic-year`,
-        },
-        {
-          labelKey: "subjects",
-          href: `/admin/subjects`,
-        },
-        {
-          labelKey: "classes",
-          href: `/admin/classes`,
-        },
-      ],
+      labelKey: "Admission Applications",
+      href: "/admin/admission-applications",
+      icon: FileCheck,
     },
     {
-      labelKey: "students",
+      labelKey: "Teacher Applications",
+      href: "/admin/teacher-applications",
+      icon: UserPlus,
+    },
+    {
+      labelKey: "Academic Year",
+      href: "/admin/academic-year",
+      icon: CalendarRange,
+    },
+    {
+      labelKey: "Subjects",
+      href: "/admin/subjects",
+      icon: BookOpen,
+    },
+    {
+      labelKey: "Classes",
+      href: "/admin/classes",
+      icon: School,
+    },
+    {
+      labelKey: "Students",
       href: "/admin/students",
       icon: GraduationCap,
     },
     {
-      labelKey: "teachers",
+      labelKey: "Teachers",
       href: "/admin/teachers",
       icon: UsersRound,
     },
     {
-      labelKey: "moderators",
+      labelKey: "Moderators",
       href: "/admin/moderators",
-      icon: UsersRound,
+      icon: UserCog,
     },
-
     {
-      labelKey: "fees",
+      labelKey: "Fees",
       href: "/admin/fees",
       icon: Banknote,
     },
     {
-      labelKey: "settings",
+      labelKey: "Settings",
       href: "/admin/settings",
-      icon: ClipboardList,
+      icon: Settings,
     },
   ],
+
   STUDENT: [
     {
-      labelKey: "attendance",
+      labelKey: "Attendance",
       href: "/student/attendance",
       icon: ClipboardList,
     },
     {
-      labelKey: "results",
+      labelKey: "Results",
       href: "/student/results",
       icon: GraduationCap,
     },
     {
-      labelKey: "fees",
+      labelKey: "Fees",
       href: "/student/fees",
       icon: Banknote,
     },
     {
-      labelKey: "timetable",
+      labelKey: "Timetable",
       href: "/student/timetable",
       icon: CalendarDays,
     },
   ],
+
   TEACHER: [
     {
-      labelKey: "classes",
+      labelKey: "Classes",
       href: "/teacher/classes",
-      icon: BookOpen,
+      icon: School,
     },
     {
-      labelKey: "assignments",
+      labelKey: "Assignments",
       href: "/teacher/assignments",
       icon: ClipboardList,
     },
     {
-      labelKey: "attendance",
+      labelKey: "Attendance",
       href: "/teacher/attendance",
       icon: CalendarDays,
     },
     {
-      labelKey: "results",
+      labelKey: "Results",
       href: "/teacher/results",
       icon: GraduationCap,
     },
   ],
+
   PARENT: [
     {
-      labelKey: "children",
+      labelKey: "Children",
       href: "/parent/children",
       icon: Baby,
     },
     {
-      labelKey: "fees",
+      labelKey: "Fees",
       href: "/parent/fees",
       icon: Banknote,
     },
     {
-      labelKey: "attendance",
+      labelKey: "Attendance",
       href: "/parent/attendance",
       icon: ClipboardList,
     },

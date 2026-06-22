@@ -2,6 +2,7 @@ import { Class, Prisma } from "@prisma/client";
 import { createModuleLogger } from "../config/logger.config";
 import { AuditContext } from "../middlewares/request-logger.middleware";
 import {
+  AssignClassTeacher,
   AssignTeacherToSubjectInput,
   ClassInput,
 } from "../validations/input.validations";
@@ -119,7 +120,7 @@ export async function createClassService(
 
 export async function assignClassTeacherService(
   moderatorId: string,
-  data: AssignTeacherToSubjectInput,
+  data: AssignClassTeacher,
   context: AuditContext,
   statusCode: number,
 ): Promise<void> {
@@ -132,22 +133,17 @@ export async function assignClassTeacherService(
         teacherId: data.teacherId,
       },
     );
-
     const teacherExists = await prisma.teacher.findUnique({
       where: { id: data.teacherId },
     });
-
     if (!teacherExists) {
       log.warn(`Teacher does not exists with teacherId ${data.teacherId}`);
       throw new Error(
         `Teacher does not exists with teacherId ${data.teacherId}`,
       );
     }
-
     const classAlreadyHasTeacher = await prisma.classTeacher.findFirst({
-      where: {
-        classId: data.classId,
-      },
+      where: { classId: data.classId },
     });
     if (classAlreadyHasTeacher) {
       log.warn(`Class already has a teacher assigned`, {
@@ -155,24 +151,6 @@ export async function assignClassTeacherService(
       });
       throw new Error("Class already has a teacher assigned");
     }
-
-    const classTeacherExists = await prisma.classTeacher.findUnique({
-      where: {
-        classId_teacherId: {
-          classId: data.classId,
-          teacherId: data.teacherId,
-        },
-      },
-    });
-
-    if (classTeacherExists) {
-      log.warn(`Class Teacher is already assigned to class`, {
-        classId: data.classId,
-        teacherId: data.teacherId,
-      });
-      throw new Error("Class Teacher is already assigned to class");
-    }
-
     const newClassTeacher = await prisma.classTeacher.create({
       data: {
         classId: data.classId,
@@ -180,11 +158,9 @@ export async function assignClassTeacherService(
         isPrimary: true,
       },
     });
-
     log.info(
       `Teacher with id ${data.teacherId} is assigned as class teacher with classId ${data.classId}`,
     );
-
     await createAuditLog({
       performedById: moderatorId,
       action: "CREATE",
@@ -198,7 +174,6 @@ export async function assignClassTeacherService(
       isSuccessful: true,
       statusCode,
     });
-
     await createSystemLog({
       level: "INFO",
       module: "ClassTeacherService",
@@ -422,6 +397,68 @@ export async function getSingleClassService(
     log.error(`Failed to fetch class with classId ${classId}`, {
       error: err.message,
       ipAddress: context.ipAddress,
+    });
+    throw err;
+  }
+}
+
+export async function unassignClassTeacherService(
+  data: AssignClassTeacher,
+  adminId: string,
+  context: AuditContext,
+  statusCode: number,
+): Promise<void> {
+  try {
+    log.info(
+      `Starting service to unassign class teacher for class with id ${data.classId}`,
+    );
+    const teacherExists = await prisma.teacher.findUnique({
+      where: { id: data.teacherId },
+    });
+    if (!teacherExists) {
+      log.warn(`Teacher does not exist with teacherId ${data.teacherId}`);
+      throw new Error(
+        `Teacher does not exist with teacherId ${data.teacherId}`,
+      );
+    }
+    const classTeacher = await prisma.classTeacher.findFirst({
+      where: { classId: data.classId },
+    });
+    if (!classTeacher) {
+      log.warn(`No teacher is assigned to class with id ${data.classId}`);
+      throw new Error("No teacher is assigned to this class");
+    }
+    await prisma.classTeacher.delete({
+      where: { id: classTeacher.id },
+    });
+    log.info(
+      `Teacher with id ${data.teacherId} unassigned from class with id ${data.classId}`,
+    );
+    await createAuditLog({
+      performedById: adminId,
+      action: "DELETE",
+      module: "Class",
+      resourceId: classTeacher.id,
+      resourceType: "Class Teacher",
+      newValues: { classTeacher },
+      context,
+      isSuccessful: true,
+      statusCode,
+    });
+    await createSystemLog({
+      level: "INFO",
+      module: "ClassTeacherService",
+      context,
+      statusCode,
+      message: "Class Teacher unassigned successfully",
+      metadata: { classTeacher },
+    });
+  } catch (error) {
+    const err = error as Error;
+    log.error("Internal Server Error. Failed to unassign class teacher", {
+      error: err.message,
+      ipAddress: context.ipAddress,
+      adminId,
     });
     throw err;
   }

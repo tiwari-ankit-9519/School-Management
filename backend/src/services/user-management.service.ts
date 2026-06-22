@@ -68,12 +68,13 @@ export async function createModeratorService(
       data,
     });
 
-    const [moderatorExists] = await Promise.all([
+    const [moderatorExists, school] = await Promise.all([
       prisma.user.findFirst({
         where: {
           OR: [{ email: data.email }, { phone: data.phone }],
         },
       }),
+      prisma.schoolConfig.findFirst(),
     ]);
 
     if (moderatorExists) {
@@ -233,7 +234,7 @@ export async function createModeratorService(
       tempPassword: result.tempPassword,
       designation: result.moderator.designation ?? "",
       department: result.moderator.department ?? "",
-      schoolName: null as unknown as string,
+      schoolName: school!.name,
     });
 
     log.info("Moderator created successfully", {
@@ -423,11 +424,14 @@ export async function teacherApplicationService(
       lastName: data.lastName,
     });
 
-    const applicationExists = await prisma.teacherApplication.findFirst({
-      where: {
-        OR: [{ email: data.email }, { phone: data.phone }],
-      },
-    });
+    const [applicationExists, school] = await Promise.all([
+      prisma.teacherApplication.findFirst({
+        where: {
+          OR: [{ email: data.email }, { phone: data.phone }],
+        },
+      }),
+      prisma.schoolConfig.findFirst(),
+    ]);
 
     if (applicationExists) {
       if (applicationExists.status === "REJECTED") {
@@ -569,7 +573,7 @@ export async function teacherApplicationService(
           qualification: data.qualification,
           experience: data.experience,
           specialization: data.specialization,
-          schoolName: "",
+          schoolName: school!.name,
           applicationId: applicationExists.id,
         });
 
@@ -716,7 +720,7 @@ export async function teacherApplicationService(
       qualification: data.qualification,
       experience: data.experience,
       specialization: data.specialization,
-      schoolName: "",
+      schoolName: school!.name,
       applicationId: newApplication.id,
     });
 
@@ -1021,12 +1025,13 @@ export async function approveTeacherApplicationService(
       applicationId,
     });
 
-    const [application] = await Promise.all([
+    const [application, school] = await Promise.all([
       prisma.teacherApplication.findUnique({
         where: {
           id: applicationId,
         },
       }),
+      prisma.schoolConfig.findFirst(),
     ]);
 
     if (!application) {
@@ -1169,7 +1174,7 @@ export async function approveTeacherApplicationService(
       regNumber: response.teacher.user.regNumber,
       tempPassword: response.tempPassword,
       applicationId,
-      schoolName: "",
+      schoolName: school!.name,
     });
 
     return response.teacher;
@@ -1200,12 +1205,13 @@ export async function rejectTeacherApplicaitonService(
       },
     );
 
-    const [teacherApplicationExists] = await Promise.all([
+    const [teacherApplicationExists, school] = await Promise.all([
       prisma.teacherApplication.findUnique({
         where: {
           id: applicationId,
         },
       }),
+      prisma.schoolConfig.findFirst(),
     ]);
 
     if (!teacherApplicationExists) {
@@ -1289,7 +1295,7 @@ export async function rejectTeacherApplicaitonService(
       qualification: teacherApplicationExists.qualification,
       experience: teacherApplicationExists.experience,
       specialization: teacherApplicationExists.specialization ?? undefined,
-      schoolName: "",
+      schoolName: school!.name,
       applicationId: applicationId,
       rejectionReason: rejectionReason,
     });
@@ -1327,11 +1333,14 @@ export async function resubmitTeacherApplicationService(
       fileCount: files.length,
     });
 
-    const teacherApplication = await prisma.teacherApplication.findUnique({
-      where: {
-        id: applicationId,
-      },
-    });
+    const [teacherApplication, school] = await Promise.all([
+      prisma.teacherApplication.findUnique({
+        where: {
+          id: applicationId,
+        },
+      }),
+      prisma.schoolConfig.findFirst(),
+    ]);
 
     if (!teacherApplication) {
       log.warn(`Application not found with applicationId ${applicationId}`);
@@ -1469,7 +1478,7 @@ export async function resubmitTeacherApplicationService(
       qualification: teacherApplication.qualification,
       experience: teacherApplication.experience,
       specialization: teacherApplication.specialization ?? "",
-      schoolName: "",
+      schoolName: school!.name,
       applicationId,
     });
     return { id: updatedApplication.id };

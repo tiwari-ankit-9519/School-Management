@@ -4,9 +4,15 @@ import { useForm, useWatch, Controller } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { Button } from "@/components/ui/button";
+import { Calendar } from "@/components/ui/calendar";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
 import { motion, AnimatePresence } from "motion/react";
 import {
-  Calendar,
+  Calendar as CalendarIcon,
   Plus,
   X,
   CheckCircle2,
@@ -25,6 +31,7 @@ import {
 } from "@/hooks/useAcademicYear";
 import { useTranslations } from "@/hooks/useTranslations";
 import { useRouter, useSearchParams, usePathname } from "next/navigation";
+import { format, parseISO } from "date-fns";
 
 export const academicYearSchema = z
   .object({
@@ -65,8 +72,9 @@ const AcademicYearPage = () => {
 
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [nameDropdownOpen, setNameDropdownOpen] = useState(false);
+  const [startDateOpen, setStartDateOpen] = useState(false);
+  const [endDateOpen, setEndDateOpen] = useState(false);
 
-  // Fetch all names for the dropdown (no filters, large limit)
   const { data: allData } = useGetAllAcademicYears(
     undefined,
     undefined,
@@ -75,7 +83,6 @@ const AcademicYearPage = () => {
   );
   const allNames = Array.from(new Set(allData?.data?.map((y) => y.name) ?? []));
 
-  // Fetch filtered data
   const { data, isLoading } = useGetAllAcademicYears(
     isCurrent,
     urlName,
@@ -116,7 +123,6 @@ const AcademicYearPage = () => {
         params.set(key, value);
       }
     });
-    // Reset to page 1 on filter change
     if (!("page" in updates)) params.set("page", "1");
     router.push(`${pathname}?${params.toString()}`);
   };
@@ -158,6 +164,16 @@ const AcademicYearPage = () => {
     });
   };
 
+  const toDateObj = (str: string): Date | undefined => {
+    if (!str) return undefined;
+    const d = new Date(str);
+    return isNaN(d.getTime()) ? undefined : d;
+  };
+
+  const toISODateString = (date: Date): string => {
+    return format(date, "yyyy-MM-dd");
+  };
+
   return (
     <div className="relative min-h-screen w-full bg-[#050810] px-4 py-10 sm:px-8">
       <div
@@ -169,7 +185,6 @@ const AcademicYearPage = () => {
       />
 
       <div className="relative z-10 mx-auto max-w-5xl">
-        {/* Header */}
         <motion.div
           initial={{ opacity: 0, y: 24 }}
           animate={{ opacity: 1, y: 0 }}
@@ -204,14 +219,12 @@ const AcademicYearPage = () => {
           </Button>
         </motion.div>
 
-        {/* Filters */}
         <motion.div
           initial={{ opacity: 0, y: 16 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.5, delay: 0.1, ease: [0.16, 1, 0.3, 1] }}
           className="mb-6 flex flex-wrap items-center gap-3"
         >
-          {/* isCurrent filter pills */}
           <div className="flex items-center gap-1.5 rounded-xl border border-white/8 bg-white/4 p-1 backdrop-blur-sm">
             {[
               { label: t("filterAll"), value: undefined },
@@ -231,7 +244,6 @@ const AcademicYearPage = () => {
             ))}
           </div>
 
-          {/* Name dropdown filter */}
           <div className="relative">
             <button
               onClick={() => setNameDropdownOpen((v) => !v)}
@@ -297,7 +309,6 @@ const AcademicYearPage = () => {
             </AnimatePresence>
           </div>
 
-          {/* Clear all filters */}
           {(isCurrent !== undefined || urlName) && (
             <button
               onClick={() => router.push(pathname)}
@@ -308,7 +319,6 @@ const AcademicYearPage = () => {
           )}
         </motion.div>
 
-        {/* Table */}
         <motion.div
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
@@ -365,7 +375,7 @@ const AcademicYearPage = () => {
                 >
                   <div className="flex items-center gap-3">
                     <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-indigo-500/20 bg-indigo-500/10">
-                      <Calendar className="h-3.5 w-3.5 text-indigo-400" />
+                      <CalendarIcon className="h-3.5 w-3.5 text-indigo-400" />
                     </div>
                     <span className="font-jakarta text-sm font-bold text-white">
                       {year.name}
@@ -426,7 +436,6 @@ const AcademicYearPage = () => {
         </motion.div>
       </div>
 
-      {/* Modal — unchanged from your original */}
       <AnimatePresence>
         {isModalOpen && (
           <>
@@ -494,25 +503,85 @@ const AcademicYearPage = () => {
                       </motion.p>
                     )}
                   </div>
-                  {/* <div className="grid grid-cols-2 gap-3"> */}
+
                   <div className="grid grid-cols-2 gap-3">
                     <div className="space-y-1.5">
                       <label className="font-manrope text-xs text-white/40">
                         {t("fieldStartDate")}
                       </label>
-                      <div className="flex h-12 items-center gap-3 rounded-xl border border-white/10 bg-white/5 px-4 focus-within:border-indigo-500/50">
-                        <Calendar className="h-4 w-4 shrink-0 text-indigo-400" />
-                        <input
-                          type="date"
-                          value={startDateValue}
-                          onChange={(e) =>
-                            setValue("startDate", e.target.value, {
-                              shouldValidate: true,
-                            })
-                          }
-                          className="flex-1 bg-transparent font-manrope text-sm text-white focus:outline-none scheme-dark"
-                        />
-                      </div>
+                      <Popover
+                        open={startDateOpen}
+                        onOpenChange={setStartDateOpen}
+                      >
+                        <PopoverTrigger asChild>
+                          <button
+                            type="button"
+                            className={`flex h-12 w-full items-center gap-3 rounded-xl border px-4 font-manrope text-sm transition-all duration-200 ${
+                              startDateOpen
+                                ? "border-indigo-500/50 bg-white/5 text-white"
+                                : startDateValue
+                                  ? "border-white/10 bg-white/5 text-white"
+                                  : "border-white/10 bg-white/5 text-white/30"
+                            }`}
+                          >
+                            <CalendarIcon className="h-4 w-4 shrink-0 text-indigo-400" />
+                            <span>
+                              {startDateValue
+                                ? format(
+                                    parseISO(startDateValue),
+                                    "dd MMM yyyy",
+                                  )
+                                : t("fieldStartDate")}
+                            </span>
+                          </button>
+                        </PopoverTrigger>
+                        <PopoverContent
+                          className="w-auto p-0 border border-white/10 bg-[#0d1525] shadow-[0_16px_40px_rgba(0,0,0,0.7)] backdrop-blur-xl rounded-xl"
+                          align="start"
+                          sideOffset={6}
+                        >
+                          <Calendar
+                            mode="single"
+                            selected={toDateObj(startDateValue)}
+                            onSelect={(date) => {
+                              if (date) {
+                                setValue("startDate", toISODateString(date), {
+                                  shouldValidate: true,
+                                });
+                                setStartDateOpen(false);
+                              }
+                            }}
+                            classNames={{
+                              months: "flex flex-col",
+                              month: "space-y-3 p-3",
+                              month_caption:
+                                "flex justify-center pt-1 relative items-center px-8",
+                              caption_label:
+                                "font-jakarta text-sm font-semibold text-white",
+                              nav: "flex items-center justify-between absolute inset-x-1 top-1",
+                              button_previous:
+                                "h-7 w-7 flex items-center justify-center rounded-lg border border-white/10 bg-white/5 text-white/40 hover:text-white/70 hover:border-white/20 transition-colors",
+                              button_next:
+                                "h-7 w-7 flex items-center justify-center rounded-lg border border-white/10 bg-white/5 text-white/40 hover:text-white/70 hover:border-white/20 transition-colors",
+                              month_grid: "w-full border-collapse",
+                              weekdays: "flex",
+                              weekday:
+                                "text-white/30 rounded-md w-8 font-manrope font-medium text-[0.7rem] text-center",
+                              week: "flex w-full mt-1",
+                              day: "relative p-0 text-center text-sm focus-within:relative focus-within:z-20",
+                              day_button:
+                                "h-8 w-8 p-0 font-manrope text-xs font-normal text-white/60 rounded-lg hover:bg-indigo-500/20 hover:text-white transition-colors aria-selected:opacity-100",
+                              selected:
+                                "bg-indigo-600 text-white hover:bg-indigo-500 hover:text-white font-semibold rounded-lg [&>button]:bg-indigo-600 [&>button]:text-white [&>button]:hover:bg-indigo-500",
+                              today:
+                                "[&>button]:border [&>button]:border-indigo-500/40 [&>button]:text-indigo-300",
+                              outside: "opacity-50 [&>button]:text-white/20",
+                              disabled: "opacity-30 [&>button]:text-white/10",
+                              hidden: "invisible",
+                            }}
+                          />
+                        </PopoverContent>
+                      </Popover>
                       {errors.startDate && (
                         <motion.p
                           initial={{ opacity: 0, y: -4 }}
@@ -528,19 +597,78 @@ const AcademicYearPage = () => {
                       <label className="font-manrope text-xs text-white/40">
                         {t("fieldEndDate")}
                       </label>
-                      <div className="flex h-12 items-center gap-3 rounded-xl border border-white/10 bg-white/5 px-4 focus-within:border-indigo-500/50">
-                        <Calendar className="h-4 w-4 shrink-0 text-indigo-400" />
-                        <input
-                          type="date"
-                          value={endDateValue}
-                          onChange={(e) =>
-                            setValue("endDate", e.target.value, {
-                              shouldValidate: true,
-                            })
-                          }
-                          className="flex-1 bg-transparent font-manrope text-sm text-white focus:outline-none scheme-dark"
-                        />
-                      </div>
+                      <Popover open={endDateOpen} onOpenChange={setEndDateOpen}>
+                        <PopoverTrigger asChild>
+                          <button
+                            type="button"
+                            className={`flex h-12 w-full items-center gap-3 rounded-xl border px-4 font-manrope text-sm transition-all duration-200 ${
+                              endDateOpen
+                                ? "border-indigo-500/50 bg-white/5 text-white"
+                                : endDateValue
+                                  ? "border-white/10 bg-white/5 text-white"
+                                  : "border-white/10 bg-white/5 text-white/30"
+                            }`}
+                          >
+                            <CalendarIcon className="h-4 w-4 shrink-0 text-indigo-400" />
+                            <span>
+                              {endDateValue
+                                ? format(parseISO(endDateValue), "dd MMM yyyy")
+                                : t("fieldEndDate")}
+                            </span>
+                          </button>
+                        </PopoverTrigger>
+                        <PopoverContent
+                          className="w-auto p-0 border border-white/10 bg-[#0d1525] shadow-[0_16px_40px_rgba(0,0,0,0.7)] backdrop-blur-xl rounded-xl"
+                          align="start"
+                          sideOffset={6}
+                        >
+                          <Calendar
+                            mode="single"
+                            selected={toDateObj(endDateValue)}
+                            onSelect={(date) => {
+                              if (date) {
+                                setValue("endDate", toISODateString(date), {
+                                  shouldValidate: true,
+                                });
+                                setEndDateOpen(false);
+                              }
+                            }}
+                            disabled={(date) =>
+                              startDateValue
+                                ? date <= new Date(startDateValue)
+                                : false
+                            }
+                            classNames={{
+                              months: "flex flex-col",
+                              month: "space-y-3 p-3",
+                              month_caption:
+                                "flex justify-center pt-1 relative items-center px-8",
+                              caption_label:
+                                "font-jakarta text-sm font-semibold text-white",
+                              nav: "flex items-center justify-between absolute inset-x-1 top-1",
+                              button_previous:
+                                "h-7 w-7 flex items-center justify-center rounded-lg border border-white/10 bg-white/5 text-white/40 hover:text-white/70 hover:border-white/20 transition-colors",
+                              button_next:
+                                "h-7 w-7 flex items-center justify-center rounded-lg border border-white/10 bg-white/5 text-white/40 hover:text-white/70 hover:border-white/20 transition-colors",
+                              month_grid: "w-full border-collapse",
+                              weekdays: "flex",
+                              weekday:
+                                "text-white/30 rounded-md w-8 font-manrope font-medium text-[0.7rem] text-center",
+                              week: "flex w-full mt-1",
+                              day: "relative p-0 text-center text-sm focus-within:relative focus-within:z-20",
+                              day_button:
+                                "h-8 w-8 p-0 font-manrope text-xs font-normal text-white/60 rounded-lg hover:bg-indigo-500/20 hover:text-white transition-colors aria-selected:opacity-100",
+                              selected:
+                                "bg-indigo-600 text-white hover:bg-indigo-500 hover:text-white font-semibold rounded-lg [&>button]:bg-indigo-600 [&>button]:text-white [&>button]:hover:bg-indigo-500",
+                              today:
+                                "[&>button]:border [&>button]:border-indigo-500/40 [&>button]:text-indigo-300",
+                              outside: "opacity-50 [&>button]:text-white/20",
+                              disabled: "opacity-30 [&>button]:text-white/10",
+                              hidden: "invisible",
+                            }}
+                          />
+                        </PopoverContent>
+                      </Popover>
                       {errors.endDate && (
                         <motion.p
                           initial={{ opacity: 0, y: -4 }}
@@ -552,7 +680,7 @@ const AcademicYearPage = () => {
                       )}
                     </div>
                   </div>
-                  {/* </div> */}
+
                   <Controller
                     control={control}
                     name="isCurrent"

@@ -2,7 +2,7 @@ import api, { ApiResponse, getErrorMessage } from "@/lib/api";
 import { QUERY_KEYS } from "@/lib/constants";
 import { Class, PaginatedClasses } from "@/types";
 import {
-  AssignTeacherToSubjectFormValues,
+  AssignClassTeacherFormValues,
   ClassFormValues,
 } from "@/validations/validations";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
@@ -59,10 +59,18 @@ const classApi = {
     return response.data.data;
   },
 
-  assignClassTeacher: async (data: AssignTeacherToSubjectFormValues) => {
+  assignClassTeacher: async (data: AssignClassTeacherFormValues) => {
     const response = await api.post<Promise<null>>(
       `/school/class/assign-class-teacher`,
       data,
+    );
+    return response.data;
+  },
+
+  unAssignClassTeacher: async (data: AssignClassTeacherFormValues) => {
+    const response = await api.delete<Promise<null>>(
+      `/school/class/unassign-class-teacher`,
+      { data },
     );
     return response.data;
   },
@@ -120,13 +128,36 @@ export const useGetAllClasses = (
 export const useAssignClassTeacher = () => {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: (data: AssignTeacherToSubjectFormValues) =>
+    mutationFn: (data: AssignClassTeacherFormValues) =>
       classApi.assignClassTeacher(data),
     onSuccess: () => {
       queryClient.invalidateQueries({
         queryKey: QUERY_KEYS.CLASS,
       });
+      queryClient.invalidateQueries({
+        queryKey: QUERY_KEYS.CLASSES,
+      });
       toast.success("Class Teacher assigned successfully");
+    },
+    onError: (error) => {
+      toast.error(getErrorMessage(error));
+    },
+  });
+};
+
+export const useUnAssignClassTeacher = () => {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (data: AssignClassTeacherFormValues) =>
+      classApi.unAssignClassTeacher(data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({
+        queryKey: QUERY_KEYS.CLASS,
+      });
+      queryClient.invalidateQueries({
+        queryKey: QUERY_KEYS.CLASSES,
+      });
+      toast.success("Class Teacher unassigned successfully");
     },
     onError: (error) => {
       toast.error(getErrorMessage(error));

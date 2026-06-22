@@ -172,6 +172,47 @@ export async function createStudentFromApprovedApplication(
       },
     });
 
+    const admissionFeeStructure = await tx.feeStructure.findFirst({
+      where: {
+        academicYearId: currentAcademicYear.id,
+        isActive: true,
+        name: { contains: "Admission", mode: "insensitive" },
+        OR: [{ classId: classExists.id }, { classId: null }],
+      },
+      orderBy: { classId: "desc" },
+    });
+
+    if (!admissionFeeStructure) {
+      log.warn(
+        `No Admission Fee structure found for class ${classExists.name}-${classExists.section} in academic year ${currentAcademicYear.id}. Skipping fee payment creation.`,
+        {
+          classId: classExists.id,
+          academicYearId: currentAcademicYear.id,
+          applicationId,
+        },
+      );
+    } else {
+      const ADMISSION_FEE_GRACE_PERIOD_DAYS = 7;
+      const dueDate = new Date();
+      dueDate.setDate(dueDate.getDate() + ADMISSION_FEE_GRACE_PERIOD_DAYS);
+
+      await Promise.all([
+        tx.feeStructure.update({
+          where: { id: admissionFeeStructure.id },
+          data: { dueDate },
+        }),
+        tx.feePayment.create({
+          data: {
+            studentId: student.id,
+            feeStructureId: admissionFeeStructure.id,
+            amountPaid: 0,
+            status: "PENDING",
+            dueDate,
+          },
+        }),
+      ]);
+    }
+
     const [aggregateCapacity, aggregateEnrollments, aggregatePending] =
       await Promise.all([
         tx.class.aggregate({

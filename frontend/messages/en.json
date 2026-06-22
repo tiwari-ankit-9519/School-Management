@@ -257,7 +257,8 @@
     "noExamsSub": "There isn't any scheduled for now",
     "leaveRequestsTitle": "Leave Requests",
     "noLeaveTitle": "No leave requests",
-    "noLeaveSub": "There isn't any leave requests"
+    "noLeaveSub": "There isn't any leave requests",
+    "unassignBtn": "Unassign Teacher"
   },
   "subjects": {
     "pageTitle": "Subjects",
@@ -485,5 +486,45 @@
     "creating": "Creating...",
 
     "footer": "The moderator will receive login credentials via email after account creation."
+  },
+  "teachersList": {
+    "pageTitle": "Teachers",
+    "pageSubtitle": "Manage and view all teachers in your school",
+    "addTeacher": "Add Teacher",
+    "addTeacherShort": "Add",
+    "filters": "Filters",
+    "filterName": "Name",
+    "filterCity": "City",
+    "filterState": "State",
+    "filterQualification": "Qualification",
+    "filterExperience": "Min. Experience (yrs)",
+    "filterGender": "Gender",
+    "filterStatus": "Status",
+    "genderMale": "Male",
+    "genderFemale": "Female",
+    "genderOther": "Other",
+    "statusActive": "Active",
+    "statusInactive": "Inactive",
+    "applyFilters": "Apply",
+    "clearFilters": "Clear all",
+    "colTeacher": "Teacher",
+    "colGender": "Gender",
+    "colSpecialization": "Specialization",
+    "colQualification": "Qualification",
+    "colExperience": "Experience",
+    "colStatus": "Status",
+    "joined": "Joined",
+    "year": "yr",
+    "years": "yrs",
+    "loading": "Loading teachers…",
+    "emptyTitle": "No teachers found",
+    "emptySubtitle": "No teachers have been added yet.",
+    "emptyFiltered": "Try adjusting your filters.",
+    "page": "Page",
+    "of": "of",
+    "total": "total",
+    "summaryTeacher": "teacher shown",
+    "summaryTeachers": "teachers shown",
+    "summaryFiltered": "(filtered)"
   }
 }

@@ -55,6 +55,7 @@ import holidayRoute from "@/src/routes/holiday.route.js";
 import notificationRoute from "@/src/routes/notification.route.js";
 import announcementRoute from "@/src/routes/announcement.route.js";
 import profileRoute from "@/src/routes/profile.route.js";
+import feeRoute from "@/src/routes/fees.route.js";
 
 const log = createModuleLogger("Server");
 
@@ -186,6 +187,7 @@ app.use(`${API_PREFIX}/school/holiday`, holidayRoute);
 app.use(`${API_PREFIX}/school/notification`, notificationRoute);
 app.use(`${API_PREFIX}/school/announcement`, announcementRoute);
 app.use(`${API_PREFIX}/school/profile`, profileRoute);
+app.use(`${API_PREFIX}/school/fee`, feeRoute);
 
 app.use((req: Request, res: Response, _next: NextFunction) => {
   const knownPaths = [
@@ -204,6 +206,7 @@ app.use((req: Request, res: Response, _next: NextFunction) => {
     `${API_PREFIX}/school/marks`,
     `${API_PREFIX}/school/leave`,
     `${API_PREFIX}/school/holiday`,
+    `${API_PREFIX}/school/fee`,
     "/health",
     "/ping",
   ];

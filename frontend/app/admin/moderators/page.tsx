@@ -339,7 +339,7 @@ const AdminsListPage = () => {
                     />
                   </div>
 
-                  {/* Gender — backend filter */}
+                  {/* Gender */}
                   <div className="relative">
                     <div className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-indigo-400/60">
                       <User className="h-3.5 w-3.5" />
@@ -425,8 +425,7 @@ const AdminsListPage = () => {
                 </span>
               </div>
             </div>
-          ) : /* Empty */
-          !filteredData?.data?.length ? (
+          ) : !filteredData?.data?.length ? (
             <div className="flex flex-col items-center justify-center gap-4 px-4 py-16 text-center sm:py-20">
               <div className="flex h-12 w-12 sm:h-14 sm:w-14 items-center justify-center rounded-2xl border border-white/10 bg-white/5">
                 <Users className="h-5 w-5 sm:h-6 sm:w-6 text-white/20" />
@@ -451,7 +450,7 @@ const AdminsListPage = () => {
                   initial={{ opacity: 0, x: -8 }}
                   animate={{ opacity: 1, x: 0 }}
                   transition={{ duration: 0.35, delay: i * 0.04 }}
-                  onClick={() => router.push(`/admin/moderator/${admin.id}`)}
+                  onClick={() => router.push(`/admin/moderators/${admin.id}`)}
                   className="cursor-pointer transition-colors duration-150 hover:bg-white/3 group"
                 >
                   {/* ── Mobile row ── */}
@@ -462,29 +461,8 @@ const AdminsListPage = () => {
                         <p className="font-jakarta text-sm font-bold text-white truncate">
                           {admin.firstName} {admin.lastName}
                         </p>
-                        {admin.user && (
-                          <p className="mt-0.5 font-manrope text-xs text-white/40 truncate">
-                            {admin.user.email ?? admin.user.phone}
-                          </p>
-                        )}
                         <div className="mt-2 flex flex-wrap items-center gap-1.5">
                           <GenderBadge gender={admin.gender} />
-                          {admin.user && (
-                            <span
-                              className={`inline-flex items-center gap-1 rounded-md border px-2 py-0.5 font-manrope text-[11px] font-medium ${
-                                admin.user.isActive
-                                  ? "border-emerald-500/20 bg-emerald-500/10 text-emerald-400"
-                                  : "border-red-500/20 bg-red-500/10 text-red-400"
-                              }`}
-                            >
-                              <span
-                                className={`h-1.5 w-1.5 rounded-full ${admin.user.isActive ? "bg-emerald-400" : "bg-red-400"}`}
-                              />
-                              {admin.user.isActive
-                                ? t("statusActive")
-                                : t("statusInactive")}
-                            </span>
-                          )}
                         </div>
                         <div className="mt-1.5 flex flex-wrap items-center gap-x-3 gap-y-1">
                           {admin.designation && (
@@ -510,36 +488,13 @@ const AdminsListPage = () => {
 
                   {/* ── Desktop row ── */}
                   <div className="hidden md:grid md:grid-cols-[2.5fr_1.5fr_1.5fr_1fr_1fr_0.5fr] gap-4 px-6 py-4 items-center">
-                    {/* Admin name + email */}
+                    {/* Admin name */}
                     <div className="flex items-center gap-3 min-w-0">
                       <AdminAvatar admin={admin} />
                       <div className="min-w-0">
-                        <div className="flex items-center gap-2">
-                          <p className="font-jakarta text-sm font-bold text-white truncate">
-                            {admin.firstName} {admin.lastName}
-                          </p>
-                          {admin.user && (
-                            <span
-                              className={`hidden xl:inline-flex items-center gap-1 rounded-md border px-1.5 py-0.5 font-manrope text-[10px] font-medium ${
-                                admin.user.isActive
-                                  ? "border-emerald-500/20 bg-emerald-500/10 text-emerald-400"
-                                  : "border-red-500/20 bg-red-500/10 text-red-400"
-                              }`}
-                            >
-                              <span
-                                className={`h-1.5 w-1.5 rounded-full ${admin.user.isActive ? "bg-emerald-400" : "bg-red-400"}`}
-                              />
-                              {admin.user.isActive
-                                ? t("statusActive")
-                                : t("statusInactive")}
-                            </span>
-                          )}
-                        </div>
-                        {admin.user && (
-                          <p className="font-manrope text-[11px] text-white/30 truncate mt-0.5">
-                            {admin.user.email ?? admin.user.phone}
-                          </p>
-                        )}
+                        <p className="font-jakarta text-sm font-bold text-white truncate">
+                          {admin.firstName} {admin.lastName}
+                        </p>
                       </div>
                     </div>
 

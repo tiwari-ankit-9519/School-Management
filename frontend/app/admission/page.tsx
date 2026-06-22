@@ -119,7 +119,7 @@ const AdmissionApplicationPage = () => {
     resolver: zodResolver(
       admissionApplicationSchema,
     ) as Resolver<AdmissionApplicationFormValues>,
-    mode: "onChange", // ✅ clears errors as soon as field becomes valid
+    mode: "onChange",
     reValidateMode: "onChange",
     defaultValues: {
       firstName: "",
@@ -240,7 +240,7 @@ const AdmissionApplicationPage = () => {
   };
 
   return (
-    <div className="relative min-h-screen w-full bg-[#050810] px-3 py-6 sm:px-6 sm:py-10">
+    <div className="relative min-h-screen w-full bg-[#050810] px-3 pt-20 pb-6 sm:px-6 sm:pt-24 sm:pb-10">
       <div
         className="pointer-events-none fixed inset-0 select-none"
         style={{

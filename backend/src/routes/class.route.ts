@@ -9,6 +9,7 @@ import {
   createClass,
   getAllClasses,
   getSingleClass,
+  unassignClassTeacher,
 } from "../controller/class.controller";
 import { Module } from "@prisma/client";
 
@@ -28,6 +29,13 @@ router.post(
   authorize("ADMIN", "MODERATOR"),
   checkPermission(Module.CLASS_TEACHER, "canCreate"),
   assignClassTeacher,
+);
+
+router.delete(
+  "/unassign-class-teacher",
+  authenticate,
+  authorize("ADMIN", "MODERATOR"),
+  unassignClassTeacher,
 );
 
 router.get(
