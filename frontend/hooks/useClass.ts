@@ -59,6 +59,15 @@ const classApi = {
     return response.data.data;
   },
 
+  getAllClassGroup: async (): Promise<{
+    data: { classGroup: string; classGroupId: string }[];
+  }> => {
+    const response = await api.get<
+      ApiResponse<{ data: { classGroup: string; classGroupId: string }[] }>
+    >(`/school/class/all-class-groups`);
+    return response.data.data;
+  },
+
   assignClassTeacher: async (data: AssignClassTeacherFormValues) => {
     const response = await api.post<Promise<null>>(
       `/school/class/assign-class-teacher`,
@@ -122,6 +131,14 @@ export const useGetAllClasses = (
     ],
     queryFn: () => classApi.getAllClasses(filters, page, limit),
     enabled: !!filters.academicYearId,
+  });
+};
+
+export const useGetAllClassGroup = () => {
+  return useQuery({
+    queryKey: [...QUERY_KEYS.CLASSGROUP],
+    queryFn: () => classApi.getAllClassGroup(),
+    enabled: true,
   });
 };
 

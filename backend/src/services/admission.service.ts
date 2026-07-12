@@ -56,11 +56,20 @@ export async function createStudentFromApprovedApplication(
       prisma.schoolConfig.findFirst({ select: { name: true } }),
     ],
   );
-
   if (!admissionApplication) throw new Error(`Application not found`);
   if (!currentAcademicYear) throw new Error(`No active academic year found`);
 
-  const classExists = await prisma.class.findUnique({ where: { id: classId } });
+  const classExists = await prisma.class.findUnique({
+    where: { id: classId },
+    select: {
+      id: true,
+      name: true,
+      section: true,
+      capacity: true,
+      academicYearId: true,
+      classGroupId: true,
+    },
+  });
   if (!classExists || classExists.academicYearId !== currentAcademicYear.id) {
     throw new Error(
       `Class not found or does not belong to current academic year`,
@@ -84,7 +93,6 @@ export async function createStudentFromApprovedApplication(
         FOR UPDATE
       ) sub
     `;
-
     if (Number(enrollmentCount[0].count) >= classExists.capacity) {
       throw new Error(
         `Class ${classExists.name}-${classExists.section} is at full capacity`,
@@ -177,9 +185,9 @@ export async function createStudentFromApprovedApplication(
         academicYearId: currentAcademicYear.id,
         isActive: true,
         name: { contains: "Admission", mode: "insensitive" },
-        OR: [{ classId: classExists.id }, { classId: null }],
+        OR: [{ classGroupId: classExists.classGroupId }],
       },
-      orderBy: { classId: "desc" },
+      orderBy: { classGroupId: "desc" },
     });
 
     if (!admissionFeeStructure) {
@@ -187,6 +195,7 @@ export async function createStudentFromApprovedApplication(
         `No Admission Fee structure found for class ${classExists.name}-${classExists.section} in academic year ${currentAcademicYear.id}. Skipping fee payment creation.`,
         {
           classId: classExists.id,
+          classGroupId: classExists.classGroupId,
           academicYearId: currentAcademicYear.id,
           applicationId,
         },
@@ -253,7 +262,6 @@ export async function createStudentFromApprovedApplication(
         select: { id: true },
         orderBy: { waitlistPosition: "asc" },
       });
-
       log.info(
         `Class ${admissionApplication.appliedForClass} is now full. ${waitlistedApplications.length} applications remain on waitlist.`,
         {

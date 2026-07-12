@@ -59,6 +59,12 @@ export async function createClassService(
       throw new Error("Class already exists");
     }
 
+    const classGroup = await prisma.classGroup.upsert({
+      where: { name: data.name },
+      update: {},
+      create: { name: data.name },
+    });
+
     const newClass = await prisma.class.create({
       data: {
         name: data.name,
@@ -66,6 +72,7 @@ export async function createClassService(
         capacity: data.capacity,
         roomNumber: data.roomNumber,
         academicYearId: academicYear.id,
+        classGroupId: classGroup.id,
       },
     });
 
@@ -161,6 +168,7 @@ export async function assignClassTeacherService(
     log.info(
       `Teacher with id ${data.teacherId} is assigned as class teacher with classId ${data.classId}`,
     );
+    await deleteCacheByPattern(`classes:*`);
     await createAuditLog({
       performedById: moderatorId,
       action: "CREATE",
@@ -434,6 +442,7 @@ export async function unassignClassTeacherService(
     log.info(
       `Teacher with id ${data.teacherId} unassigned from class with id ${data.classId}`,
     );
+    await deleteCacheByPattern(`classes:*`);
     await createAuditLog({
       performedById: adminId,
       action: "DELETE",
@@ -456,6 +465,65 @@ export async function unassignClassTeacherService(
   } catch (error) {
     const err = error as Error;
     log.error("Internal Server Error. Failed to unassign class teacher", {
+      error: err.message,
+      ipAddress: context.ipAddress,
+      adminId,
+    });
+    throw err;
+  }
+}
+
+export async function getAllClassGroupService(
+  adminId: string,
+  context: AuditContext,
+  statusCode: number,
+): Promise<{
+  data: {
+    classGroup: string;
+    classGroupId: string;
+  }[];
+}> {
+  try {
+    log.info(`Starting service to fetch all the class groups`, {
+      ipAddress: context.ipAddress,
+      adminId,
+    });
+
+    const academicYear = await prisma.academicYear.findFirst({
+      where: { isCurrent: true },
+    });
+
+    if (!academicYear) {
+      log.warn(`Academic Year not found`);
+      throw new Error(`Academic Year not found`);
+    }
+
+    const classGroups = await prisma.classGroup.findMany({
+      select: {
+        id: true,
+        name: true,
+      },
+    });
+
+    const response = {
+      data: classGroups.map((cg) => ({
+        classGroup: cg.name,
+        classGroupId: cg.id,
+      })),
+    };
+
+    await createSystemLog({
+      level: "INFO",
+      module: "Class Module",
+      message: "Class Group Fetched successfully",
+      context,
+      statusCode,
+    });
+
+    return response;
+  } catch (error) {
+    const err = error as Error;
+    log.error(`Internal Server Error. Failed to fetch all class groups`, {
       error: err.message,
       ipAddress: context.ipAddress,
       adminId,

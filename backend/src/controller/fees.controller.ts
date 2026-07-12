@@ -98,11 +98,11 @@ export async function getFeeStructureForClass(
   res: Response,
 ): Promise<void> {
   const adminId = req.user?.id;
-  const classId = req.params.classId as string;
+  const classGroupId = req.params.classGroupId as string;
   if (!adminId) {
     throw new Error("Admin ID is required");
   }
-  if (!classId) {
+  if (!classGroupId) {
     throw new Error("Class ID is required");
   }
 
@@ -114,7 +114,7 @@ export async function getFeeStructureForClass(
   res.status(HTTP_STATUS.OK);
 
   const feeStructure = await getFeeStructureForClassService(
-    classId,
+    classGroupId,
     adminId,
     auditContext,
     res.statusCode,

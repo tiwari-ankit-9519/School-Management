@@ -249,6 +249,13 @@ model AcademicYear {
   @@index([isCurrent])
 }
 
+model ClassGroup {
+  id            String         @id @default(cuid())
+  name          String         @unique
+  classes       Class[]
+  feeStructures FeeStructure[]
+}
+
 model Class {
   id             String         @id @default(cuid())
   academicYearId String
@@ -265,6 +272,8 @@ model Class {
   classTeachers  ClassTeacher[]
   feeStructures  FeeStructure[]
   leaveRequest   LeaveRequest[]
+  classGroupId   String
+  classGroup     ClassGroup     @relation(fields: [classGroupId], references: [id])
 
   @@unique([academicYearId, name, section])
   @@index([academicYearId])
@@ -760,6 +769,8 @@ model FeeStructure {
   academicYear   AcademicYear @relation(fields: [academicYearId], references: [id], onDelete: Cascade)
   class          Class?       @relation(fields: [classId], references: [id])
   feePayments    FeePayment[]
+  classGroupId   String
+  classGroup     ClassGroup   @relation(fields: [classGroupId], references: [id])
 
   @@index([academicYearId])
   @@index([classId])

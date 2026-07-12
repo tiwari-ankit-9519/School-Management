@@ -146,6 +146,16 @@ export const subjectSchema = z.object({
     .trim(),
 });
 
+export const FeesStructureSchema = z.object({
+  name: z
+    .string({ error: "Name is required" })
+    .min(1, { error: "Name should be of atleast one character" }),
+  amount: z.coerce.number({ error: "Amount is required" }),
+  recurringMonth: z.coerce.number().nullable().optional(),
+  description: z.string().optional(),
+  isRecurring: z.boolean().optional(),
+});
+
 // ─────────────────────────────────────────────
 // PERMISSIONS & MODERATOR
 // ─────────────────────────────────────────────
@@ -707,10 +717,20 @@ export const assignClassTeacherSchema = z.object({
   classId: z.string({ error: "Class ID is required" }),
 });
 
+export const FeesStructureUpdatePayload = z.object({
+  name: z.string().optional(),
+  amount: z.number().optional(),
+  recurringMonth: z.number().nullable().optional(),
+  description: z.string().optional(),
+  isRecurring: z.boolean().optional(),
+});
+
 // ─────────────────────────────────────────────
 // INFERRED FORM VALUE TYPES
 // ─────────────────────────────────────────────
 
+export type FeesStructureType = z.infer<typeof FeesStructureSchema>;
+export type FeeStructureUpdateType = z.infer<typeof FeesStructureUpdatePayload>;
 export type LoginFormValues = z.infer<typeof loginSchema>;
 export type ChangePasswordFormValues = z.infer<typeof changePasswordSchema>;
 export type SendResetPasswordFormValues = z.infer<

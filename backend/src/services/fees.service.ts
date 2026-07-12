@@ -27,40 +27,39 @@ export async function createFeeStructureService(
     const academicYear = await prisma.academicYear.findFirst({
       where: { isCurrent: true },
     });
-
     if (!academicYear) {
-      log.warn(`Academic Year not found`);
-      throw new Error(`Academic Year not found`);
+      log.warn("Academic Year not found");
+      throw new Error("Academic Year not found");
     }
 
-    const [feeStructure, classExists] = await Promise.all([
-      prisma.feeStructure.findFirst({
-        where: { classId, academicYearId: academicYear.id, name: data.name },
-      }),
-      prisma.class.findFirst({
-        where: { id: classId },
-      }),
-    ]);
+    const classExists = await prisma.class.findFirst({
+      where: { id: classId },
+      select: { classGroupId: true },
+    });
+    if (!classExists) {
+      log.warn("Class does not exist");
+      throw new Error("Class does not exist");
+    }
 
-    if (feeStructure) {
+    const { classGroupId } = classExists;
+
+    const feeStructureExists = await prisma.feeStructure.findFirst({
+      where: { classGroupId, academicYearId: academicYear.id, name: data.name },
+    });
+    if (feeStructureExists) {
       log.warn("Fee Structure already exists");
       throw new Error("Fee Structure already exists");
-    }
-    if (!classExists) {
-      log.warn("Class does not exists");
-      throw new Error("Class does not exists");
     }
 
     const ADMISSION_FEE_GRACE_PERIOD_DAYS = 30;
     const dueDate = new Date(academicYear.startDate);
     dueDate.setDate(dueDate.getDate() + ADMISSION_FEE_GRACE_PERIOD_DAYS);
-
     log.info(`The due date for the admission fees is ${dueDate}`);
 
     const newFeeStructure = await prisma.feeStructure.create({
       data: {
         academicYearId: academicYear.id,
-        classId,
+        classGroupId,
         name: data.name,
         amount: data.amount,
         dueDate,
@@ -72,7 +71,7 @@ export async function createFeeStructureService(
 
     await createSystemLog({
       level: "INFO",
-      message: "Fee Structure create successfully",
+      message: "Fee Structure created successfully",
       module: "Fee Structure",
       context,
       statusCode,
@@ -80,7 +79,7 @@ export async function createFeeStructureService(
         name: newFeeStructure.name,
         amount: newFeeStructure.amount,
         dueDate: newFeeStructure.dueDate,
-        classId: newFeeStructure.classId,
+        classGroupId: newFeeStructure.classGroupId,
         isRecurring: newFeeStructure.isRecurring,
       },
     });
@@ -95,7 +94,7 @@ export async function createFeeStructureService(
         name: newFeeStructure.name,
         amount: newFeeStructure.amount,
         dueDate: newFeeStructure.dueDate,
-        classId: newFeeStructure.classId,
+        classGroupId: newFeeStructure.classGroupId,
         isRecurring: newFeeStructure.isRecurring,
       },
       context,
@@ -206,7 +205,7 @@ export async function updateFeeStructureService(
 }
 
 export async function getFeeStructureForClassService(
-  classId: string,
+  classGroupId: string,
   adminId: string,
   context: AuditContext,
   statusCode: number,
@@ -221,7 +220,7 @@ export async function getFeeStructureForClassService(
 }> {
   try {
     log.info(`Starting service to fetch fee structure of the class`, {
-      classId,
+      classGroupId,
       adminId,
       ipAddress: context.ipAddress,
     });
@@ -237,13 +236,18 @@ export async function getFeeStructureForClassService(
 
     const [feeStructureOfClass, total] = await prisma.$transaction([
       prisma.feeStructure.findMany({
-        where: { classId, academicYearId: academicYear.id },
+        where: { classGroupId, academicYearId: academicYear.id },
         skip: (page - 1) * limit,
         take: limit,
         orderBy: { createdAt: "desc" },
+        include: {
+          classGroup: {
+            select: { name: true },
+          },
+        },
       }),
       prisma.feeStructure.count({
-        where: { classId, academicYearId: academicYear.id },
+        where: { classGroupId, academicYearId: academicYear.id },
       }),
     ]);
 
@@ -268,11 +272,11 @@ export async function getFeeStructureForClassService(
       statusCode,
       metadata: {
         adminId,
-        classId,
+        classGroupId,
       },
     });
 
-    log.info(`Fetched fee structure for classs with id ${classId}`, {
+    log.info(`Fetched fee structure for classs with id ${classGroupId}`, {
       total,
       page,
       limit,
@@ -283,11 +287,11 @@ export async function getFeeStructureForClassService(
   } catch (error) {
     const err = error as Error;
     log.error(
-      `Internal Server Error. Failed to fetch fee structure of class ${classId}`,
+      `Internal Server Error. Failed to fetch fee structure of class ${classGroupId}`,
       {
         error: err.message,
         ipAddress: context.ipAddress,
-        classId,
+        classGroupId,
         adminId,
       },
     );

@@ -8,6 +8,7 @@ import {
   assignClassTeacher,
   createClass,
   getAllClasses,
+  getAllClassGroup,
   getSingleClass,
   unassignClassTeacher,
 } from "../controller/class.controller";
@@ -44,6 +45,13 @@ router.get(
   authorize("ADMIN", "MODERATOR"),
   checkPermission(Module.CLASS, "canRead"),
   getAllClasses,
+);
+
+router.get(
+  "/all-class-groups",
+  authenticate,
+  authorize("ADMIN", "MODERATOR"),
+  getAllClassGroup,
 );
 
 router.get(

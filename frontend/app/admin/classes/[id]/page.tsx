@@ -470,7 +470,7 @@ const ClassDetailPage = () => {
         }}
       />
 
-      <div className="relative z-10 mx-auto max-w-3xl space-y-6">
+      <div className="relative z-10 mx-auto max-w-6xl space-y-6">
         <motion.div
           initial={{ opacity: 0, y: 24 }}
           animate={{ opacity: 1, y: 0 }}

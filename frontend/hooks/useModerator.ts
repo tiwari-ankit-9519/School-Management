@@ -64,10 +64,10 @@ export const useCreateModerator = () => {
   return useMutation({
     mutationFn: ({ formData }: { formData: CreateModeratorFormValues }) =>
       moderatorApi.createModerator(formData), // ✅ no photoUrl
-    onSuccess: (data) => {
+    onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: QUERY_KEYS.ADMINS });
       toast.success("Moderator created successfully");
-      router.push(`/admin/moderator-detail/${data.id}`);
+      router.push(`/admin/moderators`);
     },
     onError: (error) => {
       toast.error(getErrorMessage(error));

@@ -30,11 +30,12 @@
     "trustedBy2": "Greenwood High",
     "trustedBy3": "+338 more"
   },
-  "sidebar": {
+ "sidebar": {
     "dashboard": "Dashboard",
     "schools": "Schools",
     "Admission Applications": "Admission Applications",
     "Teacher Applications": "Teacher Applications",
+    "Academic Year": "Academic Year",
     "academic year": "Academic Year",
     "subjects": "Subjects",
     "students": "Students",
@@ -49,7 +50,7 @@
     "users": "Users",
     "applications": "Applications",
     "children": "Children",
-    "moderators":"Moderators"
+    "moderators": "Moderators"
   },
   "navbar": {
     "edusphere": "EduSphere",

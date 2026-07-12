@@ -22,10 +22,68 @@ export interface NavItem {
   icon: LucideIcon;
 }
 
-export type UserRole = "ADMIN" | "STUDENT" | "TEACHER" | "PARENT";
+export type UserRole = "ADMIN" | "STUDENT" | "TEACHER" | "PARENT" | "MODERATOR";
 
 export const NAV_CONFIG: Record<UserRole, NavItem[]> = {
   ADMIN: [
+    {
+      labelKey: "dashboard",
+      href: "/admin/dashboard",
+      icon: LayoutDashboard,
+    },
+    {
+      labelKey: "Admission Applications",
+      href: "/admin/admission-applications",
+      icon: FileCheck,
+    },
+    {
+      labelKey: "Teacher Applications",
+      href: "/admin/teacher-applications",
+      icon: UserPlus,
+    },
+    {
+      labelKey: "Academic Year",
+      href: "/admin/academic-year",
+      icon: CalendarRange,
+    },
+    {
+      labelKey: "Subjects",
+      href: "/admin/subjects",
+      icon: BookOpen,
+    },
+    {
+      labelKey: "Classes",
+      href: "/admin/classes",
+      icon: School,
+    },
+    {
+      labelKey: "Students",
+      href: "/admin/students",
+      icon: GraduationCap,
+    },
+    {
+      labelKey: "Teachers",
+      href: "/admin/teachers",
+      icon: UsersRound,
+    },
+    {
+      labelKey: "Moderators",
+      href: "/admin/moderators",
+      icon: UserCog,
+    },
+    {
+      labelKey: "Fees",
+      href: "/admin/fees",
+      icon: Banknote,
+    },
+    {
+      labelKey: "Settings",
+      href: "/admin/settings",
+      icon: Settings,
+    },
+  ],
+
+  MODERATOR: [
     {
       labelKey: "dashboard",
       href: "/admin/dashboard",

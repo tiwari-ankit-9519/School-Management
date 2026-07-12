@@ -8,6 +8,7 @@ import {
   assignClassTeacherService,
   createClassService,
   getAllClassesService,
+  getAllClassGroupService,
   getSingleClassService,
   unassignClassTeacherService,
 } from "../services/class.service";
@@ -196,5 +197,27 @@ export async function unassignClassTeacher(
   res.json({
     success: true,
     message: "Class Teacher unassigned successfully",
+  });
+}
+
+export async function getAllClassGroup(
+  req: AuthenticatedRequest,
+  res: Response,
+): Promise<void> {
+  const adminId = req.user?.id;
+  if (!adminId) {
+    throw new Error("Admin ID is required");
+  }
+  const auditContext = buildAuditContext(req);
+  res.status(HTTP_STATUS.OK);
+  const classGroups = await getAllClassGroupService(
+    adminId,
+    auditContext,
+    res.statusCode,
+  );
+  res.json({
+    success: true,
+    message: "Fetched all class groups",
+    data: classGroups,
   });
 }

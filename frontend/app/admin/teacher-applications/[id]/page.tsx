@@ -372,7 +372,7 @@ const TeacherApplicationDetailPage = () => {
   // ─────────────────────────────────────────────
 
   return (
-    <div className="relative min-h-screen w-full bg-[#050810] px-3 pt-20 pb-6 sm:px-6 sm:pt-24 sm:pb-10">
+    <div className="relative min-h-screen w-full bg-[#050810] px-3 pb-6 sm:px-8 pt-10 sm:pt-8 sm:pb-10">
       <div
         className="pointer-events-none fixed inset-0 select-none"
         style={{
@@ -381,7 +381,7 @@ const TeacherApplicationDetailPage = () => {
         }}
       />
 
-      <div className="relative z-10 mx-auto max-w-2xl space-y-5">
+      <div className="relative z-10 mx-auto max-w-6xl space-y-5">
         {/* ── Header ── */}
         <motion.div
           initial={{ opacity: 0, y: 20 }}

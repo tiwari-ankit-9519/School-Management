@@ -16,7 +16,7 @@ router.post(
 );
 
 router.get(
-  "/:classId",
+  "/:classGroupId",
   authenticate,
   authorize("ADMIN", "MODERATOR"),
   getFeeStructureForClass,

@@ -1,7 +1,6 @@
 "use client";
 import { usePathname, useRouter } from "next/navigation";
-import { useState } from "react";
-import { motion, AnimatePresence } from "motion/react";
+import { motion } from "motion/react";
 import Image from "next/image";
 import Link from "next/link";
 import {
@@ -13,8 +12,6 @@ import {
   SidebarHeader,
   SidebarMenu,
   SidebarMenuItem,
-  SidebarMenuSub,
-  SidebarMenuSubItem,
   SidebarProvider,
   SidebarTrigger,
 } from "@/components/ui/sidebar";
@@ -25,13 +22,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import {
-  ChevronRight,
-  LogOut,
-  Settings,
-  User,
-  ChevronDown,
-} from "lucide-react";
+import { LogOut, Settings, User, ChevronDown } from "lucide-react";
 import { NAV_CONFIG, UserRole, NavItem } from "@/config/sidebar-config";
 import { useAuthStore } from "@/stores/useAuthStore";
 import { useLogout } from "@/hooks/useAuth";
@@ -52,74 +43,7 @@ const sidebarCssVars = {
 function NavItemRow({ item }: { item: NavItem }) {
   const pathname = usePathname();
   const t = useTranslations("sidebar");
-  const [open, setOpen] = useState(() => {
-    if (!item.children) return false;
-    return item.children.some((c) => pathname === c.href);
-  });
   const isActive = item.href ? pathname === item.href : false;
-
-  if (item.children) {
-    return (
-      <SidebarMenuItem>
-        <button
-          onClick={() => setOpen((o) => !o)}
-          className={`group w-full flex items-center gap-3 px-3 py-2.5 rounded-xl transition-all duration-200 font-manrope text-sm cursor-pointer ${
-            open
-              ? "bg-indigo-500/10 text-indigo-300"
-              : "text-white/50 hover:text-white/80 hover:bg-white/5"
-          }`}
-        >
-          <item.icon
-            className={`h-4 w-4 shrink-0 transition-colors ${
-              open
-                ? "text-indigo-400"
-                : "text-white/30 group-hover:text-white/60"
-            }`}
-          />
-          <span className="flex-1 text-left">
-            {t(item.labelKey as Parameters<typeof t>[0])}
-          </span>
-          <motion.div
-            animate={{ rotate: open ? 90 : 0 }}
-            transition={{ duration: 0.2 }}
-          >
-            <ChevronRight className="h-3.5 w-3.5 opacity-50" />
-          </motion.div>
-        </button>
-        <AnimatePresence initial={false}>
-          {open && (
-            <motion.div
-              initial={{ height: 0, opacity: 0 }}
-              animate={{ height: "auto", opacity: 1 }}
-              exit={{ height: 0, opacity: 0 }}
-              transition={{ duration: 0.2, ease: [0.16, 1, 0.3, 1] }}
-              style={{ overflow: "hidden" }}
-            >
-              <SidebarMenuSub className="ml-4 mt-1 border-l border-white/8 pl-3 space-y-0.5">
-                {item.children.map((child) => {
-                  const childActive = pathname === child.href;
-                  return (
-                    <SidebarMenuSubItem key={child.href}>
-                      <Link
-                        href={child.href}
-                        className={`block rounded-lg px-3 py-2 text-xs font-manrope transition-all duration-200 ${
-                          childActive
-                            ? "bg-indigo-500/15 text-indigo-300 font-medium"
-                            : "text-white/40 hover:text-white/70 hover:bg-white/5"
-                        }`}
-                      >
-                        {t(child.labelKey as Parameters<typeof t>[0])}
-                      </Link>
-                    </SidebarMenuSubItem>
-                  );
-                })}
-              </SidebarMenuSub>
-            </motion.div>
-          )}
-        </AnimatePresence>
-      </SidebarMenuItem>
-    );
-  }
 
   return (
     <SidebarMenuItem>
@@ -156,15 +80,14 @@ function AppSidebarInner() {
   const router = useRouter();
   const t = useTranslations("common");
   const role = user?.role as UserRole | undefined;
-  const navItems = role ? NAV_CONFIG[role] : [];
-
+  const navItems = role && NAV_CONFIG[role] ? NAV_CONFIG[role] : [];
   const roleLabel: Record<UserRole, string> = {
     ADMIN: "Admin",
     STUDENT: "Student",
     TEACHER: "Teacher",
     PARENT: "Parent",
+    MODERATOR: "Moderator",
   };
-
   const handleLogout = () => {
     logout(undefined, {
       onSuccess: () => router.push("/login"),

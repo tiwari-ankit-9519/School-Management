@@ -29,4 +29,5 @@ export const QUERY_KEYS = {
   DASHBOARD: ["dashboard"],
   ADMINS: ["admins"],
   ADMIN: ["admin"],
+  CLASSGROUP: ["classGroup"],
 };

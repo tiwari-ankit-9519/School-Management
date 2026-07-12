@@ -260,6 +260,7 @@ export interface Class {
   roomNumber: string | null;
   createdAt: string;
   updatedAt: string;
+  classGroupId: string;
   academicYear?: AcademicYear;
   classTeachers?: ClassTeacher[];
   enrollments?: Enrollment[];
@@ -692,10 +693,6 @@ export interface Mark {
   subject?: Subject;
 }
 
-// ─────────────────────────────────────────────
-// FEES
-// ─────────────────────────────────────────────
-
 export interface FeeStructure {
   id: string;
   academicYearId: string;
@@ -709,6 +706,7 @@ export interface FeeStructure {
   isActive: boolean;
   createdAt: string;
   updatedAt: string;
+  classGroupId: string;
   academicYear?: AcademicYear;
   class?: Class;
 }
@@ -1052,8 +1050,14 @@ export interface FeeStructureListItem {
   amount: number;
   dueDate: string;
   isRecurring: boolean;
+  recurringMonth: number | null;
+  description: string | null;
   isActive: boolean;
   createdAt: string;
+  updatedAt: string;
+  classGroupId: string;
+  academicYear?: AcademicYear;
+  class?: Class;
 }
 
 export interface LeaveRequestListItem {
@@ -1227,10 +1231,6 @@ export type PaginatedTeacherAttendance =
   PaginatedResponse<TeacherAttendanceListItem>;
 export type PaginatedEnrollments = PaginatedResponse<EnrollmentListItem>;
 export type PaginatedIPBlacklist = PaginatedResponse<IPBlacklistListItem>;
-
-// ─────────────────────────────────────────────
-// API RESPONSE WRAPPER
-// ─────────────────────────────────────────────
 
 export interface ApiResponse<T> {
   success: boolean;
