@@ -204,10 +204,6 @@ export enum Module {
   RATE_LIMIT = "RATE_LIMIT",
 }
 
-// ─────────────────────────────────────────────
-// CORE MODELS
-// ─────────────────────────────────────────────
-
 export type AdmissionClass = {
   id: string;
   name: string;

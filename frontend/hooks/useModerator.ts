@@ -1,7 +1,10 @@
 import api, { getErrorMessage } from "@/lib/api";
 import { QUERY_KEYS } from "@/lib/constants";
 import { ApiResponse, PaginatedAdmins, SingleAdminInfo } from "@/types";
-import { CreateModeratorFormValues } from "@/validations/validations";
+import {
+  CreateModeratorFormValues,
+  UpdateUserPermissionFormValues,
+} from "@/validations/validations";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
@@ -56,6 +59,16 @@ const moderatorApi = {
     );
     return response.data.data;
   },
+  updateUserPermissions: async (
+    userId: string,
+    data: UpdateUserPermissionFormValues,
+  ): Promise<void> => {
+    const response = await api.patch<ApiResponse<void>>(
+      `/school/users/${userId}/permissions`,
+      data,
+    );
+    return response.data.data;
+  },
 };
 
 export const useCreateModerator = () => {
@@ -92,5 +105,22 @@ export const useGetSingleAdmin = (adminId: string) => {
     queryKey: [...QUERY_KEYS.ADMIN, adminId],
     queryFn: () => moderatorApi.getSingleAdmin(adminId),
     enabled: !!adminId,
+  });
+};
+
+export const useUpdateUserPermissions = (userId: string) => {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (data: UpdateUserPermissionFormValues) =>
+      moderatorApi.updateUserPermissions(userId, data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({
+        queryKey: [...QUERY_KEYS.ADMIN, userId],
+      });
+      toast.success("User permissions updated successfully");
+    },
+    onError: (error) => {
+      toast.error(getErrorMessage(error));
+    },
   });
 };

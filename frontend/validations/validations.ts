@@ -725,10 +725,6 @@ export const FeesStructureUpdatePayload = z.object({
   isRecurring: z.boolean().optional(),
 });
 
-// ─────────────────────────────────────────────
-// INFERRED FORM VALUE TYPES
-// ─────────────────────────────────────────────
-
 export type FeesStructureType = z.infer<typeof FeesStructureSchema>;
 export type FeeStructureUpdateType = z.infer<typeof FeesStructureUpdatePayload>;
 export type LoginFormValues = z.infer<typeof loginSchema>;

@@ -1518,15 +1518,15 @@ export async function updateUserPermissionsService(
       targetUserId: data.userId,
     });
 
-    const targetUser = await prisma.user.findUnique({
+    const targetUser = await prisma.user.findFirst({
       where: {
-        id: data.userId,
+        admin: { id: data.userId },
       },
       select: {
         id: true,
         role: true,
         regNumber: true,
-        permissions: true,
+        userPermission: true,
       },
     });
 
@@ -1558,16 +1558,23 @@ export async function updateUserPermissionsService(
       );
     }
 
-    const oldPermissions = targetUser.permissions;
+    const oldPermissions = targetUser.userPermission.map((p) => ({
+      module: p.module,
+      canCreate: p.canCreate,
+      canRead: p.canRead,
+      canUpdate: p.canUpdate,
+      canDelete: p.canDelete,
+      canApprove: p.canApprove,
+      canExport: p.canExport,
+    }));
 
     const result = await prisma.$transaction(async (tx) => {
       await tx.userPermission.deleteMany({
-        where: { userId: data.userId },
+        where: { userId: targetUser.id }, // ✅ real User.id
       });
-
       await tx.userPermission.createMany({
         data: data.permissions.map((p) => ({
-          userId: data.userId,
+          userId: targetUser.id, // ✅ real User.id
           module: p.module,
           canCreate: p.canCreate,
           canRead: p.canRead,
@@ -1577,9 +1584,8 @@ export async function updateUserPermissionsService(
           canExport: p.canExport,
         })),
       });
-
       return await tx.user.findUniqueOrThrow({
-        where: { id: data.userId },
+        where: { id: targetUser.id }, // ✅ real User.id
         select: {
           id: true,
           regNumber: true,
