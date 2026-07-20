@@ -29,6 +29,9 @@ import { useLogout } from "@/hooks/useAuth";
 import { useTranslations } from "@/hooks/useTranslations";
 import { LanguageToggle } from "@/components/LanguageToggle";
 
+const SCHOOL_NAME = "Nageshwari Devi Shree Krishna Girls Inter College";
+const SCHOOL_CODE = "N.D.S.K.G.I.C.";
+
 const sidebarCssVars = {
   "--sidebar-background": "#060a14",
   "--sidebar-foreground": "rgba(255,255,255,0.5)",
@@ -44,7 +47,6 @@ function NavItemRow({ item }: { item: NavItem }) {
   const pathname = usePathname();
   const t = useTranslations("sidebar");
   const isActive = item.href ? pathname === item.href : false;
-
   return (
     <SidebarMenuItem>
       <Link
@@ -93,7 +95,6 @@ function AppSidebarInner() {
       onSuccess: () => router.push("/login"),
     });
   };
-
   return (
     <Sidebar
       style={sidebarCssVars}
@@ -104,18 +105,21 @@ function AppSidebarInner() {
           <div className="w-8 h-8 rounded-xl bg-indigo-500/20 border border-indigo-400/30 flex items-center justify-center shrink-0">
             <Image
               src="/logo.png"
-              alt="EduSphere"
+              alt={SCHOOL_NAME}
               width={20}
               height={20}
               className="object-contain"
             />
           </div>
-          <div>
+          <div className="min-w-0">
             <span className="text-white text-sm font-bold font-jakarta tracking-tight block leading-none">
-              EduSphere
+              {SCHOOL_CODE}
             </span>
-            <span className="text-white/30 text-[10px] font-manrope">
-              School Management
+            <span
+              className="text-white/30 text-[10px] font-manrope truncate block max-w-40"
+              title={SCHOOL_NAME}
+            >
+              {SCHOOL_NAME}
             </span>
           </div>
         </div>
@@ -189,7 +193,7 @@ export function AppSidebar({ children }: { children: React.ReactNode }) {
             <SidebarTrigger className="text-white/50 hover:text-white transition-colors" />
             <div className="flex items-center gap-2">
               <span className="text-white text-sm font-bold font-jakarta">
-                EduSphere
+                {SCHOOL_CODE}
               </span>
             </div>
           </div>

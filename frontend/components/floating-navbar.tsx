@@ -50,17 +50,15 @@ export function FloatingNavbar() {
           }`}
         >
           <Link href="/" className="flex items-center gap-2.5 shrink-0">
-            <div className="w-7 h-7 rounded-lg bg-indigo-500/20 border border-indigo-400/30 flex items-center justify-center">
-              <Image
-                src="/logo.png"
-                alt="EduSphere"
-                width={16}
-                height={16}
-                className="object-contain"
-              />
-            </div>
+            <Image
+              src="/logo.png"
+              alt="EduSphere"
+              width={16}
+              height={16}
+              className="object-contain"
+            />
             <span className="text-white text-sm font-bold font-jakarta tracking-tight">
-              EduSphere
+              N.D.S.K.G.I.C.
             </span>
           </Link>
           <div className="hidden md:flex items-center gap-1">

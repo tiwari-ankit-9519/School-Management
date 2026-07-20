@@ -567,7 +567,7 @@ model Student {
   updatedAt         DateTime              @updatedAt
   user              User                  @relation(fields: [userId], references: [id], onDelete: Cascade)
   admission         AdmissionApplication? @relation(fields: [admissionId], references: [id])
-  parent            Parent?               @relation("StudentParent")
+  parentLinks       ParentStudent[]
   enrollments       Enrollment[]
   attendances       StudentAttendance[]
   marks             Mark[]
@@ -581,18 +581,32 @@ model Student {
 }
 
 model Parent {
-  id             String     @id @default(cuid())
-  userId         String     @unique
-  studentId      String     @unique
+  id             String          @id @default(cuid())
+  userId         String          @unique
   firstName      String
   lastName       String
-  parentType     ParentType
   alternatePhone String?
-  createdAt      DateTime   @default(now())
-  updatedAt      DateTime   @updatedAt
-  user           User       @relation(fields: [userId], references: [id], onDelete: Cascade)
-  student        Student    @relation("StudentParent", fields: [studentId], references: [id], onDelete: Cascade)
-  documents      Document[] @relation("ParentDocuments")
+  createdAt      DateTime        @default(now())
+  updatedAt      DateTime        @updatedAt
+  user           User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+  children       ParentStudent[]
+  documents      Document[]      @relation("ParentDocuments")
+
+  @@index([userId])
+}
+
+model ParentStudent {
+  id         String     @id @default(cuid())
+  parentId   String
+  studentId  String
+  parentType ParentType
+  createdAt  DateTime   @default(now())
+  parent     Parent     @relation(fields: [parentId], references: [id], onDelete: Cascade)
+  student    Student    @relation(fields: [studentId], references: [id], onDelete: Cascade)
+
+  @@unique([parentId, studentId])
+  @@index([parentId])
+  @@index([studentId])
 }
 
 model Enrollment {

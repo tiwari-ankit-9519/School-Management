@@ -12,19 +12,19 @@ import { generateRegistrationNumber } from "../utils/registration.util";
 const log = createModuleLogger("Seeder");
 
 const SCHOOL_CONFIG_DATA = {
-  name: "Your School Name",
-  code: "SCH001",
-  address: "123 School Street",
-  city: "City",
-  state: "State",
-  country: "Country",
-  pincode: "000000",
+  name: "Nageshwari Devi Shree Krishna Girls Inter College",
+  code: "N.D.S.K.G.I.C",
+  address: "Vill + Post - Ukachhi",
+  city: "Ballia",
+  state: "Uttar Pradesh",
+  country: "India",
+  pincode: "277124",
   phone: "+000000000000",
   email: "school@example.com",
   website: "https://example.com",
   establishedYear: 2000,
   affiliationNumber: "AFF001",
-  boardType: "CBSE",
+  boardType: "UP Board",
   isActive: true,
 };
 
@@ -34,7 +34,7 @@ const ADMIN_DATA = {
   firstName: "Ankit",
   lastName: "Tiwari",
   gender: "MALE" as const,
-  designation: "Principal",
+  designation: "Administrator",
   department: "Administration",
 };
 

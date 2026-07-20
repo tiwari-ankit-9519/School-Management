@@ -509,7 +509,7 @@ export interface Student {
   createdAt: string;
   updatedAt: string;
   user?: SafeUser;
-  parent?: Parent;
+  parentLinks?: ParentStudent[];
   enrollments?: Enrollment[];
   attendances?: StudentAttendance[];
   marks?: Mark[];
@@ -520,10 +520,10 @@ export interface Student {
 
 export interface StudentWithDetails extends Omit<
   Student,
-  "user" | "parent" | "enrollments"
+  "user" | "parentLinks" | "enrollments"
 > {
   user: SafeUser;
-  parent: Parent | undefined;
+  parentLinks: ParentStudent[];
   enrollments: Enrollment[];
 }
 
@@ -560,15 +560,13 @@ export interface Enrollment {
 export interface Parent {
   id: string;
   userId: string;
-  studentId: string;
   firstName: string;
   lastName: string;
-  parentType: ParentType;
   alternatePhone: string | null;
   createdAt: string;
   updatedAt: string;
   user?: SafeUser;
-  student?: Student;
+  children?: ParentStudent[];
   documents?: Document[];
 }
 
@@ -1152,14 +1150,51 @@ export interface TeacherAttendanceListItem {
   markedBy: string | null;
 }
 
-export interface EnrollmentListItem {
+export interface ParentStudent {
   id: string;
+  parentId: string;
   studentId: string;
-  classId: string;
-  academicYearId: string;
-  rollNumber: string | null;
+  parentType: ParentType;
+  createdAt: string;
+  parent?: Parent;
+  student?: Student;
+}
+
+export interface EnrollmentListItem {
+  studentId: string;
   status: EnrollmentStatus;
-  enrolledAt: string;
+  academicYearId: string;
+  class: {
+    name: string;
+    section: string;
+  };
+  student: {
+    firstName: string;
+    lastName: string;
+    gender: Gender;
+    dateOfBirth: string;
+    address: string;
+    city: string;
+    state: string;
+    enrollmentStatus: EnrollmentStatus;
+    admissionDate: string;
+    user: {
+      email: string | null;
+      phone: string | null;
+    };
+    parentLinks: {
+      parentType: ParentType;
+      parent: {
+        firstName: string;
+        lastName: string;
+        alternatePhone: string | null;
+        user: {
+          email: string | null;
+          phone: string | null;
+        };
+      };
+    }[];
+  };
 }
 
 export interface IPBlacklistListItem {

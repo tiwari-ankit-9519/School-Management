@@ -9,10 +9,6 @@ import {
   Module,
 } from "@/types";
 
-// ─────────────────────────────────────────────
-// HELPERS
-// ─────────────────────────────────────────────
-
 const enumValues = <T extends Record<string, string>>(e: T) =>
   Object.values(e) as [string, ...string[]];
 
@@ -30,10 +26,6 @@ const classGrade = z.preprocess(
     ])
     .optional(),
 );
-
-// ─────────────────────────────────────────────
-// AUTH
-// ─────────────────────────────────────────────
 
 export const loginSchema = z.object({
   identifier: z

@@ -64,7 +64,8 @@ export type TeacherListPayload = Prisma.TeacherGetPayload<typeof TeacherList>;
 
 export const StudentList = Prisma.validator<Prisma.EnrollmentDefaultArgs>()({
   select: {
-    id: true,
+    studentId: true,
+    status: true,
     class: {
       select: {
         name: true,
@@ -74,9 +75,39 @@ export const StudentList = Prisma.validator<Prisma.EnrollmentDefaultArgs>()({
     academicYearId: true,
     student: {
       select: {
-        id: true,
         firstName: true,
         lastName: true,
+        gender: true,
+        dateOfBirth: true,
+        address: true,
+        city: true,
+        state: true,
+        enrollmentStatus: true,
+        admissionDate: true,
+        user: {
+          select: {
+            email: true,
+            phone: true,
+          },
+        },
+        parentLinks: {
+          select: {
+            parentType: true,
+            parent: {
+              select: {
+                firstName: true,
+                lastName: true,
+                alternatePhone: true,
+                user: {
+                  select: {
+                    email: true,
+                    phone: true,
+                  },
+                },
+              },
+            },
+          },
+        },
       },
     },
   },

@@ -10,6 +10,9 @@ import Image from "next/image";
 import { LoginFormValues, loginSchema } from "@/validations/validations";
 import { useTranslations } from "@/hooks/useTranslations";
 
+const SCHOOL_NAME = "Nageshwari Devi Shree Krishna Girls Inter College";
+const SCHOOL_CODE = "N.D.S.K.G.I.C.";
+
 const LoginPage = () => {
   const t = useTranslations("login");
   const { mutate: login, isPending } = useLogin();
@@ -22,14 +25,11 @@ const LoginPage = () => {
     resolver: zodResolver(loginSchema),
     defaultValues: { identifier: "", password: "" },
   });
-
   const identifierValue = useWatch({ control, name: "identifier" });
   const passwordValue = useWatch({ control, name: "password" });
-
   const onSubmit = (data: LoginFormValues) => {
     login(data);
   };
-
   return (
     <div className="relative min-h-screen w-full overflow-hidden bg-[#050810] flex items-center justify-center px-4 py-12 sm:px-6">
       <div className="absolute inset-0 overflow-hidden pointer-events-none select-none">
@@ -40,7 +40,23 @@ const LoginPage = () => {
               "radial-gradient(ellipse at 30% 50%, #1e3a5f22 0%, transparent 60%), radial-gradient(ellipse at 75% 40%, #0ea5e910 0%, transparent 55%), radial-gradient(ellipse at 50% 80%, #6366f108 0%, transparent 50%)",
           }}
         />
-
+        <div
+          className="absolute top-1/2 left-[26%] -translate-x-1/2 -translate-y-1/2 w-175 h-175 opacity-[0.05]"
+          style={{
+            maskImage:
+              "radial-gradient(circle at center, black 0%, black 30%, transparent 68%)",
+            WebkitMaskImage:
+              "radial-gradient(circle at center, black 0%, black 30%, transparent 68%)",
+          }}
+        >
+          <Image
+            src="/logo.png"
+            alt=""
+            fill
+            className="object-contain"
+            aria-hidden="true"
+          />
+        </div>
         <motion.div
           initial={{ opacity: 0, rotate: -6, y: 60 }}
           animate={{ opacity: 1, rotate: -6, y: 0 }}
@@ -56,13 +72,11 @@ const LoginPage = () => {
                 "url(\"data:image/svg+xml,%3Csvg width='60' height='60' viewBox='0 0 60 60' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='none' fill-rule='evenodd'%3E%3Cg fill='%23ffffff' fill-opacity='1'%3E%3Cpath d='M36 34v-4h-2v4h-4v2h4v4h2v-4h4v-2h-4zm0-30V0h-2v4h-4v2h4v4h2V6h4V4h-4zM6 34v-4H4v4H0v2h4v4h2v-4h4v-2H6zM6 4V0H4v4H0v2h4v4h2V6h4V4H6z'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E\")",
             }}
           />
-
-          {/* Image Section */}
           <div className="absolute inset-0 flex flex-col justify-between p-8 xl:p-12">
             <div className="flex items-start justify-between">
               <div>
                 <div className="text-white/30 text-xs font-manrope uppercase tracking-widest mb-1">
-                  {t("platformPreview")}
+                  {t("institutionOverview")}
                 </div>
                 <div className="text-white text-lg font-bold font-jakarta">
                   {t("schoolDashboard")}
@@ -81,20 +95,20 @@ const LoginPage = () => {
                 {[
                   {
                     labelKey: "students",
-                    value: "12,840",
-                    delta: "+4.2%",
+                    value: "1,240",
+                    delta: "+3.1%",
                     up: true,
                   },
                   {
-                    labelKey: "schools",
-                    value: "340",
-                    delta: "+12%",
+                    labelKey: "teachingStaff",
+                    value: "68",
+                    delta: "+2",
                     up: true,
                   },
                   {
-                    labelKey: "staff",
-                    value: "2,910",
-                    delta: "+1.8%",
+                    labelKey: "classSections",
+                    value: "42",
+                    delta: "12",
                     up: true,
                   },
                 ].map((s) => (
@@ -149,7 +163,7 @@ const LoginPage = () => {
                     91.4%
                   </span>
                   <span className="text-white/30 text-xs font-manrope">
-                    {t("acrossSchools")}
+                    {t("thisSession")}
                   </span>
                 </div>
               </div>
@@ -157,13 +171,13 @@ const LoginPage = () => {
                 {[
                   {
                     labelKey: "feeCollection",
-                    value: "₹4.2Cr",
+                    value: "₹18.6L",
                     subKey: "thisMonth",
                     color: "from-indigo-500/20 to-indigo-600/5",
                   },
                   {
                     labelKey: "avgPerformance",
-                    value: "78.3%",
+                    value: "81.2%",
                     subKey: "boardExams",
                     color: "from-sky-500/20 to-sky-600/5",
                   },
@@ -186,18 +200,15 @@ const LoginPage = () => {
               </div>
             </div>
           </div>
-
           <div className="absolute inset-0 bg-linear-to-r from-[#050810] via-[#050810]/30 to-transparent pointer-events-none" />
           <div className="absolute inset-0 bg-linear-to-t from-[#050810]/60 via-transparent to-transparent pointer-events-none" />
         </motion.div>
       </div>
-
-      {/* Form Section */}
       <motion.div
         initial={{ opacity: 0, y: 32 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.7, ease: [0.16, 1, 0.3, 1] }}
-        className="relative z-10 w-full max-w-105"
+        className="relative z-10 w-full max-w-120"
       >
         <div className="relative bg-white/4 border border-white/10 rounded-3xl p-8 sm:p-10 backdrop-blur-2xl shadow-[0_0_0_1px_rgba(255,255,255,0.05),0_32px_80px_rgba(0,0,0,0.6)]">
           <div className="absolute inset-0 rounded-3xl overflow-hidden pointer-events-none">
@@ -205,25 +216,21 @@ const LoginPage = () => {
             <div className="absolute inset-x-0 bottom-0 h-px bg-linear-to-r from-transparent via-white/5 to-transparent" />
           </div>
           <div className="mb-8">
-            <div className="flex items-center justify-between mb-8">
-              <div className="flex items-center gap-3">
-                <div className="w-9 h-9 rounded-xl bg-indigo-500/20 border border-indigo-400/30 flex items-center justify-center shrink-0">
-                  <Image
-                    src="/logo.png"
-                    alt="EduSphere Logo"
-                    width={24}
-                    height={24}
-                    className="object-contain"
-                  />
-                </div>
-                <div>
-                  <span className="text-white text-sm font-bold font-jakarta tracking-tight block leading-none">
-                    EduSphere
-                  </span>
-                  <span className="text-white/30 text-xs font-manrope">
-                    {t("saasTagline")}
-                  </span>
-                </div>
+            <div className="flex items-center gap-3 mb-8">
+              <Image
+                src="/logo.png"
+                alt={`${SCHOOL_NAME} Logo`}
+                width={40}
+                height={40}
+                className="object-contain"
+              />
+              <div className="min-w-0">
+                <span className="text-white text-sm font-bold font-jakarta tracking-tight block leading-tight truncate">
+                  {t("schoolName")}
+                </span>
+                <span className="text-indigo-300/70 text-xs font-manrope tracking-wide">
+                  {SCHOOL_CODE}
+                </span>
               </div>
             </div>
             <h1 className="text-2xl sm:text-3xl font-extrabold font-jakarta text-white leading-tight mb-1.5">
@@ -233,7 +240,6 @@ const LoginPage = () => {
               {t("signInSub")}
             </p>
           </div>
-
           <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
             <div className="space-y-1.5">
               <AnimatedInput
@@ -322,7 +328,6 @@ const LoginPage = () => {
               )}
             </Button>
           </form>
-
           <div className="mt-6 pt-6 border-t border-white/6">
             <p className="text-center text-xs text-white/30 font-manrope">
               {t("needAccess")}{" "}
@@ -342,5 +347,4 @@ const LoginPage = () => {
     </div>
   );
 };
-
 export default LoginPage;

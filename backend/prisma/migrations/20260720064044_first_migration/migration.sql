@@ -5,13 +5,13 @@ CREATE TYPE "Role" AS ENUM ('ADMIN', 'TEACHER', 'STUDENT', 'PARENT', 'MODERATOR'
 CREATE TYPE "Gender" AS ENUM ('MALE', 'FEMALE', 'OTHER');
 
 -- CreateEnum
-CREATE TYPE "AdmissionStatus" AS ENUM ('PENDING', 'APPROVED', 'REJECTED', 'WAITLISTED');
+CREATE TYPE "AdmissionStatus" AS ENUM ('PENDING', 'WAITLISTED', 'APPROVED', 'REJECTED', 'SLOT_OFFERED', 'OFFER_EXPIRED', 'OFFER_DECLINED');
 
 -- CreateEnum
 CREATE TYPE "ApplicationStatus" AS ENUM ('PENDING', 'SHORTLISTED', 'SELECTED', 'REJECTED');
 
 -- CreateEnum
-CREATE TYPE "EnrollmentStatus" AS ENUM ('ACTIVE', 'INACTIVE', 'SUSPENDED', 'GRADUATED', 'TRANSFERRED', 'EXPELLED');
+CREATE TYPE "EnrollmentStatus" AS ENUM ('ACTIVE', 'INACTIVE', 'SUSPENDED', 'GRADUATED', 'TRANSFERRED', 'EXPELLED', 'WITHDRAWN');
 
 -- CreateEnum
 CREATE TYPE "EmploymentStatus" AS ENUM ('ACTIVE', 'INACTIVE', 'SUSPENDED', 'TERMINATED', 'ON_LEAVE');
@@ -91,6 +91,13 @@ CREATE TABLE "AcademicYear" (
 );
 
 -- CreateTable
+CREATE TABLE "ClassGroup" (
+    "id" TEXT NOT NULL,
+    "name" TEXT NOT NULL,
+    CONSTRAINT "ClassGroup_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
 CREATE TABLE "Class" (
     "id" TEXT NOT NULL,
     "academicYearId" TEXT NOT NULL,
@@ -100,6 +107,7 @@ CREATE TABLE "Class" (
     "roomNumber" TEXT,
     "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "updatedAt" TIMESTAMP(3) NOT NULL,
+    "classGroupId" TEXT NOT NULL,
     CONSTRAINT "Class_pkey" PRIMARY KEY ("id")
 );
 
@@ -308,6 +316,9 @@ CREATE TABLE "AdmissionApplication" (
     "updatedAt" TIMESTAMP(3) NOT NULL,
     "photoUrl" TEXT,
     "guardianPhotoUrl" TEXT,
+    "slotOfferedAt" TIMESTAMP(3),
+    "slotExpiresAt" TIMESTAMP(3),
+    "slotOfferedClass" TEXT,
     CONSTRAINT "AdmissionApplication_pkey" PRIMARY KEY ("id")
 );
 
@@ -338,14 +349,22 @@ CREATE TABLE "Student" (
 CREATE TABLE "Parent" (
     "id" TEXT NOT NULL,
     "userId" TEXT NOT NULL,
-    "studentId" TEXT NOT NULL,
     "firstName" TEXT NOT NULL,
     "lastName" TEXT NOT NULL,
-    "parentType" "ParentType" NOT NULL,
     "alternatePhone" TEXT,
     "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "updatedAt" TIMESTAMP(3) NOT NULL,
     CONSTRAINT "Parent_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
+CREATE TABLE "ParentStudent" (
+    "id" TEXT NOT NULL,
+    "parentId" TEXT NOT NULL,
+    "studentId" TEXT NOT NULL,
+    "parentType" "ParentType" NOT NULL,
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT "ParentStudent_pkey" PRIMARY KEY ("id")
 );
 
 -- CreateTable
@@ -471,6 +490,7 @@ CREATE TABLE "FeeStructure" (
     "isActive" BOOLEAN NOT NULL DEFAULT true,
     "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "updatedAt" TIMESTAMP(3) NOT NULL,
+    "classGroupId" TEXT NOT NULL,
     CONSTRAINT "FeeStructure_pkey" PRIMARY KEY ("id")
 );
 
@@ -731,6 +751,9 @@ CREATE UNIQUE INDEX "AcademicYear_name_key" ON "AcademicYear" ("name");
 CREATE INDEX "AcademicYear_isCurrent_idx" ON "AcademicYear" ("isCurrent");
 
 -- CreateIndex
+CREATE UNIQUE INDEX "ClassGroup_name_key" ON "ClassGroup" ("name");
+
+-- CreateIndex
 CREATE INDEX "Class_academicYearId_idx" ON "Class" ("academicYearId");
 
 -- CreateIndex
@@ -871,7 +894,16 @@ CREATE INDEX "Student_admissionId_idx" ON "Student" ("admissionId");
 CREATE UNIQUE INDEX "Parent_userId_key" ON "Parent" ("userId");
 
 -- CreateIndex
-CREATE UNIQUE INDEX "Parent_studentId_key" ON "Parent" ("studentId");
+CREATE INDEX "Parent_userId_idx" ON "Parent" ("userId");
+
+-- CreateIndex
+CREATE INDEX "ParentStudent_parentId_idx" ON "ParentStudent" ("parentId");
+
+-- CreateIndex
+CREATE INDEX "ParentStudent_studentId_idx" ON "ParentStudent" ("studentId");
+
+-- CreateIndex
+CREATE UNIQUE INDEX "ParentStudent_parentId_studentId_key" ON "ParentStudent" ("parentId", "studentId");
 
 -- CreateIndex
 CREATE INDEX "Enrollment_studentId_idx" ON "Enrollment" ("studentId");
@@ -1210,6 +1242,10 @@ ALTER TABLE "Class"
 ADD CONSTRAINT "Class_academicYearId_fkey" FOREIGN KEY ("academicYearId") REFERENCES "AcademicYear" ("id") ON DELETE CASCADE ON UPDATE CASCADE;
 
 -- AddForeignKey
+ALTER TABLE "Class"
+ADD CONSTRAINT "Class_classGroupId_fkey" FOREIGN KEY ("classGroupId") REFERENCES "ClassGroup" ("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+
+-- AddForeignKey
 ALTER TABLE "Session"
 ADD CONSTRAINT "Session_userId_fkey" FOREIGN KEY ("userId") REFERENCES "User" ("id") ON DELETE CASCADE ON UPDATE CASCADE;
 
@@ -1258,8 +1294,12 @@ ALTER TABLE "Parent"
 ADD CONSTRAINT "Parent_userId_fkey" FOREIGN KEY ("userId") REFERENCES "User" ("id") ON DELETE CASCADE ON UPDATE CASCADE;
 
 -- AddForeignKey
-ALTER TABLE "Parent"
-ADD CONSTRAINT "Parent_studentId_fkey" FOREIGN KEY ("studentId") REFERENCES "Student" ("id") ON DELETE CASCADE ON UPDATE CASCADE;
+ALTER TABLE "ParentStudent"
+ADD CONSTRAINT "ParentStudent_parentId_fkey" FOREIGN KEY ("parentId") REFERENCES "Parent" ("id") ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "ParentStudent"
+ADD CONSTRAINT "ParentStudent_studentId_fkey" FOREIGN KEY ("studentId") REFERENCES "Student" ("id") ON DELETE CASCADE ON UPDATE CASCADE;
 
 -- AddForeignKey
 ALTER TABLE "Enrollment"
@@ -1332,6 +1372,10 @@ ADD CONSTRAINT "FeeStructure_academicYearId_fkey" FOREIGN KEY ("academicYearId")
 -- AddForeignKey
 ALTER TABLE "FeeStructure"
 ADD CONSTRAINT "FeeStructure_classId_fkey" FOREIGN KEY ("classId") REFERENCES "Class" ("id") ON DELETE SET NULL ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "FeeStructure"
+ADD CONSTRAINT "FeeStructure_classGroupId_fkey" FOREIGN KEY ("classGroupId") REFERENCES "ClassGroup" ("id") ON DELETE RESTRICT ON UPDATE CASCADE;
 
 -- AddForeignKey
 ALTER TABLE "FeePayment"
@@ -1441,29 +1485,8 @@ CREATE TRIGGER trg_prevent_reg_change
   WHEN (OLD."regNumber" IS DISTINCT FROM NEW."regNumber")
   EXECUTE FUNCTION trg_fn_prevent_reg_change();
 
--- Partial unique index for TeacherSubject where classId is NULL
+-- Partial unique index: a teacher can only be assigned to a subject
+-- without a specific class once (classId IS NULL means "all classes")
 CREATE UNIQUE INDEX "TeacherSubject_teacherId_subjectId_no_class_key" ON "TeacherSubject" ("teacherId", "subjectId")
 WHERE
     "classId" IS NULL;
-
--- AlterEnum
--- This migration adds more than one value to an enum.
--- With PostgreSQL versions 11 and earlier, this is not possible
--- in a single migration. This can be worked around by creating
--- multiple migrations, each migration adding only one value to
--- the enum.
-
-ALTER TYPE "AdmissionStatus" ADD VALUE 'SLOT_OFFERED';
-
-ALTER TYPE "AdmissionStatus" ADD VALUE 'OFFER_EXPIRED';
-
-ALTER TYPE "AdmissionStatus" ADD VALUE 'OFFER_DECLINED';
-
--- AlterTable
-ALTER TABLE "AdmissionApplication"
-ADD COLUMN "slotExpiresAt" TIMESTAMP(3),
-ADD COLUMN "slotOfferedAt" TIMESTAMP(3),
-ADD COLUMN "slotOfferedClass" TEXT;
-
--- AlterEnum
-ALTER TYPE "EnrollmentStatus" ADD VALUE 'WITHDRAWN';

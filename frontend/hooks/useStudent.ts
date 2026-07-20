@@ -4,7 +4,7 @@ import {
   ApiResponse,
   EnrollmentStatus,
   Gender,
-  PaginatedStudents,
+  PaginatedEnrollments,
   StudentWithDetails,
 } from "@/types";
 import { useQuery } from "@tanstack/react-query";
@@ -19,7 +19,7 @@ export const studentApi = {
     },
     page: number = 1,
     limit: number = 10,
-  ): Promise<PaginatedStudents> => {
+  ): Promise<PaginatedEnrollments> => {
     const params = new URLSearchParams({
       page: String(page),
       limit: String(limit),
@@ -29,8 +29,8 @@ export const studentApi = {
     if (filters.classId) params.set("classId", filters.classId);
     if (filters.status) params.set("status", filters.status);
     if (filters.gender) params.set("gender", filters.gender);
-    const response = await api.get<ApiResponse<PaginatedStudents>>(
-      `/school/subject/all-subjects?${params.toString()}`,
+    const response = await api.get<ApiResponse<PaginatedEnrollments>>(
+      `/school/students/all?${params.toString()}`,
     );
     return response.data.data;
   },

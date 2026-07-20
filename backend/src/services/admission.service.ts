@@ -58,7 +58,6 @@ export async function createStudentFromApprovedApplication(
   );
   if (!admissionApplication) throw new Error(`Application not found`);
   if (!currentAcademicYear) throw new Error(`No active academic year found`);
-
   const classExists = await prisma.class.findUnique({
     where: { id: classId },
     select: {
@@ -75,15 +74,10 @@ export async function createStudentFromApprovedApplication(
       `Class not found or does not belong to current academic year`,
     );
   }
-
   const response = await prisma.$transaction(async (tx) => {
     const studentRegNumber = await generateRegistrationNumber(Role.STUDENT);
-    const parentRegNumber = await generateRegistrationNumber(Role.PARENT);
     const studentTempPassword = `STUDENT@${Math.random().toString(36).slice(-8)}`;
-    const parentTempPassword = `PARENT@${Math.random().toString(36).slice(-8)}`;
     const hashedPasswordStudent = await hashPassword(studentTempPassword);
-    const hashedPasswordParent = await hashPassword(parentTempPassword);
-
     const enrollmentCount = await tx.$queryRaw<[{ count: bigint }]>`
       SELECT COUNT(*) as count FROM (
         SELECT id FROM "Enrollment"
@@ -98,7 +92,6 @@ export async function createStudentFromApprovedApplication(
         `Class ${classExists.name}-${classExists.section} is at full capacity`,
       );
     }
-
     const studentUser = await tx.user.create({
       data: {
         regNumber: studentRegNumber,
@@ -110,7 +103,6 @@ export async function createStudentFromApprovedApplication(
         role: "STUDENT",
       },
     });
-
     const student = await tx.student.create({
       data: {
         userId: studentUser.id,
@@ -125,29 +117,60 @@ export async function createStudentFromApprovedApplication(
         pincode: admissionApplication.pincode,
       },
     });
-
-    const parentUser = await tx.user.create({
-      data: {
-        regNumber: parentRegNumber,
-        email: admissionApplication.guardianEmail,
-        phone: admissionApplication.guardianPhone,
-        passwordHash: hashedPasswordParent,
-        isActive: true,
-        isVerified: false,
-        role: "PARENT",
-      },
-    });
-
-    await tx.parent.create({
-      data: {
-        userId: parentUser.id,
-        studentId: student.id,
-        firstName: admissionApplication.guardianFirstName,
-        lastName: admissionApplication.guardianLastName,
-        parentType: admissionApplication.guardianRelation,
-      },
-    });
-
+    let existingParent = admissionApplication.guardianEmail
+      ? await tx.parent.findFirst({
+          where: { user: { email: admissionApplication.guardianEmail } },
+          include: { user: { select: safeUserSelect } },
+        })
+      : null;
+    if (!existingParent && admissionApplication.guardianPhone) {
+      existingParent = await tx.parent.findFirst({
+        where: { user: { phone: admissionApplication.guardianPhone } },
+        include: { user: { select: safeUserSelect } },
+      });
+    }
+    let parentRegNumber: string;
+    let parentTempPassword: string | null = null;
+    if (existingParent) {
+      parentRegNumber = existingParent.user.regNumber;
+      await tx.parentStudent.create({
+        data: {
+          parentId: existingParent.id,
+          studentId: student.id,
+          parentType: admissionApplication.guardianRelation,
+        },
+      });
+    } else {
+      parentRegNumber = await generateRegistrationNumber(Role.PARENT);
+      parentTempPassword = `PARENT@${Math.random().toString(36).slice(-8)}`;
+      const hashedPasswordParent = await hashPassword(parentTempPassword);
+      const parentUser = await tx.user.create({
+        data: {
+          regNumber: parentRegNumber,
+          email: admissionApplication.guardianEmail,
+          phone: admissionApplication.guardianPhone,
+          passwordHash: hashedPasswordParent,
+          isActive: true,
+          isVerified: false,
+          role: "PARENT",
+        },
+      });
+      const parent = await tx.parent.create({
+        data: {
+          userId: parentUser.id,
+          firstName: admissionApplication.guardianFirstName,
+          lastName: admissionApplication.guardianLastName,
+          alternatePhone: null,
+        },
+      });
+      await tx.parentStudent.create({
+        data: {
+          parentId: parent.id,
+          studentId: student.id,
+          parentType: admissionApplication.guardianRelation,
+        },
+      });
+    }
     await tx.enrollment.create({
       data: {
         studentId: student.id,
@@ -156,7 +179,6 @@ export async function createStudentFromApprovedApplication(
         status: "ACTIVE",
       },
     });
-
     await tx.admissionApplication.update({
       where: { id: applicationId },
       data: {
@@ -170,7 +192,6 @@ export async function createStudentFromApprovedApplication(
         waitlistReason: null,
       },
     });
-
     await tx.admissonApplicationHistory.create({
       data: {
         applicationId,
@@ -179,7 +200,6 @@ export async function createStudentFromApprovedApplication(
         previousStatus: admissionApplication.status,
       },
     });
-
     const admissionFeeStructure = await tx.feeStructure.findFirst({
       where: {
         academicYearId: currentAcademicYear.id,
@@ -189,7 +209,6 @@ export async function createStudentFromApprovedApplication(
       },
       orderBy: { classGroupId: "desc" },
     });
-
     if (!admissionFeeStructure) {
       log.warn(
         `No Admission Fee structure found for class ${classExists.name}-${classExists.section} in academic year ${currentAcademicYear.id}. Skipping fee payment creation.`,
@@ -204,7 +223,6 @@ export async function createStudentFromApprovedApplication(
       const ADMISSION_FEE_GRACE_PERIOD_DAYS = 7;
       const dueDate = new Date();
       dueDate.setDate(dueDate.getDate() + ADMISSION_FEE_GRACE_PERIOD_DAYS);
-
       await Promise.all([
         tx.feeStructure.update({
           where: { id: admissionFeeStructure.id },
@@ -221,7 +239,6 @@ export async function createStudentFromApprovedApplication(
         }),
       ]);
     }
-
     const [aggregateCapacity, aggregateEnrollments, aggregatePending] =
       await Promise.all([
         tx.class.aggregate({
@@ -246,12 +263,10 @@ export async function createStudentFromApprovedApplication(
           },
         }),
       ]);
-
     const totalCapacity = aggregateCapacity._sum.capacity ?? 0;
     const totalOccupied =
       aggregateEnrollments._count.studentId + aggregatePending + 1;
     const isNowFull = totalOccupied >= totalCapacity;
-
     if (isNowFull) {
       const waitlistedApplications = await tx.admissionApplication.findMany({
         where: {
@@ -271,30 +286,27 @@ export async function createStudentFromApprovedApplication(
         },
       );
     }
-
     const updatedStudent = await tx.student.findUniqueOrThrow({
       where: { id: student.id },
       include: {
         user: { select: safeUserSelect },
-        parent: true,
+        parentLinks: { include: { parent: true } },
         enrollments: true,
       },
     });
-
     return {
       student: updatedStudent,
       studentTempPassword,
       parentTempPassword,
       parentRegNumber,
+      isExistingParent: !!existingParent,
     };
   });
-
   await Promise.all([
     deleteCacheByPattern(`students:*`),
     deleteCache(CACHE_KEYS.admissionApplication(applicationId)),
     deleteCacheByPattern(`admission-applications:*`),
   ]);
-
   await createAuditLog({
     performedById: reviewerId,
     action: "APPROVE",
@@ -308,12 +320,12 @@ export async function createStudentFromApprovedApplication(
       studentLastName: response.student.lastName,
       assignedClass: classExists.name,
       assignedSection: classExists.section,
+      linkedExistingParent: response.isExistingParent,
     },
     context,
     isSuccessful: true,
     statusCode,
   });
-
   await sendAdmissionApprovedEmailService({
     studentFirstName: admissionApplication.firstName,
     studentLastName: admissionApplication.lastName,
@@ -324,12 +336,12 @@ export async function createStudentFromApprovedApplication(
     studentRegNumber: response.student.user.regNumber,
     parentRegNumber: response.parentRegNumber,
     studentTempPassword: response.studentTempPassword,
-    parentTempPassword: response.parentTempPassword,
+    parentTempPassword:
+      response.parentTempPassword ?? "Use your existing password",
     schoolName: school!.name,
     applicationId: admissionApplication.id,
     appliedForClass: admissionApplication.appliedForClass,
   });
-
   return { id: response.student.id };
 }
 
