@@ -810,7 +810,7 @@ export const studentWithDetails = Prisma.validator<Prisma.StudentDefaultArgs>()(
   {
     include: {
       user: { select: safeUserSelect },
-      parent: true,
+      parentLinks: true,
       documents: true,
       enrollments: {
         include: {
@@ -868,7 +868,7 @@ export const studentWithClassDetails =
       student: {
         include: {
           user: { select: safeUserSelect },
-          parent: true,
+          parentLinks: true,
           documents: true,
         },
       },
@@ -924,6 +924,16 @@ export const FeesStructureUpdatePayload = z.object({
   isRecurring: z.coerce.boolean().optional(),
 });
 
+export const UpdateSchoolSettingsPayload = z.object({
+  phone: z.coerce.string().optional(),
+  email: z.string().optional(),
+  website: z.string().optional(),
+  logoUrl: z.string().optional(),
+});
+
+export type UpdateSchoolSettingsType = z.infer<
+  typeof UpdateSchoolSettingsPayload
+>;
 export type FeesStructureType = z.infer<typeof FeesStructurePayload>;
 export type FeesStructureUpdateType = z.infer<
   typeof FeesStructureUpdatePayload
