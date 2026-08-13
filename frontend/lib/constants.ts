@@ -30,4 +30,5 @@ export const QUERY_KEYS = {
   ADMINS: ["admins"],
   ADMIN: ["admin"],
   CLASSGROUP: ["classGroup"],
+  SCHOOLSETTINGS: ["schoolSettings"],
 };

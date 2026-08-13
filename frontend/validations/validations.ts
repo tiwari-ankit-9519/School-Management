@@ -12,6 +12,13 @@ import {
 const enumValues = <T extends Record<string, string>>(e: T) =>
   Object.values(e) as [string, ...string[]];
 
+export const UpdateSchoolSettingsPayload = z.object({
+  phone: z.coerce.string().optional(),
+  email: z.string().optional(),
+  website: z.string().optional(),
+  logoUrl: z.string().optional(),
+});
+
 const classGrade = z.preprocess(
   (val) => (val === "" ? undefined : val),
   z
@@ -775,4 +782,8 @@ export type AssignTeacherToSubjectFormValues = z.infer<
 >;
 export type AssignClassTeacherFormValues = z.infer<
   typeof assignClassTeacherSchema
+>;
+
+export type UpdateSchoolSettingsType = z.infer<
+  typeof UpdateSchoolSettingsPayload
 >;
