@@ -5,6 +5,7 @@ import {
   confirmSlotOffer,
   declineSlotOffer,
   getAdmissionApplication,
+  getAdmissionApplicationForStudent,
   getAdmissionClass,
   getAllAdmissionApplication,
   rejectAdmissionApplication,
@@ -62,6 +63,8 @@ router.get(
   checkPermission(Module.ADMISSION_APPLICATION, "canRead"),
   getAdmissionApplication,
 );
+
+router.get("/status/:appId", getAdmissionApplicationForStudent);
 
 router.patch(
   "/:applicationId/waitlist",

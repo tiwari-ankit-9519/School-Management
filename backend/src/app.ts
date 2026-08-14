@@ -57,6 +57,7 @@ import announcementRoute from "@/src/routes/announcement.route.js";
 import profileRoute from "@/src/routes/profile.route.js";
 import feeRoute from "@/src/routes/fees.route.js";
 import settingsRoute from "@/src/routes/schoolsettings.route.js";
+import dashboardRoute from "@/src/routes/dashboard.route.js";
 
 const log = createModuleLogger("Server");
 
@@ -190,6 +191,7 @@ app.use(`${API_PREFIX}/school/announcement`, announcementRoute);
 app.use(`${API_PREFIX}/school/profile`, profileRoute);
 app.use(`${API_PREFIX}/school/fee`, feeRoute);
 app.use(`${API_PREFIX}/school`, settingsRoute);
+app.use(`${API_PREFIX}/school`, dashboardRoute);
 
 app.use((req: Request, res: Response, _next: NextFunction) => {
   const knownPaths = [

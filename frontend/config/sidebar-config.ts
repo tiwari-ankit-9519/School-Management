@@ -14,6 +14,7 @@ import {
   CalendarDays,
   Baby,
   type LucideIcon,
+  TimerIcon,
 } from "lucide-react";
 
 export interface NavItem {
@@ -77,6 +78,11 @@ export const NAV_CONFIG: Record<UserRole, NavItem[]> = {
       icon: Banknote,
     },
     {
+      labelKey: "Time Table",
+      href: "/admin/time-table",
+      icon: TimerIcon,
+    },
+    {
       labelKey: "Settings",
       href: "/admin/settings",
       icon: Settings,
@@ -133,6 +139,11 @@ export const NAV_CONFIG: Record<UserRole, NavItem[]> = {
       labelKey: "Fees",
       href: "/admin/fees",
       icon: Banknote,
+    },
+    {
+      labelKey: "Time Table",
+      href: "/admin/time-table",
+      icon: TimerIcon,
     },
     {
       labelKey: "Settings",

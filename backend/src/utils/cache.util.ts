@@ -67,6 +67,7 @@ export async function deleteCacheByPattern(pattern: string): Promise<void> {
 }
 
 export const CACHE_KEYS = {
+  dashboardSummary: () => `dashboard:summary`,
   teacherApplications: (status: string, page: number, limit: number) =>
     `teacher-applications:${status}:page:${page}:limit:${limit}`,
   teacherApplication: (applicationId: string) =>
@@ -75,6 +76,10 @@ export const CACHE_KEYS = {
     `admission-applications:${status}:page:${page}:limit:${limit}`,
   admissionApplication: (applicationId: string) =>
     `admission-application:${applicationId}`,
+  admissionApplicationStatus: (applicationId: string) =>
+    `admission-application-status:${applicationId}`,
+  teacherApplicationStatus: (applicationId: string) =>
+    `teacher_application_status:${applicationId}`,
   subjects: (page: number, limit: number) =>
     `subjects:page:${page}:limit:${limit}`,
   subject: (subjectId: string) => `subject:${subjectId}`,
@@ -312,4 +317,5 @@ export const CACHE_TTL = {
   ANNOUNCEMENT_DETAIL: 60 * 1,
   NOTIFICATIONS_LIST: 60 * 1,
   USER_PROFILE: 60 * 5,
+  DASHBOARD_SUMMARY: 60 * 5,
 } as const;

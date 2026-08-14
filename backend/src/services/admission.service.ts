@@ -10,6 +10,7 @@ import { createModuleLogger } from "../config/logger.config";
 import { AuditContext } from "../middlewares/request-logger.middleware";
 import {
   AdmissionApplicationInput,
+  AdmissionApplicationStatusResponse,
   ResubmitAdmissionApplicationInput,
   safeUserSelect,
 } from "../validations/input.validations";
@@ -2247,6 +2248,115 @@ export async function getAdmissionClassService(
         name,
       },
     );
+    throw err;
+  }
+}
+
+export async function getAdmissionApplicationForStudentService(
+  applicationId: string,
+  context: AuditContext,
+  statusCode: number,
+): Promise<AdmissionApplicationStatusResponse> {
+  try {
+    log.info(
+      `Starting service to fetch admission application status for student with applicationId ${applicationId}`,
+      {
+        applicationId,
+        ipAddress: context.ipAddress,
+      },
+    );
+
+    const cacheKey = CACHE_KEYS.admissionApplicationStatus(applicationId);
+
+    const cached = await getCache<AdmissionApplicationStatusResponse>(cacheKey);
+
+    if (cached) {
+      log.info("Returning admission application status from cache", {
+        applicationId,
+        status: cached.status,
+      });
+
+      return cached;
+    }
+
+    const application = await prisma.admissionApplication.findUnique({
+      where: {
+        id: applicationId,
+      },
+      select: {
+        id: true,
+        status: true,
+        rejectionReason: true,
+        waitlistReason: true,
+        waitlistPosition: true,
+        slotOfferedAt: true,
+        slotExpiresAt: true,
+        slotOfferedClass: true,
+        updatedAt: true,
+      },
+    });
+
+    if (!application) {
+      log.warn(`No application exists with applicationId ${applicationId}`);
+
+      throw new Error("Application does not exist");
+    }
+
+    const response: AdmissionApplicationStatusResponse = {
+      id: application.id,
+      status: application.status,
+      updatedAt: application.updatedAt.toISOString(),
+    };
+
+    if (application.status === "REJECTED") {
+      response.rejectionReason = application.rejectionReason;
+    }
+
+    if (application.status === "WAITLISTED") {
+      response.waitlistReason = application.waitlistReason;
+      response.waitlistPosition = application.waitlistPosition;
+    }
+
+    if (application.status === "SLOT_OFFERED") {
+      response.slotOfferedAt = application.slotOfferedAt?.toISOString() ?? null;
+
+      response.slotExpiresAt = application.slotExpiresAt?.toISOString() ?? null;
+
+      response.slotOfferedClass = application.slotOfferedClass ?? null;
+    }
+
+    await createSystemLog({
+      level: "INFO",
+      message: "Fetched admission application status",
+      module: "AdmissionApplication",
+      context,
+      statusCode,
+      metadata: {
+        applicationId,
+        status: application.status,
+      },
+    });
+
+    await setCache(cacheKey, response, CACHE_TTL.ADMISSION_APPLICATION_SINGLE);
+
+    log.info("Admission application status fetched successfully", {
+      applicationId,
+      status: application.status,
+    });
+
+    return response;
+  } catch (error) {
+    const err = error as Error;
+
+    log.error(
+      "Internal Server Error. Failed to get admission application status",
+      {
+        error: err.message,
+        ipAddress: context.ipAddress,
+        applicationId,
+      },
+    );
+
     throw err;
   }
 }

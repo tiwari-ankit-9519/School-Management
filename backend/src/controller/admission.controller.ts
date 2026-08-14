@@ -13,6 +13,7 @@ import {
   approveAdmissionApplicationService,
   confirmSlotOfferService,
   declineSlotOfferService,
+  getAdmissionApplicationForStudentService,
   getAdmissionApplicationService,
   getAdmissionClassService,
   getAllAdmissionApplicationService,
@@ -408,5 +409,29 @@ export async function getAdmissionClass(
     success: true,
     message: "Retrieved classes successfully",
     data: classes,
+  });
+}
+
+export async function getAdmissionApplicationForStudent(
+  req: AuthenticatedRequest,
+  res: Response,
+): Promise<void> {
+  const appId = req.params.appId as string;
+  if (!appId) {
+    throw new Error("Application ID is required");
+  }
+  const auditContext = buildAuditContext(req);
+  res.status(HTTP_STATUS.OK);
+  const admissionApplicationStatus =
+    await getAdmissionApplicationForStudentService(
+      appId,
+      auditContext,
+      res.statusCode,
+    );
+
+  res.json({
+    success: true,
+    message: "Admission application fetched",
+    data: admissionApplicationStatus,
   });
 }

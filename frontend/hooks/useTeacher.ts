@@ -5,6 +5,7 @@ import {
   PaginatedTeachers,
   Teacher,
   TeacherApplication,
+  TeacherApplicationStatusResponse,
   TeacherWithDetails,
 } from "@/types";
 import {
@@ -140,6 +141,15 @@ const teacherApi = {
     );
     return response.data.data;
   },
+
+  getTeacherApplicationStatusForTeacher: async (
+    applicationId: string,
+  ): Promise<TeacherApplicationStatusResponse> => {
+    const response = await api.get<
+      ApiResponse<TeacherApplicationStatusResponse>
+    >(`/school/teacher/status/${applicationId}`);
+    return response.data.data;
+  },
 };
 
 export const useCreateTeacherApplication = () => {
@@ -157,8 +167,11 @@ export const useCreateTeacherApplication = () => {
       queryClient.invalidateQueries({
         queryKey: QUERY_KEYS.TEACHER_APPLICATIONS,
       });
+      queryClient.invalidateQueries({
+        queryKey: QUERY_KEYS.TEACHERAPPLICATIONSTATUS,
+      });
       toast.success("Teacher Application submitted successfully");
-      router.push(`/teacher-application/${data.id}`);
+      router.push(`/teacher-application/status/${data.id}`);
     },
     onError: (error) => {
       toast.error(getErrorMessage(error));
@@ -197,6 +210,9 @@ export const useShortlistTeacherApplication = () => {
       queryClient.invalidateQueries({
         queryKey: [...QUERY_KEYS.TEACHER_APPLICATION, applicationId],
       });
+      queryClient.invalidateQueries({
+        queryKey: QUERY_KEYS.TEACHERAPPLICATIONSTATUS,
+      });
       toast.success(message ?? "Application shortlisted successfully");
     },
     onError: (error) => {
@@ -216,6 +232,9 @@ export const useApproveTeacherApplication = () => {
       });
       queryClient.invalidateQueries({
         queryKey: [...QUERY_KEYS.TEACHER_APPLICATION, applicationId],
+      });
+      queryClient.invalidateQueries({
+        queryKey: QUERY_KEYS.TEACHERAPPLICATIONSTATUS,
       });
       toast.success(message ?? "Application approved successfully");
     },
@@ -241,6 +260,9 @@ export const useRejectTeacherApplication = () => {
       });
       queryClient.invalidateQueries({
         queryKey: [...QUERY_KEYS.TEACHER_APPLICATION, applicationId],
+      });
+      queryClient.invalidateQueries({
+        queryKey: QUERY_KEYS.TEACHERAPPLICATIONSTATUS,
       });
       toast.success(message ?? "Application rejected successfully");
     },
@@ -268,6 +290,9 @@ export const useResubmitTeacherApplication = () => {
       });
       queryClient.invalidateQueries({
         queryKey: [...QUERY_KEYS.TEACHER_APPLICATION, applicationId],
+      });
+      queryClient.invalidateQueries({
+        queryKey: QUERY_KEYS.TEACHERAPPLICATIONSTATUS,
       });
       toast.success("Application resubmitted successfully");
     },
@@ -318,5 +343,16 @@ export const useGetSingleTeacher = (teacherId: string) => {
     queryKey: [...QUERY_KEYS.TEACHER, teacherId],
     queryFn: () => teacherApi.getSingleTeacher(teacherId),
     enabled: !!teacherId,
+  });
+};
+
+export const useGetTeacherApplicationStatusForTeacher = (
+  applicationId: string,
+) => {
+  return useQuery({
+    queryKey: [...QUERY_KEYS.TEACHERAPPLICATIONSTATUS, applicationId],
+    queryFn: () =>
+      teacherApi.getTeacherApplicationStatusForTeacher(applicationId),
+    enabled: !!applicationId,
   });
 };

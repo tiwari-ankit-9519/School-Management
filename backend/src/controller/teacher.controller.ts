@@ -7,6 +7,7 @@ import { HTTP_STATUS } from "../utils/constants";
 import {
   getAllTeachersService,
   getSingleTeacherService,
+  getTeacherApplicationStatusService,
 } from "../services/teacher.service";
 import { EmploymentStatus, Gender } from "@prisma/client";
 
@@ -76,5 +77,31 @@ export async function getSingleTeacher(
     success: true,
     message: `Fetched teacher with id ${teacherId}`,
     data: teacher,
+  });
+}
+
+export async function getTeacherApplicationStatus(
+  req: AuthenticatedRequest,
+  res: Response,
+): Promise<void> {
+  const applicationId = req.params.applicationId as string;
+  if (!applicationId) {
+    throw new Error("Application ID is reuqired");
+  }
+
+  const auditContext = buildAuditContext(req);
+
+  res.status(HTTP_STATUS.OK);
+
+  const teacherApplicationStatus = await getTeacherApplicationStatusService(
+    applicationId,
+    auditContext,
+    res.statusCode,
+  );
+
+  res.json({
+    success: true,
+    message: "Fetched teacher application status",
+    data: teacherApplicationStatus,
   });
 }

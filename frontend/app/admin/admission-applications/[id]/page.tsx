@@ -472,7 +472,7 @@ const AdmissionApplicationDetailPage = () => {
             "radial-gradient(ellipse at 20% 20%, #1e3a5f18 0%, transparent 55%), radial-gradient(ellipse at 80% 70%, #6366f10a 0%, transparent 50%)",
         }}
       />
-      <div className="relative z-10 mx-auto max-w-2xl space-y-5">
+      <div className="relative z-10 mx-auto max-w-6xl space-y-5">
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}

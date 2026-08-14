@@ -24,6 +24,7 @@ import {
   Loader2,
   AlertCircle,
   ImageIcon,
+  Search,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import AnimatedInput from "@/components/smoothui/animated-input";
@@ -34,6 +35,7 @@ import {
 } from "@/validations/validations";
 import { Gender, ParentType, DocumentType } from "@/types";
 import { useTranslations } from "@/hooks/useTranslations";
+import { useRouter } from "next/navigation";
 
 const STEPS = [
   { id: 0, labelKey: "stepStudent", icon: User },
@@ -86,6 +88,8 @@ const ErrorMsg = ({
 };
 
 const AdmissionApplicationPage = () => {
+  const router = useRouter();
+
   const t = useTranslations("admission");
   const [currentStep, setCurrentStep] = useState(0);
   const [photoFile, setPhotoFile] = useState<File | null>(null);
@@ -100,6 +104,22 @@ const AdmissionApplicationPage = () => {
   const photoInputRef = useRef<HTMLInputElement>(null);
   const guardianPhotoInputRef = useRef<HTMLInputElement>(null);
   const docInputRef = useRef<HTMLInputElement>(null);
+
+  const [searchValue, setSearchValue] = useState("");
+
+  const handleSearch = () => {
+    const trimmed = searchValue.trim();
+    if (trimmed) {
+      router.push(`/admission/status/${trimmed}`);
+      // setSearchValue("");
+    }
+  };
+
+  const handleSearchKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === "Enter") {
+      handleSearch();
+    }
+  };
 
   const { mutate: submitApplication, isPending } =
     useCreateAdmissionApplication();
@@ -249,7 +269,7 @@ const AdmissionApplicationPage = () => {
         }}
       />
 
-      <div className="relative z-10 mx-auto max-w-2xl">
+      <div className="relative z-10 mx-auto max-w-6xl">
         <motion.div
           initial={{ opacity: 0, y: 24 }}
           animate={{ opacity: 1, y: 0 }}
@@ -275,6 +295,35 @@ const AdmissionApplicationPage = () => {
               </p>
             </div>
           </div>
+        </motion.div>
+        <h1 className="text-gray-500 mb-5">
+          If you already have an application id use the search bar to check
+          status
+        </h1>
+        <motion.div
+          initial={{ opacity: 0, y: 16 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.5, delay: 0.05, ease: [0.16, 1, 0.3, 1] }}
+          className="mb-8 flex items-center gap-3 rounded-xl border border-white/8 bg-white/4 p-1.5 backdrop-blur-sm"
+        >
+          <div className="flex flex-1 items-center gap-2 px-3">
+            <Search className="h-4 w-4 shrink-0 text-white/30" />
+            <input
+              value={searchValue}
+              onChange={(e) => setSearchValue(e.target.value)}
+              onKeyDown={handleSearchKeyDown}
+              placeholder={t("searchPlaceholder")}
+              className="w-full bg-transparent font-manrope text-sm text-white placeholder:text-white/20 focus:outline-none"
+            />
+          </div>
+          <button
+            onClick={handleSearch}
+            disabled={!searchValue.trim()}
+            className="flex h-9 shrink-0 items-center gap-2 rounded-lg bg-indigo-600 px-4 font-jakarta text-xs font-bold text-white transition-all duration-200 hover:bg-indigo-500 disabled:opacity-40 disabled:hover:bg-indigo-600"
+          >
+            <Search className="h-3.5 w-3.5" />
+            {t("searchButton")}
+          </button>
         </motion.div>
 
         <motion.div

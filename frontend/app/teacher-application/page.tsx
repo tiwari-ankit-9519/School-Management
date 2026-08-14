@@ -1,5 +1,5 @@
 "use client";
-import { useState, useRef } from "react";
+import { useState, useRef, type KeyboardEvent } from "react";
 import {
   useForm,
   useWatch,
@@ -27,6 +27,7 @@ import {
   Phone,
   Mail,
   Star,
+  Search,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import AnimatedInput from "@/components/smoothui/animated-input";
@@ -37,10 +38,8 @@ import {
 } from "@/validations/validations";
 import { Gender, DocumentType } from "@/types";
 import { useTranslations } from "@/hooks/useTranslations";
-
-// ─────────────────────────────────────────────
-// CONSTANTS
-// ─────────────────────────────────────────────
+import { useRouter } from "next/navigation";
+import { Input } from "@/components/ui/input";
 
 const STEPS = [
   { id: 0, labelKey: "stepPersonal", icon: User },
@@ -60,17 +59,9 @@ const DOCUMENT_TYPE_OPTIONS = Object.values(DocumentType).map((d) => ({
   label: d.replace(/_/g, " "),
 }));
 
-// ─────────────────────────────────────────────
-// SHARED STYLES
-// ─────────────────────────────────────────────
-
 const inputClass =
   "h-12 rounded-xl border-white/10 bg-white/5 text-white placeholder:text-white/20 focus-visible:ring-indigo-500/50 focus-visible:border-indigo-500/50";
 const labelClass = "text-white/40";
-
-// ─────────────────────────────────────────────
-// ERROR MESSAGE COMPONENT
-// ─────────────────────────────────────────────
 
 const ErrorMsg = ({
   errors,
@@ -92,10 +83,6 @@ const ErrorMsg = ({
     </motion.p>
   );
 };
-
-// ─────────────────────────────────────────────
-// MAIN PAGE
-// ─────────────────────────────────────────────
 
 const TeacherApplicationPage = () => {
   const t = useTranslations("teacherApplication");
@@ -149,7 +136,6 @@ const TeacherApplicationPage = () => {
     },
   });
 
-  // ── Watched values ──────────────────────────
   const firstNameValue = useWatch({ control, name: "firstName" });
   const lastNameValue = useWatch({ control, name: "lastName" });
   const emailValue = useWatch({ control, name: "email" });
@@ -163,7 +149,6 @@ const TeacherApplicationPage = () => {
   const experienceValue = useWatch({ control, name: "experience" });
   const specializationValue = useWatch({ control, name: "specialization" });
 
-  // ── Step field mapping ──────────────────────
   const STEP_FIELDS: (keyof TeacherApplicationFormValues)[][] = [
     ["firstName", "lastName", "email", "phone", "gender", "dateOfBirth"],
     ["address", "city", "state", "pincode"],
@@ -171,7 +156,6 @@ const TeacherApplicationPage = () => {
     [],
   ];
 
-  // ── Navigation ──────────────────────────────
   const handleNext = async () => {
     const valid = await trigger(STEP_FIELDS[currentStep]);
     if (valid) {
@@ -185,14 +169,12 @@ const TeacherApplicationPage = () => {
     setCurrentStep((p) => Math.max(0, p - 1));
   };
 
-  // ── Photo handlers ──────────────────────────
   const handlePhotoChange = (file: File) => {
     const url = URL.createObjectURL(file);
     setPhotoFile(file);
     setPhotoPreview(url);
   };
 
-  // ── Document handlers ───────────────────────
   const handleAddDocument = (file: File) => {
     setDocumentFiles((prev) => [
       ...prev,
@@ -202,6 +184,21 @@ const TeacherApplicationPage = () => {
 
   const handleRemoveDocument = (index: number) => {
     setDocumentFiles((prev) => prev.filter((_, i) => i !== index));
+  };
+
+  const [searchValue, setSearchValue] = useState("");
+  const router = useRouter();
+  const handleSearch = () => {
+    const trimmed = searchValue.trim();
+    if (trimmed) {
+      router.push(`/teacher-application/status/${trimmed}`);
+    }
+  };
+
+  const handleSearchKeyDown = (e: KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === "Enter") {
+      handleSearch();
+    }
   };
 
   const updateDocumentMeta = (
@@ -214,7 +211,6 @@ const TeacherApplicationPage = () => {
     );
   };
 
-  // ── Submit ──────────────────────────────────
   const onSubmit = (data: TeacherApplicationFormValues) => {
     submitApplication({
       formData: {
@@ -231,13 +227,8 @@ const TeacherApplicationPage = () => {
     });
   };
 
-  // ─────────────────────────────────────────────
-  // RENDER
-  // ─────────────────────────────────────────────
-
   return (
     <div className="relative min-h-screen w-full bg-[#050810] px-3 pt-20 pb-6 sm:px-6 sm:pt-24 sm:pb-10">
-      {/* Background radial glow */}
       <div
         className="pointer-events-none fixed inset-0 select-none"
         style={{
@@ -246,8 +237,7 @@ const TeacherApplicationPage = () => {
         }}
       />
 
-      <div className="relative z-10 mx-auto max-w-2xl">
-        {/* ── Header ── */}
+      <div className="relative z-10 mx-auto max-w-6xl">
         <motion.div
           initial={{ opacity: 0, y: 24 }}
           animate={{ opacity: 1, y: 0 }}
@@ -275,7 +265,37 @@ const TeacherApplicationPage = () => {
           </div>
         </motion.div>
 
-        {/* ── Step Indicator ── */}
+        <h1 className="text-gray-500 mb-5">
+          If you already have the application id then you can check the status
+          of your application
+        </h1>
+
+        <motion.div
+          initial={{ opacity: 0, y: 16 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.5, delay: 0.05, ease: [0.16, 1, 0.3, 1] }}
+          className="mb-8 flex items-center gap-3 rounded-xl border border-white/8 bg-white/4 p-1.5 backdrop-blur-sm"
+        >
+          <div className="flex flex-1 items-center gap-2 px-2">
+            <Search className="h-4 w-4 shrink-0 text-white/30" />
+            <Input
+              value={searchValue}
+              onChange={(e) => setSearchValue(e.target.value)}
+              onKeyDown={handleSearchKeyDown}
+              placeholder={t("searchPlaceholder")}
+              className="h-9 border-0 bg-transparent font-manrope text-sm text-white placeholder:text-white/20 focus-visible:ring-0 focus-visible:ring-offset-0"
+            />
+          </div>
+          <Button
+            onClick={handleSearch}
+            disabled={!searchValue.trim()}
+            className="h-9 shrink-0 gap-2 rounded-lg border-0 bg-indigo-600 px-4 font-jakarta text-xs font-bold text-white transition-all duration-200 hover:bg-indigo-500 disabled:opacity-40"
+          >
+            <Search className="h-3.5 w-3.5" />
+            {t("searchButton")}
+          </Button>
+        </motion.div>
+
         <motion.div
           initial={{ opacity: 0, y: 16 }}
           animate={{ opacity: 1, y: 0 }}
@@ -330,7 +350,6 @@ const TeacherApplicationPage = () => {
           })}
         </motion.div>
 
-        {/* ── Card ── */}
         <motion.div
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
@@ -342,9 +361,6 @@ const TeacherApplicationPage = () => {
 
           <div className="p-5 sm:p-8">
             <AnimatePresence mode="wait">
-              {/* ════════════════════════════════
-                  STEP 0 — Personal Information
-              ════════════════════════════════ */}
               {currentStep === 0 && (
                 <motion.div
                   key="step0"
@@ -447,7 +463,6 @@ const TeacherApplicationPage = () => {
                     </div>
                   </div>
 
-                  {/* Email + Phone */}
                   <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                     <div className="space-y-1">
                       <AnimatedInput
@@ -477,7 +492,6 @@ const TeacherApplicationPage = () => {
                     </div>
                   </div>
 
-                  {/* Gender */}
                   <div className="space-y-1">
                     <p className="font-manrope text-xs text-white/40 mb-2">
                       {t("gender")}
@@ -510,7 +524,6 @@ const TeacherApplicationPage = () => {
                     <ErrorMsg errors={errors} field="gender" />
                   </div>
 
-                  {/* Date of Birth */}
                   <div className="space-y-1">
                     <label className="font-manrope text-xs text-white/40">
                       {t("dateOfBirth")}
@@ -539,9 +552,6 @@ const TeacherApplicationPage = () => {
                 </motion.div>
               )}
 
-              {/* ════════════════════════════════
-                  STEP 1 — Address
-              ════════════════════════════════ */}
               {currentStep === 1 && (
                 <motion.div
                   key="step1"
@@ -619,9 +629,6 @@ const TeacherApplicationPage = () => {
                 </motion.div>
               )}
 
-              {/* ════════════════════════════════
-                  STEP 2 — Professional Details
-              ════════════════════════════════ */}
               {currentStep === 2 && (
                 <motion.div
                   key="step2"
@@ -657,7 +664,6 @@ const TeacherApplicationPage = () => {
                     <ErrorMsg errors={errors} field="qualification" />
                   </div>
 
-                  {/* Experience */}
                   <div className="space-y-1">
                     <label className="font-manrope text-xs text-white/40">
                       {t("experience")}
@@ -712,9 +718,6 @@ const TeacherApplicationPage = () => {
                 </motion.div>
               )}
 
-              {/* ════════════════════════════════
-                  STEP 3 — Documents
-              ════════════════════════════════ */}
               {currentStep === 3 && (
                 <motion.div
                   key="step3"
@@ -783,7 +786,6 @@ const TeacherApplicationPage = () => {
                     />
                   </div>
 
-                  {/* Document list */}
                   {documentFiles.length > 0 ? (
                     <div className="space-y-2">
                       {documentFiles.map((doc, i) => (
@@ -848,7 +850,6 @@ const TeacherApplicationPage = () => {
               )}
             </AnimatePresence>
 
-            {/* ── Footer Navigation ── */}
             <div className="mt-8 flex items-center justify-between gap-3 border-t border-white/8 pt-6">
               <Button
                 type="button"

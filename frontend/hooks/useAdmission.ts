@@ -2,6 +2,7 @@ import api, { ApiResponse, getErrorMessage } from "@/lib/api";
 import { QUERY_KEYS } from "@/lib/constants";
 import {
   AdmissionApplication,
+  AdmissionApplicationStatusResponse,
   AdmissionClass,
   PaginatedAdmissionApplications,
 } from "@/types";
@@ -156,6 +157,15 @@ const admissionApi = {
     );
     return response.data.message;
   },
+
+  getAdmissionApplicationStatusForStudent: async (
+    appId: string,
+  ): Promise<AdmissionApplicationStatusResponse> => {
+    const response = await api.get<
+      ApiResponse<AdmissionApplicationStatusResponse>
+    >(`/school/admission/status/${appId}`);
+    return response.data.data;
+  },
 };
 
 export const useCreateAdmissionApplication = () => {
@@ -184,7 +194,7 @@ export const useCreateAdmissionApplication = () => {
         queryKey: QUERY_KEYS.SCHOOL_APPLICATIONS,
       });
       toast.success("Application submitted successfully");
-      router.push(`/student/admission/${data.id}`);
+      router.push(`/admission/status/${data.id}`);
     },
     onError: (error) => {
       toast.error(getErrorMessage(error));
@@ -208,6 +218,14 @@ export const useGetAdmissionApplication = (applicationId: string) => {
     queryKey: [...QUERY_KEYS.SCHOOL_APPLICATION, applicationId],
     queryFn: () => admissionApi.getAdmissionApplication(applicationId),
     enabled: !!applicationId,
+  });
+};
+
+export const useGetAdmissionApplicationStatusForStudent = (appId: string) => {
+  return useQuery({
+    queryKey: [...QUERY_KEYS.ADMISSIONAPPLICATIONSTATUS, appId],
+    queryFn: () => admissionApi.getAdmissionApplicationStatusForStudent(appId),
+    enabled: !!appId,
   });
 };
 
@@ -236,6 +254,9 @@ export const useApproveAdmissionApplication = () => {
       queryClient.invalidateQueries({
         queryKey: [...QUERY_KEYS.SCHOOL_APPLICATION, applicationId],
       });
+      queryClient.invalidateQueries({
+        queryKey: [...QUERY_KEYS.ADMISSIONAPPLICATIONSTATUS, applicationId],
+      });
       toast.success(message ?? "Application approved successfully");
     },
     onError: (error) => {
@@ -262,6 +283,9 @@ export const useRejectAdmissionApplication = () => {
       queryClient.invalidateQueries({
         queryKey: [...QUERY_KEYS.SCHOOL_APPLICATION, applicationId],
       });
+      queryClient.invalidateQueries({
+        queryKey: [...QUERY_KEYS.ADMISSIONAPPLICATIONSTATUS, applicationId],
+      });
       toast.success(message ?? "Application rejected successfully");
     },
     onError: (error) => {
@@ -287,6 +311,9 @@ export const useWaitlistAdmissionApplication = () => {
       });
       queryClient.invalidateQueries({
         queryKey: [...QUERY_KEYS.SCHOOL_APPLICATION, applicationId],
+      });
+      queryClient.invalidateQueries({
+        queryKey: [...QUERY_KEYS.ADMISSIONAPPLICATIONSTATUS, applicationId],
       });
       toast.success(message ?? "Application waitlisted successfully");
     },
@@ -315,6 +342,9 @@ export const useResubmitAdmissionApplication = () => {
       queryClient.invalidateQueries({
         queryKey: [...QUERY_KEYS.SCHOOL_APPLICATION, applicationId],
       });
+      queryClient.invalidateQueries({
+        queryKey: [...QUERY_KEYS.ADMISSIONAPPLICATIONSTATUS, applicationId],
+      });
       toast.success(message ?? "Application resubmitted successfully");
     },
     onError: (error) => {
@@ -335,6 +365,9 @@ export const useConfirmSlotOffer = () => {
       queryClient.invalidateQueries({
         queryKey: [...QUERY_KEYS.SCHOOL_APPLICATION, applicationId],
       });
+      queryClient.invalidateQueries({
+        queryKey: [...QUERY_KEYS.ADMISSIONAPPLICATIONSTATUS, applicationId],
+      });
       toast.success(message ?? "Slot offer confirmed successfully");
     },
     onError: (error) => {
@@ -354,6 +387,9 @@ export const useDeclineSlotOffer = () => {
       });
       queryClient.invalidateQueries({
         queryKey: [...QUERY_KEYS.SCHOOL_APPLICATION, applicationId],
+      });
+      queryClient.invalidateQueries({
+        queryKey: [...QUERY_KEYS.ADMISSIONAPPLICATIONSTATUS, applicationId],
       });
       toast.success(message ?? "Slot offer declined successfully");
     },

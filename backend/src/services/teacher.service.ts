@@ -5,6 +5,7 @@ import { CACHE_KEYS, CACHE_TTL, getCache, setCache } from "../utils/cache.util";
 import { prisma } from "../config/database.config";
 import { createSystemLog } from "../utils/audit.util";
 import { TeacherListPayload } from "../types/response-type";
+import { TeacherApplicationStatusResponse } from "../validations/input.validations";
 
 const log = createModuleLogger("TeacherService");
 
@@ -178,6 +179,84 @@ export async function getSingleTeacherService(
       {
         error: err.message,
         ipAddress: context.ipAddress,
+      },
+    );
+    throw err;
+  }
+}
+
+export async function getTeacherApplicationStatusService(
+  applicationId: string,
+  context: AuditContext,
+  statusCode: number,
+): Promise<TeacherApplicationStatusResponse> {
+  try {
+    log.info(
+      `Starting service to fetch teacher application status for applicationId ${applicationId}`,
+      {
+        applicationId,
+        ipAddress: context.ipAddress,
+      },
+    );
+    const cacheKey = CACHE_KEYS.teacherApplicationStatus(applicationId);
+    const cached = await getCache<TeacherApplicationStatusResponse>(cacheKey);
+    if (cached) {
+      log.info("Returning teacher application status from cache", {
+        applicationId,
+        status: cached.status,
+      });
+      return cached;
+    }
+    const application = await prisma.teacherApplication.findUnique({
+      where: {
+        id: applicationId,
+      },
+      select: {
+        id: true,
+        status: true,
+        rejectionReason: true,
+        updatedAt: true,
+      },
+    });
+    if (!application) {
+      log.warn(
+        `No teacher application exists with applicationId ${applicationId}`,
+      );
+      throw new Error("Application does not exist");
+    }
+    const response: TeacherApplicationStatusResponse = {
+      id: application.id,
+      status: application.status,
+      updatedAt: application.updatedAt.toISOString(),
+    };
+    if (application.status === "REJECTED") {
+      response.rejectionReason = application.rejectionReason;
+    }
+    await createSystemLog({
+      level: "INFO",
+      message: "Fetched teacher application status",
+      module: "TeacherApplication",
+      context,
+      statusCode,
+      metadata: {
+        applicationId,
+        status: application.status,
+      },
+    });
+    await setCache(cacheKey, response, CACHE_TTL.TEACHER_APPLICATION_SINGLE);
+    log.info("Teacher application status fetched successfully", {
+      applicationId,
+      status: application.status,
+    });
+    return response;
+  } catch (error) {
+    const err = error as Error;
+    log.error(
+      "Internal Server Error. Failed to get teacher application status",
+      {
+        error: err.message,
+        ipAddress: context.ipAddress,
+        applicationId,
       },
     );
     throw err;

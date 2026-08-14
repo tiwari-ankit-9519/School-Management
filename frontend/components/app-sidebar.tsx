@@ -19,10 +19,9 @@ import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
-  DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { LogOut, Settings, User, ChevronDown } from "lucide-react";
+import { LogOut, User, ChevronDown } from "lucide-react";
 import { NAV_CONFIG, UserRole, NavItem } from "@/config/sidebar-config";
 import { useAuthStore } from "@/stores/useAuthStore";
 import { useLogout } from "@/hooks/useAuth";
@@ -164,11 +163,11 @@ function AppSidebarInner() {
             align="start"
             className="w-56 bg-[#0c1220] border border-white/10 rounded-xl shadow-xl mb-1"
           >
-            <DropdownMenuItem className="flex items-center gap-2.5 px-3 py-2.5 text-white/60 hover:text-white hover:bg-white/5 rounded-lg font-manrope text-xs cursor-pointer">
+            {/* <DropdownMenuItem className="flex items-center gap-2.5 px-3 py-2.5 text-white/60 hover:text-white hover:bg-white/5 rounded-lg font-manrope text-xs cursor-pointer">
               <Settings className="h-3.5 w-3.5" />
               {t("settings")}
-            </DropdownMenuItem>
-            <DropdownMenuSeparator className="bg-white/8" />
+            </DropdownMenuItem> */}
+            {/* <DropdownMenuSeparator className="bg-white/8" /> */}
             <DropdownMenuItem
               onClick={handleLogout}
               className="flex items-center gap-2.5 px-3 py-2.5 text-red-400/80 hover:text-red-400 hover:bg-red-500/8 rounded-lg font-manrope text-xs cursor-pointer"

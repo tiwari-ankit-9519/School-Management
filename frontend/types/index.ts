@@ -216,6 +216,13 @@ export type AdmissionClass = {
   remaining: number;
 };
 
+export interface TeacherApplicationStatusResponse {
+  id: string;
+  status: ApplicationStatus;
+  updatedAt: string;
+  rejectionReason?: string | null;
+}
+
 export interface SchoolConfig {
   id: string;
   name: string;
@@ -1232,6 +1239,128 @@ export interface SingleAdminInfo {
   user: User & {
     userPermission: UserPermission[];
   };
+}
+
+export interface DashboardSummary {
+  academicYear: {
+    id: string;
+    name: string;
+  } | null;
+  students: {
+    total: number;
+    byStatus: {
+      ACTIVE: number;
+      INACTIVE: number;
+      SUSPENDED: number;
+      GRADUATED: number;
+      TRANSFERRED: number;
+      EXPELLED: number;
+      WITHDRAWN: number;
+    };
+  };
+  teachers: {
+    total: number;
+    byStatus: {
+      ACTIVE: number;
+      INACTIVE: number;
+      SUSPENDED: number;
+      TERMINATED: number;
+      ON_LEAVE: number;
+    };
+  };
+  admins: {
+    total: number;
+    byStatus: {
+      ACTIVE: number;
+      INACTIVE: number;
+      SUSPENDED: number;
+      TERMINATED: number;
+      ON_LEAVE: number;
+    };
+  };
+  parentCount: number;
+  classCount: number;
+  admissionApplications: {
+    total: number;
+    byStatus: {
+      PENDING: number;
+      WAITLISTED: number;
+      APPROVED: number;
+      REJECTED: number;
+      SLOT_OFFERED: number;
+      OFFER_EXPIRED: number;
+      OFFER_DECLINED: number;
+    };
+  };
+  teacherApplications: {
+    total: number;
+    byStatus: {
+      PENDING: number;
+      SHORTLISTED: number;
+      SELECTED: number;
+      REJECTED: number;
+    };
+  };
+  feePayments: {
+    total: number;
+    byStatus: {
+      PENDING: number;
+      PAID: number;
+      OVERDUE: number;
+      WAIVED: number;
+      PARTIAL: number;
+    };
+  };
+  feeRevenue: {
+    collected: number;
+    expected: number;
+  };
+  studentLeaveRequests: {
+    total: number;
+    byStatus: {
+      PENDING: number;
+      APPROVED: number;
+      REJECTED: number;
+      CANCELLED: number;
+    };
+  };
+  teacherLeaveRequests: {
+    total: number;
+    byStatus: {
+      PENDING: number;
+      APPROVED: number;
+      REJECTED: number;
+      CANCELLED: number;
+    };
+  };
+  todayAttendance: {
+    students: {
+      PRESENT: number;
+      ABSENT: number;
+      LATE: number;
+      EXCUSED: number;
+      HOLIDAY: number;
+    };
+    teachers: {
+      PRESENT: number;
+      ABSENT: number;
+      LATE: number;
+      EXCUSED: number;
+      HOLIDAY: number;
+    };
+  };
+}
+
+export interface AdmissionApplicationStatusResponse {
+  id: string;
+  status: string;
+  updatedAt: string;
+  rejectionReason?: string | null;
+  waitlistReason?: string | null;
+  waitlistPosition?: number | null;
+  slotOfferedAt?: string | null;
+  slotExpiresAt?: string | null;
+  slotOfferedClass?: string | null;
 }
 
 export type PaginatedTeachers = PaginatedResponse<TeacherListItem>;

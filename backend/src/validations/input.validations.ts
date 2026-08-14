@@ -1,5 +1,6 @@
 import { z } from "zod";
 import {
+  ApplicationStatus,
   AttendanceStatus,
   DocumentType,
   ExamType,
@@ -60,6 +61,13 @@ export const ResetPasswordSchema = z
   .refine((data) => data.email || data.regNumber, {
     error: "Either email, registration number or phone is required",
   });
+
+export interface TeacherApplicationStatusResponse {
+  id: string;
+  status: ApplicationStatus;
+  updatedAt: string;
+  rejectionReason?: string | null;
+}
 
 export const AcademicYearSchema = z
   .object({
@@ -930,6 +938,18 @@ export const UpdateSchoolSettingsPayload = z.object({
   website: z.string().optional(),
   logoUrl: z.string().optional(),
 });
+
+export type AdmissionApplicationStatusResponse = {
+  id: string;
+  status: string;
+  updatedAt: string;
+  rejectionReason?: string | null;
+  waitlistReason?: string | null;
+  waitlistPosition?: number | null;
+  slotOfferedAt?: string | null;
+  slotExpiresAt?: string | null;
+  slotOfferedClass?: string | null;
+};
 
 export type UpdateSchoolSettingsType = z.infer<
   typeof UpdateSchoolSettingsPayload

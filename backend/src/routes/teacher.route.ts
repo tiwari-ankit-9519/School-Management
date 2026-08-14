@@ -7,6 +7,7 @@ import {
 import {
   getAllTeachers,
   getSingleTeacher,
+  getTeacherApplicationStatus,
 } from "../controller/teacher.controller";
 import { Module } from "@prisma/client";
 
@@ -27,5 +28,7 @@ router.get(
   checkPermission(Module.TEACHER, "canRead"),
   getSingleTeacher,
 );
+
+router.get("/status/:applicationId", getTeacherApplicationStatus);
 
 export default router;

@@ -1,20 +1,24 @@
 import api, { getErrorMessage } from "@/lib/api";
 import { QUERY_KEYS } from "@/lib/constants";
-import { SchoolConfig } from "@/types";
+import { ApiResponse, SchoolConfig } from "@/types";
 import { UpdateSchoolSettingsType } from "@/validations/validations";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 
 const schoolSettingsApi = {
   getSchoolSettings: async (): Promise<SchoolConfig> => {
-    const response = await api.get<SchoolConfig>(`/school/settings`);
-    return response.data;
+    const response =
+      await api.get<ApiResponse<SchoolConfig>>(`/school/settings`);
+    return response.data.data;
   },
   updateSchoolSettings: async (
     data: UpdateSchoolSettingsType,
   ): Promise<SchoolConfig> => {
-    const response = await api.patch<SchoolConfig>(`/school/settings`, data);
-    return response.data;
+    const response = await api.patch<ApiResponse<SchoolConfig>>(
+      `/school/settings`,
+      data,
+    );
+    return response.data.data;
   },
 };
 
@@ -36,9 +40,9 @@ export const useUpdateSchoolSettings = () => {
 };
 
 export const useGetSchoolSettings = () => {
-  useQuery({
+  return useQuery({
     queryKey: [QUERY_KEYS.SCHOOLSETTINGS],
-    queryFn: () => schoolSettingsApi.getSchoolSettings,
+    queryFn: () => schoolSettingsApi.getSchoolSettings(),
     enabled: true,
   });
 };
