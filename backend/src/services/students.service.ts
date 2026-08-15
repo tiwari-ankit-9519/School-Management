@@ -139,7 +139,7 @@ export async function getSingleStudentDetailService(
       where: { id: studentId },
       include: {
         user: { select: safeUserSelect },
-        parent: true,
+        parentLinks: true,
         documents: true,
         enrollments: {
           where: {
