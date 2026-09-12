@@ -148,16 +148,12 @@ export const subjectSchema = z.object({
 export const FeesStructureSchema = z.object({
   name: z
     .string({ error: "Name is required" })
-    .min(1, { error: "Name should be of atleast one character" }),
-  amount: z.coerce.number({ error: "Amount is required" }),
-  recurringMonth: z.coerce.number().nullable().optional(),
+    .min(1, { error: "Name should be of at least one character" }),
+  amount: z.number({ error: "Amount is required" }).min(0),
+  recurringMonth: z.number().nullable().optional(),
   description: z.string().optional(),
   isRecurring: z.boolean().optional(),
 });
-
-// ─────────────────────────────────────────────
-// PERMISSIONS & MODERATOR
-// ─────────────────────────────────────────────
 
 export const modulePermissionSchema = z.object({
   module: z.enum(enumValues(Module)),

@@ -12,7 +12,7 @@ const log = createModuleLogger("FeeModule");
 
 export async function createFeeStructureService(
   adminId: string,
-  classId: string,
+  classGroupId: string,
   data: FeesStructureType,
   context: AuditContext,
   statusCode: number,
@@ -21,7 +21,7 @@ export async function createFeeStructureService(
     log.info("Starting service to create fee structure", {
       requestPayload: data,
       ipAddress: context.ipAddress,
-      classId,
+      classGroupId,
     });
 
     const academicYear = await prisma.academicYear.findFirst({
@@ -32,16 +32,13 @@ export async function createFeeStructureService(
       throw new Error("Academic Year not found");
     }
 
-    const classExists = await prisma.class.findFirst({
-      where: { id: classId },
-      select: { classGroupId: true },
+    const classGroupExists = await prisma.classGroup.findUnique({
+      where: { id: classGroupId },
     });
-    if (!classExists) {
-      log.warn("Class does not exist");
-      throw new Error("Class does not exist");
+    if (!classGroupExists) {
+      log.warn("Class Group does not exist");
+      throw new Error("Class Group does not exist");
     }
-
-    const { classGroupId } = classExists;
 
     const feeStructureExists = await prisma.feeStructure.findFirst({
       where: { classGroupId, academicYearId: academicYear.id, name: data.name },
@@ -51,18 +48,12 @@ export async function createFeeStructureService(
       throw new Error("Fee Structure already exists");
     }
 
-    const ADMISSION_FEE_GRACE_PERIOD_DAYS = 30;
-    const dueDate = new Date(academicYear.startDate);
-    dueDate.setDate(dueDate.getDate() + ADMISSION_FEE_GRACE_PERIOD_DAYS);
-    log.info(`The due date for the admission fees is ${dueDate}`);
-
     const newFeeStructure = await prisma.feeStructure.create({
       data: {
         academicYearId: academicYear.id,
         classGroupId,
         name: data.name,
         amount: data.amount,
-        dueDate,
         description: data.description,
         recurringMonth: data.recurringMonth,
         isRecurring: data.isRecurring,
@@ -78,7 +69,6 @@ export async function createFeeStructureService(
       metadata: {
         name: newFeeStructure.name,
         amount: newFeeStructure.amount,
-        dueDate: newFeeStructure.dueDate,
         classGroupId: newFeeStructure.classGroupId,
         isRecurring: newFeeStructure.isRecurring,
       },
@@ -93,7 +83,6 @@ export async function createFeeStructureService(
       newValues: {
         name: newFeeStructure.name,
         amount: newFeeStructure.amount,
-        dueDate: newFeeStructure.dueDate,
         classGroupId: newFeeStructure.classGroupId,
         isRecurring: newFeeStructure.isRecurring,
       },
@@ -108,7 +97,7 @@ export async function createFeeStructureService(
     log.error("Internal Server Error.", {
       error: err.message,
       ipAddress: context.ipAddress,
-      classId,
+      classGroupId,
     });
     throw err;
   }
@@ -162,7 +151,6 @@ export async function updateFeeStructureService(
       metadata: {
         name: updatedFeeStructure.name,
         amount: updatedFeeStructure.amount,
-        dueDate: updatedFeeStructure.dueDate,
         classId: updatedFeeStructure.classId,
         isRecurring: updatedFeeStructure.isRecurring,
       },
@@ -182,7 +170,6 @@ export async function updateFeeStructureService(
       newValues: {
         name: updatedFeeStructure.name,
         amount: updatedFeeStructure.amount,
-        dueDate: updatedFeeStructure.dueDate,
         classId: updatedFeeStructure.classId,
         isRecurring: updatedFeeStructure.isRecurring,
       },

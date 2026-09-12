@@ -34,4 +34,8 @@ export const QUERY_KEYS = {
   DASHBOARDSUMMARY: ["dashboardSummary"],
   ADMISSIONAPPLICATIONSTATUS: ["admissionApplicationStatus"],
   TEACHERAPPLICATIONSTATUS: ["teacherApplicationStatus"],
+  TIME_TABLES: ["timeTables"],
+  TIME_TABLE: ["timeTable"],
+  EXAM_SCHEDULES: ["examSchedules"],
+  EXAM_SCHEDULE: ["examSchedule"],
 };

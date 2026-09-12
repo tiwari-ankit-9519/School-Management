@@ -1,7 +1,7 @@
 "use client";
 import { useState, useMemo } from "react";
 import { motion, AnimatePresence } from "motion/react";
-import { useForm } from "react-hook-form";
+import { useForm, useWatch, Controller } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import {
   Wallet,
@@ -17,15 +17,22 @@ import {
   X,
   Pencil,
   AlertCircle,
+  Plus,
 } from "lucide-react";
 import Image from "next/image";
+import { Checkbox } from "@/components/ui/checkbox";
 import { useGetAllClassGroup } from "@/hooks/useClass";
 import {
   useGetFeeStructureForClass,
   useUpdateFeeStructure,
+  useCreateFeeStructure,
 } from "@/hooks/useFees";
-import { FeeStructureUpdateType } from "@/validations/validations";
-import { FeesStructureUpdatePayload } from "@/validations/validations";
+import {
+  FeeStructureUpdateType,
+  FeesStructureType,
+  FeesStructureUpdatePayload,
+  FeesStructureSchema,
+} from "@/validations/validations";
 import { FeeStructure } from "@/types";
 
 const MONTH_NAMES = [
@@ -43,25 +50,221 @@ const MONTH_NAMES = [
   "December",
 ];
 
-const formatDate = (dateStr: string) => {
-  return new Date(dateStr).toLocaleDateString("en-IN", {
+const formatDate = (dateStr: string) =>
+  new Date(dateStr).toLocaleDateString("en-IN", {
     day: "numeric",
     month: "short",
     year: "numeric",
   });
-};
 
-const formatAmount = (amount: number) => {
-  return new Intl.NumberFormat("en-IN", {
+const formatAmount = (amount: number) =>
+  new Intl.NumberFormat("en-IN", {
     style: "currency",
     currency: "INR",
     maximumFractionDigits: 0,
   }).format(amount);
-};
 
 const inputClass =
   "h-10 w-full rounded-xl border border-white/10 bg-white/5 px-3 font-manrope text-sm text-white placeholder:text-white/20 focus:border-indigo-500/50 focus:outline-none focus:ring-1 focus:ring-indigo-500/30 transition-colors";
 const labelClass = "mb-1 block font-manrope text-xs text-white/40";
+
+const ErrorMsg = ({ message }: { message?: string }) => {
+  if (!message) return null;
+  return (
+    <p className="mt-1 flex items-center gap-1 font-manrope text-xs text-red-400">
+      <AlertCircle className="h-3 w-3 shrink-0" />
+      {message}
+    </p>
+  );
+};
+
+const CreateFeeModal = ({
+  classGroupId,
+  onClose,
+}: {
+  classGroupId: string;
+  onClose: () => void;
+}) => {
+  const { mutate: createFee, isPending } = useCreateFeeStructure(classGroupId);
+
+  const {
+    register,
+    handleSubmit,
+    control,
+    setValue,
+    formState: { errors },
+  } = useForm<FeesStructureType>({
+    resolver: zodResolver(FeesStructureSchema),
+    defaultValues: {
+      name: "",
+      amount: 0,
+      description: undefined,
+      isRecurring: false,
+      recurringMonth: undefined,
+    },
+  });
+
+  const isRecurringValue = useWatch({ control, name: "isRecurring" });
+
+  const onSubmit = (data: FeesStructureType) => {
+    createFee(data, {
+      onSuccess: () => onClose(),
+    });
+  };
+
+  return (
+    <motion.div
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      exit={{ opacity: 0 }}
+      className="fixed inset-0 z-50 flex items-center justify-center px-4"
+      onClick={onClose}
+    >
+      <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" />
+      <motion.div
+        initial={{ opacity: 0, scale: 0.96, y: 16 }}
+        animate={{ opacity: 1, scale: 1, y: 0 }}
+        exit={{ opacity: 0, scale: 0.96, y: 16 }}
+        transition={{ duration: 0.2, ease: [0.16, 1, 0.3, 1] }}
+        onClick={(e) => e.stopPropagation()}
+        className="relative z-10 w-full max-w-md overflow-hidden rounded-2xl border border-white/10 bg-[#0d1525] shadow-[0_24px_60px_rgba(0,0,0,0.7)]"
+      >
+        <div className="absolute inset-x-0 top-0 h-px bg-linear-to-r from-transparent via-white/20 to-transparent" />
+        <div className="flex items-center justify-between border-b border-white/8 px-5 py-4">
+          <div>
+            <h2 className="font-jakarta text-base font-bold text-white">
+              Create Fee Structure
+            </h2>
+            <p className="mt-0.5 font-manrope text-xs text-white/40">
+              Add a new fee structure for this class group
+            </p>
+          </div>
+          <button
+            onClick={onClose}
+            className="flex h-7 w-7 items-center justify-center rounded-lg border border-white/10 bg-white/5 text-white/40 transition-colors hover:text-white"
+          >
+            <X className="h-3.5 w-3.5" />
+          </button>
+        </div>
+
+        <form onSubmit={handleSubmit(onSubmit)} className="space-y-4 p-5">
+          <div>
+            <label className={labelClass}>Fee Name</label>
+            <input
+              {...register("name")}
+              placeholder="e.g. Admission Fee"
+              className={inputClass}
+            />
+            <ErrorMsg message={errors.name?.message} />
+          </div>
+
+          <div>
+            <label className={labelClass}>Amount (₹)</label>
+            <input
+              {...register("amount", { valueAsNumber: true })}
+              type="number"
+              placeholder="0"
+              className={inputClass}
+            />
+            <ErrorMsg message={errors.amount?.message} />
+          </div>
+
+          <div>
+            <label className={labelClass}>Description (optional)</label>
+            <input
+              {...register("description")}
+              placeholder="e.g. One-time admission fee"
+              className={inputClass}
+            />
+            <ErrorMsg message={errors.description?.message} />
+          </div>
+
+          <div className="flex items-center justify-between rounded-xl border border-white/8 bg-white/3 px-4 py-3">
+            <div>
+              <p className="font-jakarta text-sm font-semibold text-white">
+                Recurring
+              </p>
+              <p className="mt-0.5 font-manrope text-xs text-white/40">
+                Charge this fee every month
+              </p>
+            </div>
+            <Controller
+              control={control}
+              name="isRecurring"
+              render={({ field }) => (
+                <Checkbox
+                  checked={field.value ?? false}
+                  onCheckedChange={(checked) => {
+                    field.onChange(checked);
+                    if (!checked) setValue("recurringMonth", undefined);
+                  }}
+                  className="border-white/20 bg-white/5 data-checked:border-indigo-500 data-checked:bg-indigo-500"
+                />
+              )}
+            />
+          </div>
+
+          <AnimatePresence>
+            {isRecurringValue && (
+              <motion.div
+                initial={{ opacity: 0, height: 0 }}
+                animate={{ opacity: 1, height: "auto" }}
+                exit={{ opacity: 0, height: 0 }}
+                transition={{ duration: 0.2, ease: [0.16, 1, 0.3, 1] }}
+                style={{ overflow: "hidden" }}
+              >
+                <div className="pt-1">
+                  <label className={labelClass}>
+                    Recurring Month (1–12, optional)
+                  </label>
+                  <input
+                    {...register("recurringMonth", {
+                      setValueAs: (v) =>
+                        v === "" || isNaN(Number(v)) ? undefined : Number(v),
+                    })}
+                    type="number"
+                    min={1}
+                    max={12}
+                    placeholder="e.g. 6 for June"
+                    className={inputClass}
+                  />
+                  <ErrorMsg message={errors.recurringMonth?.message} />
+                </div>
+              </motion.div>
+            )}
+          </AnimatePresence>
+
+          <div className="flex items-center gap-3 border-t border-white/8 pt-4">
+            <button
+              type="button"
+              onClick={onClose}
+              className="flex h-10 flex-1 items-center justify-center rounded-xl border border-white/10 bg-white/5 font-jakarta text-sm font-bold text-white/50 transition-colors hover:text-white"
+            >
+              Cancel
+            </button>
+            <button
+              type="submit"
+              disabled={isPending}
+              className="flex h-10 flex-1 items-center justify-center gap-2 rounded-xl bg-indigo-600 font-jakarta text-sm font-bold text-white shadow-lg shadow-indigo-500/20 transition-colors hover:bg-indigo-500 disabled:opacity-70"
+            >
+              {isPending ? (
+                <>
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                  Creating...
+                </>
+              ) : (
+                <>
+                  <Plus className="h-4 w-4" />
+                  Create
+                </>
+              )}
+            </button>
+          </div>
+        </form>
+      </motion.div>
+    </motion.div>
+  );
+};
 
 const UpdateFeeModal = ({
   fee,
@@ -75,6 +278,8 @@ const UpdateFeeModal = ({
   const {
     register,
     handleSubmit,
+    control,
+    setValue,
     formState: { errors },
   } = useForm<FeeStructureUpdateType>({
     resolver: zodResolver(FeesStructureUpdatePayload),
@@ -87,11 +292,11 @@ const UpdateFeeModal = ({
     },
   });
 
+  const isRecurringValue = useWatch({ control, name: "isRecurring" });
+
   const onSubmit = (data: FeeStructureUpdateType) => {
     updateFee(data, {
-      onSuccess: () => {
-        onClose();
-      },
+      onSuccess: () => onClose(),
     });
   };
 
@@ -138,39 +343,28 @@ const UpdateFeeModal = ({
               placeholder="e.g. Admission Fee"
               className={inputClass}
             />
-            {errors.name && (
-              <p className="mt-1 flex items-center gap-1 font-manrope text-xs text-red-400">
-                <AlertCircle className="h-3 w-3 shrink-0" />
-                {errors.name.message}
-              </p>
-            )}
+            <ErrorMsg message={errors.name?.message} />
           </div>
 
           <div>
             <label className={labelClass}>Amount (₹)</label>
             <input
-              {...register("amount", {
-                valueAsNumber: true,
-              })}
+              {...register("amount", { valueAsNumber: true })}
               type="number"
               placeholder="0"
               className={inputClass}
             />
-            {errors.amount && (
-              <p className="mt-1 flex items-center gap-1 font-manrope text-xs text-red-400">
-                <AlertCircle className="h-3 w-3 shrink-0" />
-                {errors.amount.message}
-              </p>
-            )}
+            <ErrorMsg message={errors.amount?.message} />
           </div>
 
           <div>
-            <label className={labelClass}>Description</label>
+            <label className={labelClass}>Description (optional)</label>
             <input
               {...register("description")}
               placeholder="Optional description"
               className={inputClass}
             />
+            <ErrorMsg message={errors.description?.message} />
           </div>
 
           <div className="flex items-center justify-between rounded-xl border border-white/8 bg-white/3 px-4 py-3">
@@ -182,34 +376,51 @@ const UpdateFeeModal = ({
                 Charge this fee every month
               </p>
             </div>
-            <input
-              {...register("isRecurring")}
-              type="checkbox"
-              className="h-4 w-4 accent-indigo-500"
+            <Controller
+              control={control}
+              name="isRecurring"
+              render={({ field }) => (
+                <Checkbox
+                  checked={field.value ?? false}
+                  onCheckedChange={(checked) => {
+                    field.onChange(checked);
+                    if (!checked) setValue("recurringMonth", undefined);
+                  }}
+                  className="border-white/20 bg-white/5 data-checked:border-indigo-500 data-checked:bg-indigo-500"
+                />
+              )}
             />
           </div>
 
-          <div>
-            <label className={labelClass}>
-              Recurring Month (1–12, optional)
-            </label>
-            <input
-              {...register("recurringMonth", {
-                valueAsNumber: true,
-              })}
-              type="number"
-              min={1}
-              max={12}
-              placeholder="e.g. 6 for June"
-              className={inputClass}
-            />
-            {errors.recurringMonth && (
-              <p className="mt-1 flex items-center gap-1 font-manrope text-xs text-red-400">
-                <AlertCircle className="h-3 w-3 shrink-0" />
-                {errors.recurringMonth.message}
-              </p>
+          <AnimatePresence>
+            {isRecurringValue && (
+              <motion.div
+                initial={{ opacity: 0, height: 0 }}
+                animate={{ opacity: 1, height: "auto" }}
+                exit={{ opacity: 0, height: 0 }}
+                transition={{ duration: 0.2, ease: [0.16, 1, 0.3, 1] }}
+                style={{ overflow: "hidden" }}
+              >
+                <div className="pt-1">
+                  <label className={labelClass}>
+                    Recurring Month (1–12, optional)
+                  </label>
+                  <input
+                    {...register("recurringMonth", {
+                      setValueAs: (v) =>
+                        v === "" || isNaN(Number(v)) ? undefined : Number(v),
+                    })}
+                    type="number"
+                    min={1}
+                    max={12}
+                    placeholder="e.g. 6 for June"
+                    className={inputClass}
+                  />
+                  <ErrorMsg message={errors.recurringMonth?.message} />
+                </div>
+              </motion.div>
             )}
-          </div>
+          </AnimatePresence>
 
           <div className="flex items-center gap-3 border-t border-white/8 pt-4">
             <button
@@ -245,12 +456,15 @@ const FeeStructurePage = () => {
   const [groupDropdownOpen, setGroupDropdownOpen] = useState(false);
   const [page, setPage] = useState(1);
   const [editingFee, setEditingFee] = useState<FeeStructure | null>(null);
+  const [isCreating, setIsCreating] = useState(false);
 
   const { data: classGroupData, isLoading: isGroupsLoading } =
     useGetAllClassGroup();
 
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  const classGroups = classGroupData?.data ?? [];
+  const classGroups = useMemo(
+    () => classGroupData?.data ?? [],
+    [classGroupData],
+  );
 
   const selectedGroupName = useMemo(
     () =>
@@ -291,7 +505,7 @@ const FeeStructurePage = () => {
           initial={{ opacity: 0, y: 24 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.6, ease: [0.16, 1, 0.3, 1] }}
-          className="mb-10 flex flex-col gap-6 sm:flex-row sm:items-center sm:justify-between"
+          className="mb-10 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between"
         >
           <div className="flex items-center gap-4">
             <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border border-indigo-400/30 bg-indigo-500/20">
@@ -308,10 +522,19 @@ const FeeStructurePage = () => {
                 Fee Structure
               </h1>
               <p className="font-manrope text-sm text-white/40">
-                Pick a class group to view its fee structure
+                Pick a class group to view or manage its fee structure
               </p>
             </div>
           </div>
+          {selectedGroupId && (
+            <button
+              onClick={() => setIsCreating(true)}
+              className="flex h-9 sm:h-10 shrink-0 items-center gap-2 rounded-xl border-0 bg-indigo-600 px-3 sm:px-4 font-jakarta text-xs sm:text-sm font-bold text-white shadow-lg shadow-indigo-500/20 transition-all hover:bg-indigo-500"
+            >
+              <Plus className="h-3.5 w-3.5" />
+              Add Fee Structure
+            </button>
+          )}
         </motion.div>
 
         <motion.div
@@ -431,7 +654,7 @@ const FeeStructurePage = () => {
                   "Due Date",
                   "Recurring",
                   "Status",
-                  "",
+                  "Modify",
                 ].map((h) => (
                   <span
                     key={h}
@@ -464,6 +687,13 @@ const FeeStructurePage = () => {
                       This class group does not have any fee structure yet
                     </p>
                   </div>
+                  <button
+                    onClick={() => setIsCreating(true)}
+                    className="flex h-9 items-center gap-2 rounded-xl bg-indigo-600 px-4 font-jakarta text-xs font-bold text-white shadow-lg shadow-indigo-500/20 transition-all hover:bg-indigo-500"
+                  >
+                    <Plus className="h-3.5 w-3.5" />
+                    Add Fee Structure
+                  </button>
                 </div>
               ) : (
                 <div className="divide-y divide-white/6">
@@ -568,6 +798,15 @@ const FeeStructurePage = () => {
           )}
         </motion.div>
       </div>
+
+      <AnimatePresence>
+        {isCreating && (
+          <CreateFeeModal
+            classGroupId={selectedGroupId}
+            onClose={() => setIsCreating(false)}
+          />
+        )}
+      </AnimatePresence>
 
       <AnimatePresence>
         {editingFee && (

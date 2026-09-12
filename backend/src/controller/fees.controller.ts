@@ -28,12 +28,12 @@ export async function createFeeStructure(
     return;
   }
   const adminId = req.user?.id;
-  const classId = req.params?.classId as string;
+  const classGroupId = req.params?.classGroupId as string;
   if (!adminId) {
     throw new Error("Admin ID is required");
   }
-  if (!classId) {
-    throw new Error("Class ID is required");
+  if (!classGroupId) {
+    throw new Error("ClassGroup ID is required");
   }
   const auditContext = buildAuditContext(req);
 
@@ -41,7 +41,7 @@ export async function createFeeStructure(
 
   const feeStructure = await createFeeStructureService(
     adminId,
-    classId,
+    classGroupId,
     parsed.data,
     auditContext,
     res.statusCode,

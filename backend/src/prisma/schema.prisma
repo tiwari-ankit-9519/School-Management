@@ -774,7 +774,6 @@ model FeeStructure {
   classId        String?
   name           String
   amount         Float
-  dueDate        DateTime
   isRecurring    Boolean      @default(false)
   recurringMonth Int?
   description    String?

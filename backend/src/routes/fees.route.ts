@@ -9,7 +9,7 @@ import {
 const router: Router = Router();
 
 router.post(
-  "/create/:classId",
+  "/create/:classGroupId",
   authenticate,
   authorize("ADMIN", "MODERATOR"),
   createFeeStructure,

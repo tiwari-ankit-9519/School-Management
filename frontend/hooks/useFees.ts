@@ -9,9 +9,9 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 
 const feeApi = {
-  createFeeStructure: async (data: FeesStructureType, classId: string) => {
+  createFeeStructure: async (data: FeesStructureType, classGroupId: string) => {
     const response = await api.post<ApiResponse<FeeStructure>>(
-      `/school/fee/create/${classId}`,
+      `/school/fee/create/${classGroupId}`,
       data,
     );
     return response.data.data;
@@ -41,11 +41,11 @@ const feeApi = {
   },
 };
 
-export const useCreateFeeStructure = (classId: string) => {
+export const useCreateFeeStructure = (classGroupId: string) => {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: (data: FeesStructureType) =>
-      feeApi.createFeeStructure(data, classId),
+      feeApi.createFeeStructure(data, classGroupId),
     onSuccess: () => {
       queryClient.invalidateQueries({
         queryKey: QUERY_KEYS.FEES,
