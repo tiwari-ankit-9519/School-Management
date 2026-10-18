@@ -2,7 +2,7 @@ import api, { getErrorMessage } from "@/lib/api";
 import { QUERY_KEYS } from "@/lib/constants";
 import { ApiResponse, ExamSchedule, PaginatedExamSchedules } from "@/types";
 import { ExamScheduleFormValues } from "@/validations/validations";
-import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 
 const examApi = {
@@ -12,6 +12,7 @@ const examApi = {
   ): Promise<ExamSchedule> => {
     const response = await api.post<ApiResponse<ExamSchedule>>(
       `/school/exam/${classGroupId}/create`,
+      data,
     );
     return response.data.data;
   },
@@ -39,8 +40,9 @@ const examApi = {
     if (fromDate !== undefined) params.set("fromDate", fromDate);
     if (toDate !== undefined) params.set("toDate", toDate);
 
-    const response =
-      await api.get<ApiResponse<PaginatedExamSchedules>>(`/school/exam/admin`);
+    const response = await api.get<ApiResponse<PaginatedExamSchedules>>(
+      `/school/exam/admin?${params.toString()}`,
+    );
 
     return response.data.data;
   },
@@ -63,8 +65,9 @@ const examApi = {
     if (subjectId !== undefined) params.set("subjectId", subjectId);
     if (fromDate !== undefined) params.set("fromDate", fromDate);
     if (toDate !== undefined) params.set("toDate", toDate);
-    const response =
-      await api.get<ApiResponse<ExamSchedule>>(`/school/exam/teacher`);
+    const response = await api.get<ApiResponse<ExamSchedule>>(
+      `/school/exam/teacher?${params.toString()}`,
+    );
     return response.data.data;
   },
   getExamScheduleForStudent: async (
@@ -82,7 +85,7 @@ const examApi = {
     if (fromDate !== undefined) params.set("fromDate", fromDate);
     if (toDate !== undefined) params.set("toDate", toDate);
     const response = await api.get<ApiResponse<ExamSchedule>>(
-      "/school/exam/student",
+      `/school/exam/student/?${params.toString()}`,
     );
     return response.data.data;
   },
@@ -110,5 +113,104 @@ export const useCreateExamSchedule = () => {
     onError: (error) => {
       toast.error(getErrorMessage(error));
     },
+  });
+};
+
+export const useGetExamScheduleForAdmin = (
+  classId?: string,
+  academicYear?: string,
+  examType?: string,
+  subjectId?: string,
+  teacherId?: string,
+  fromDate?: string,
+  toDate?: string,
+  page: number = 1,
+  limit: number = 10,
+) => {
+  return useQuery({
+    queryKey: [
+      ...QUERY_KEYS.EXAM_SCHEDULES,
+      classId,
+      academicYear,
+      examType,
+      subjectId,
+      teacherId,
+      fromDate,
+      toDate,
+      page,
+      limit,
+    ],
+    queryFn: () =>
+      examApi.getExamScheduleForAdmin(
+        classId,
+        academicYear,
+        examType,
+        subjectId,
+        teacherId,
+        fromDate,
+        toDate,
+        page,
+        limit,
+      ),
+  });
+};
+
+export const useGetExamScheduleForTeacher = (
+  classId?: string,
+  examType?: string,
+  subjectId?: string,
+  fromDate?: string,
+  toDate?: string,
+  page: number = 1,
+  limit: number = 10,
+) => {
+  return useQuery({
+    queryKey: [
+      ...QUERY_KEYS.EXAM_SCHEDULES,
+      classId,
+      examType,
+      subjectId,
+      fromDate,
+      toDate,
+      page,
+      limit,
+    ],
+    queryFn: () =>
+      examApi.getExamScheduleForTeacher(
+        classId,
+        examType,
+        subjectId,
+        fromDate,
+        toDate,
+        page,
+        limit,
+      ),
+  });
+};
+
+export const useGetExamScheduleForStudent = (
+  examType?: string,
+  fromDate?: string,
+  toDate?: string,
+  page: number = 1,
+  limit: number = 10,
+) => {
+  return useQuery({
+    queryKey: [
+      ...QUERY_KEYS.EXAM_SCHEDULES,
+      examType,
+      fromDate,
+      toDate,
+      page,
+      limit,
+    ],
+    queryFn: () =>
+      examApi.getExamScheduleForStudent(
+        examType,
+        fromDate,
+        toDate,
+        page,
+        limit,
+      ),
   });
 };

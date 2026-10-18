@@ -6,7 +6,6 @@ import {
 import {
   createLeaveRequestSchema,
   reviewLeaveRequestSchema,
-  ReviewSchoolApplicationSchema,
 } from "../validations/input.validations";
 import {
   applyLeaveRequestByModeratorService,

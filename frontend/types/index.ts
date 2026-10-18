@@ -1363,6 +1363,149 @@ export interface AdmissionApplicationStatusResponse {
   slotOfferedClass?: string | null;
 }
 
+export type ProfileUserFields = Pick<
+  User,
+  | "id"
+  | "regNumber"
+  | "role"
+  | "email"
+  | "phone"
+  | "isActive"
+  | "isVerified"
+  | "lastLoginAt"
+  | "createdAt"
+>;
+
+export type StudentProfileRecord = Omit<
+  Student,
+  | "user"
+  | "parentLinks"
+  | "enrollments"
+  | "attendances"
+  | "marks"
+  | "feePayments"
+  | "leaveRequests"
+  | "documents"
+>;
+
+export type TeacherProfileRecord = Omit<
+  Teacher,
+  | "user"
+  | "subjects"
+  | "timetables"
+  | "classTeachers"
+  | "attendances"
+  | "leaveRequests"
+  | "examSchedules"
+  | "documents"
+> & {
+  photoUrl: string | null;
+};
+
+export type ParentProfileRecord = Omit<
+  Parent,
+  "user" | "children" | "documents"
+>;
+
+export type AdminProfileRecord = Omit<
+  SingleAdminInfo,
+  "adminAttendance" | "user"
+>;
+
+export interface StudentProfile extends Omit<ProfileUserFields, "role"> {
+  role: Role.STUDENT;
+  student: StudentProfileRecord | null;
+}
+
+export interface TeacherProfile extends Omit<ProfileUserFields, "role"> {
+  role: Role.TEACHER;
+  teacher: TeacherProfileRecord | null;
+}
+
+export interface ParentProfile extends Omit<ProfileUserFields, "role"> {
+  role: Role.PARENT;
+  parent: ParentProfileRecord | null;
+}
+
+export interface AdminProfile extends Omit<ProfileUserFields, "role"> {
+  role: Role.ADMIN | Role.MODERATOR;
+  admin: AdminProfileRecord | null;
+}
+
+export type MyProfile =
+  | StudentProfile
+  | TeacherProfile
+  | ParentProfile
+  | AdminProfile;
+
+export type UpdatedUserCore = Pick<User, "id" | "email" | "phone" | "role">;
+
+export type UpdatedProfile =
+  | {
+      user: UpdatedUserCore & { role: Role.STUDENT };
+      student: StudentProfileRecord;
+    }
+  | {
+      user: UpdatedUserCore & { role: Role.TEACHER };
+      teacher: TeacherProfileRecord;
+    }
+  | {
+      user: UpdatedUserCore & { role: Role.PARENT };
+      parent: ParentProfileRecord;
+    }
+  | {
+      user: UpdatedUserCore & { role: Role.ADMIN | Role.MODERATOR };
+      admin: AdminProfileRecord;
+    };
+
+export type GetMyProfileResponse = ApiResponse<MyProfile>;
+export type UpdateMyProfileResponse = ApiResponse<UpdatedProfile>;
+
+export interface UpdateStudentProfilePayload {
+  email?: string;
+  phone?: string;
+  address?: string;
+  city?: string;
+  state?: string;
+  pincode?: string;
+  bloodGroup?: string;
+  medicalConditions?: string;
+  emergencyContact?: string;
+}
+
+export interface UpdateTeacherProfilePayload {
+  email?: string;
+  phone?: string;
+  address?: string;
+  city?: string;
+  state?: string;
+  pincode?: string;
+  qualification?: string;
+  experience?: number;
+  specialization?: string;
+  photoUrl?: string;
+}
+
+export interface UpdateParentProfilePayload {
+  email?: string;
+  phone?: string;
+  alternatePhone?: string;
+}
+
+export interface UpdateAdminProfilePayload {
+  email?: string;
+  phone?: string;
+  designation?: string;
+  department?: string;
+  photoUrl?: string;
+}
+
+export type UpdateMyProfilePayload =
+  | UpdateStudentProfilePayload
+  | UpdateTeacherProfilePayload
+  | UpdateParentProfilePayload
+  | UpdateAdminProfilePayload;
+
 export type PaginatedTeachers = PaginatedResponse<TeacherListItem>;
 export type PaginatedAdmins = PaginatedResponse<Admin>;
 export type PaginatedTeacherApplications =
@@ -1396,4 +1539,9 @@ export interface ApiResponse<T> {
   success: boolean;
   message: string;
   data: T;
+}
+
+export interface ApiMessageResponse {
+  success: true;
+  message?: string;
 }

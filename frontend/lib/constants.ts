@@ -38,4 +38,8 @@ export const QUERY_KEYS = {
   TIME_TABLE: ["timeTable"],
   EXAM_SCHEDULES: ["examSchedules"],
   EXAM_SCHEDULE: ["examSchedule"],
+  HOLIDAYS: ["holidays"],
+  HOLIDAY: ["holiday"],
+  MY_PROFILE: ["my_profile"],
+  MARKS: ["marks"] as const,
 };
