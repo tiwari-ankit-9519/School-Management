@@ -5,6 +5,7 @@ import {
   createModuleLogger,
   logRequest,
   logSecurityEvent,
+  runWithLogContext,
 } from "../config/logger.config.js";
 import {
   getClientIp,
@@ -249,31 +250,46 @@ export function requestIdMiddleware(
   res: Response,
   next: NextFunction,
 ): void {
-  req.requestId =
+  const requestId =
     (req.headers["x-request-id"] as string | undefined) ??
     (req.headers["x-correlation-id"] as string | undefined) ??
     crypto.randomUUID();
+
+  req.requestId = requestId;
   req.startTime = Date.now();
   req.context = buildRequestContext(req);
   req.deviceInfo = req.context.deviceInfo;
   req.fingerprint = req.context.fingerprint;
 
-  res.setHeader("X-Request-ID", req.requestId);
+  res.setHeader("X-Request-ID", requestId);
 
-  if (req.context.deviceInfo.isBot) {
-    const botMsg = `Bot traffic detected on request entry | requestId=${req.requestId} ip=${req.context.ip} isPrivateIp=${req.context.isPrivateIp} isVpnOrProxy=${req.context.isVpnOrProxy} fingerprint=${req.context.fingerprint} path=${req.path} userAgent=${req.context.deviceInfo.raw} browser=${req.context.deviceInfo.browser} os=${req.context.deviceInfo.os} deviceType=${req.context.deviceInfo.deviceType}`;
-    log.warn(botMsg);
-    logSecurityEvent("BOT_TRAFFIC_DETECTED", req.context.ip, null, {
-      requestId: req.requestId,
-      path: req.path,
+  const requestContext = req.context;
+
+  runWithLogContext(
+    {
+      requestId,
       method: req.method,
-      fingerprint: req.context.fingerprint,
-      userAgent: req.context.deviceInfo.raw,
-      isVpnOrProxy: req.context.isVpnOrProxy,
-    });
-  }
-
-  next();
+      path: req.originalUrl,
+      ip: requestContext.ip,
+      traceId: req.headers["x-trace-id"] as string | undefined,
+      getUser: () => req.user,
+    },
+    () => {
+      if (requestContext.deviceInfo.isBot) {
+        log.warn(
+          `Bot traffic detected on request entry | ip=${requestContext.ip} isPrivateIp=${requestContext.isPrivateIp} isVpnOrProxy=${requestContext.isVpnOrProxy} fingerprint=${requestContext.fingerprint} path=${req.path} userAgent=${requestContext.deviceInfo.raw} browser=${requestContext.deviceInfo.browser} os=${requestContext.deviceInfo.os} deviceType=${requestContext.deviceInfo.deviceType}`,
+        );
+        logSecurityEvent("BOT_TRAFFIC_DETECTED", requestContext.ip, null, {
+          path: req.path,
+          method: req.method,
+          fingerprint: requestContext.fingerprint,
+          userAgent: requestContext.deviceInfo.raw,
+          isVpnOrProxy: requestContext.isVpnOrProxy,
+        });
+      }
+      next();
+    },
+  );
 }
 
 export function requestContextMiddleware(

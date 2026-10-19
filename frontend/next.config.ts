@@ -11,6 +11,7 @@ const nextConfig: NextConfig = {
     ],
   },
   reactStrictMode: false,
+  devIndicators: false,
 };
 
 export default nextConfig;

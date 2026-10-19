@@ -6,6 +6,7 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { LayoutShell } from "@/components/layout-shell";
 import "./globals.css";
 import { LocaleProvider } from "@/lib/locale-context";
+import { ThemeProvider } from "@/components/theme-provider";
 
 export const manrope = Manrope({
   subsets: ["latin"],
@@ -33,15 +34,22 @@ export default function RootLayout({
       suppressHydrationWarning
       className={`${manrope.variable} ${jakarta.variable}`}
     >
-      <body className="bg-[#050810] antialiased font-manrope">
-        <LocaleProvider>
-          <QueryProvider>
-            <TooltipProvider>
-              <LayoutShell>{children}</LayoutShell>
-              <Toaster position="top-right" richColors />
-            </TooltipProvider>
-          </QueryProvider>
-        </LocaleProvider>
+      <body className="bg-background text-foreground antialiased font-manrope">
+        <ThemeProvider
+          attribute="class"
+          defaultTheme="dark"
+          enableSystem
+          disableTransitionOnChange
+        >
+          <LocaleProvider>
+            <QueryProvider>
+              <TooltipProvider>
+                <LayoutShell>{children}</LayoutShell>
+                <Toaster position="top-right" richColors />
+              </TooltipProvider>
+            </QueryProvider>
+          </LocaleProvider>
+        </ThemeProvider>
       </body>
     </html>
   );

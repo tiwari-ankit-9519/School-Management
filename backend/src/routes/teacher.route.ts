@@ -10,8 +10,11 @@ import {
   getTeacherApplicationStatus,
 } from "../controller/teacher.controller";
 import { Module } from "@prisma/client";
+import { controllerContext } from "../config/logger.config";
 
 const router: Router = Router();
+
+router.use(controllerContext("TeacherController"));
 
 router.get(
   "/all-teachers",

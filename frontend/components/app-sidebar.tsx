@@ -1,237 +1,356 @@
 "use client";
+import { ReactNode, useSyncExternalStore } from "react";
 import { usePathname, useRouter } from "next/navigation";
-import { motion } from "motion/react";
 import Image from "next/image";
 import Link from "next/link";
+import { ArrowUpRight, ChevronDown, LogOut } from "lucide-react";
 import {
   Sidebar,
   SidebarContent,
   SidebarFooter,
   SidebarGroup,
   SidebarGroupContent,
+  SidebarGroupLabel,
   SidebarHeader,
+  SidebarInset,
   SidebarMenu,
+  SidebarMenuButton,
   SidebarMenuItem,
   SidebarProvider,
   SidebarTrigger,
+  useSidebar,
 } from "@/components/ui/sidebar";
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { LogOut, User, ChevronDown, Sparkles } from "lucide-react";
+import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { Button } from "@/components/ui/button";
+import { Separator } from "@/components/ui/separator";
 import { NAV_CONFIG, UserRole, NavItem } from "@/config/sidebar-config";
 import { useAuthStore } from "@/stores/useAuthStore";
 import { useLogout } from "@/hooks/useAuth";
 import { useTranslations } from "@/hooks/useTranslations";
 import { LanguageToggle } from "@/components/LanguageToggle";
+import { ThemeToggle } from "@/components/ThemeToggle";
 
 const SCHOOL_NAME = "Nageshwari Devi Shree Krishna Girls Inter College";
 const SCHOOL_CODE = "N.D.S.K.G.I.C.";
 
-const sidebarCssVars = {
-  "--sidebar-background": "#030712",
-  "--sidebar-foreground": "rgba(255,255,255,0.5)",
-  "--sidebar-primary": "#6366f1",
-  "--sidebar-primary-foreground": "#fff",
-  "--sidebar-accent": "rgba(255,255,255,0.04)",
-  "--sidebar-accent-foreground": "rgba(255,255,255,0.9)",
-  "--sidebar-border": "rgba(255,255,255,0.06)",
-  "--sidebar-ring": "#6366f1",
-} as React.CSSProperties;
+const ROLE_LABEL_KEYS = {
+  ADMIN: "roleAdmin",
+  STUDENT: "roleStudent",
+  TEACHER: "roleTeacher",
+  PARENT: "roleParent",
+  MODERATOR: "roleModerator",
+} as const satisfies Record<UserRole, string>;
 
-function NavItemRow({ item }: { item: NavItem }) {
-  const pathname = usePathname();
+type GreetingKey = "greetingMorning" | "greetingAfternoon" | "greetingEvening";
+
+const NAV_BUTTON_CLASS =
+  "h-10 gap-3 rounded-xl px-3 font-manrope text-sm text-muted-foreground transition-colors hover:bg-sidebar-accent hover:text-foreground data-[active=true]:bg-transparent data-[active=true]:font-semibold data-[active=true]:text-foreground [&>svg]:size-[18px]";
+
+const subscribeMinutes = (callback: () => void) => {
+  const id = setInterval(callback, 60_000);
+  return () => clearInterval(id);
+};
+
+const getGreetingKey = (): GreetingKey => {
+  const hour = new Date().getHours();
+  if (hour < 12) return "greetingMorning";
+  if (hour < 17) return "greetingAfternoon";
+  return "greetingEvening";
+};
+
+const getServerGreetingKey = (): GreetingKey | null => null;
+
+const getDisplayName = (email?: string | null): string => {
+  if (!email) return "";
+  const local = email
+    .split("@")[0]
+    .replace(/[._-]+/g, " ")
+    .trim();
+  return local.charAt(0).toUpperCase() + local.slice(1);
+};
+
+const getInitials = (email?: string | null): string =>
+  email ? email.slice(0, 2).toUpperCase() : "—";
+
+const findActiveHref = (
+  pathname: string,
+  items: NavItem[],
+): string | undefined =>
+  items
+    .map((item) => item.href)
+    .filter(
+      (href): href is string =>
+        !!href && (pathname === href || pathname.startsWith(`${href}/`)),
+    )
+    .sort((a, b) => b.length - a.length)[0];
+
+function NavItemRow({ item, isActive }: { item: NavItem; isActive: boolean }) {
   const t = useTranslations("sidebar");
-  const isActive = item.href ? pathname === item.href : false;
+  const { setOpenMobile } = useSidebar();
 
   return (
     <SidebarMenuItem>
-      <Link
-        href={item.href ?? "#"}
-        className={`group relative flex items-center gap-3 px-3.5 py-3 rounded-xl transition-all duration-300 font-manrope text-sm overflow-hidden ${
-          isActive
-            ? "bg-linear-to-r from-indigo-500/20 via-indigo-500/10 to-transparent text-indigo-200 font-semibold shadow-inner shadow-indigo-500/10"
-            : "text-zinc-400 hover:text-zinc-200 hover:bg-white/3"
-        }`}
+      {isActive && (
+        <span
+          aria-hidden="true"
+          className="absolute top-1.5 bottom-1.5 -left-2 w-1 rounded-r-full bg-indigo-600 dark:bg-indigo-400"
+        />
+      )}
+      <SidebarMenuButton
+        asChild
+        isActive={isActive}
+        className={NAV_BUTTON_CLASS}
       >
-        {/* Active subtle left border accent line */}
-        {isActive && (
-          <motion.div
-            layoutId="active-pill"
-            className="absolute left-0 top-1.5 bottom-1.5 w-1 bg-linear-to-b from-indigo-400 to-indigo-600 rounded-r-full shadow-lg shadow-indigo-500/50"
+        <Link href={item.href ?? "#"} onClick={() => setOpenMobile(false)}>
+          <item.icon
+            className={isActive ? "text-indigo-600 dark:text-indigo-400" : ""}
           />
-        )}
-
-        <div
-          className={`p-1.5 rounded-lg transition-colors duration-200 ${
-            isActive
-              ? "bg-indigo-500/20 text-indigo-400 shadow-sm"
-              : "bg-white/2 text-zinc-400 group-hover:text-zinc-200 group-hover:bg-white/5"
-          }`}
-        >
-          <item.icon className="h-4 w-4 shrink-0 transition-transform duration-200 group-hover:scale-110" />
-        </div>
-
-        <span className="tracking-wide text-xs">
-          {t(item.labelKey as Parameters<typeof t>[0])}
-        </span>
-
-        {isActive && (
-          <motion.div
-            layoutId="active-indicator"
-            className="ml-auto w-1.5 h-1.5 rounded-full bg-indigo-400 shadow-[0_0_8px_rgba(129,140,248,0.8)]"
-          />
-        )}
-      </Link>
+          <span>{t(item.labelKey as Parameters<typeof t>[0])}</span>
+        </Link>
+      </SidebarMenuButton>
     </SidebarMenuItem>
   );
 }
 
-function AppSidebarInner() {
-  const { user } = useAuthStore();
-  const { mutate: logout } = useLogout();
+function useLogoutAction() {
   const router = useRouter();
-  const t = useTranslations("common");
-  const role = user?.role as UserRole | undefined;
-  const navItems = role && NAV_CONFIG[role] ? NAV_CONFIG[role] : [];
-
-  const roleLabel: Record<UserRole, string> = {
-    ADMIN: "Administrator",
-    STUDENT: "Student Portal",
-    TEACHER: "Faculty Member",
-    PARENT: "Parent Account",
-    MODERATOR: "Moderator",
-  };
-
-  const handleLogout = () => {
+  const { mutate: logout } = useLogout();
+  return () =>
     logout(undefined, {
       onSuccess: () => router.push("/login"),
     });
-  };
+}
+
+function AppSidebarInner() {
+  const pathname = usePathname();
+  const { user } = useAuthStore();
+  const handleLogout = useLogoutAction();
+  const t = useTranslations("sidebar");
+  const tCommon = useTranslations("common");
+  const role = user?.role as UserRole | undefined;
+  const navItems = role && NAV_CONFIG[role] ? NAV_CONFIG[role] : [];
+  const activeHref = findActiveHref(pathname, navItems);
 
   return (
     <Sidebar
-      style={sidebarCssVars}
-      className="border-r border-white/[0.07] bg-[#030712] shadow-2xl"
+      variant="floating"
+      className="**:data-[sidebar=sidebar]:rounded-2xl **:data-[sidebar=sidebar]:border-sidebar-border **:data-[sidebar=sidebar]:shadow-none"
     >
-      {/* Brand Header */}
-      <SidebarHeader className="px-5 py-6 border-b border-white/6 bg-[#030712]/80 backdrop-blur-xl relative">
-        <div className="absolute inset-0 bg-linear-to-b from-indigo-500/3 to-transparent pointer-events-none" />
-        <div className="flex items-center gap-3.5 relative z-10">
-          <div className="w-10 h-10 rounded-2xl bg-linear-to-br from-indigo-500/30 to-purple-500/20 border border-indigo-400/30 flex items-center justify-center shrink-0 shadow-lg shadow-indigo-500/10 group-hover:scale-105 transition-transform">
+      <SidebarHeader className="px-4 pt-5 pb-3">
+        <div className="flex items-center gap-2.5">
+          <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-indigo-500/10 ring-1 ring-indigo-500/20">
             <Image
               src="/logo.png"
               alt={SCHOOL_NAME}
               width={22}
               height={22}
-              className="object-contain drop-shadow"
+              className="object-contain"
             />
-          </div>
-          <div className="min-w-0 flex-1">
-            <div className="flex items-center gap-1.5">
-              <span className="text-white text-sm font-bold font-jakarta tracking-wide block leading-none">
-                {SCHOOL_CODE}
-              </span>
-              <Sparkles className="w-3 h-3 text-indigo-400 animate-pulse" />
-            </div>
-            <span
-              className="text-zinc-500 text-[10px] font-manrope truncate block max-w-40 mt-1"
+          </span>
+          <div className="min-w-0">
+            <p className="font-jakarta text-base font-bold tracking-tight text-foreground">
+              {SCHOOL_CODE}
+            </p>
+            <p
+              className="truncate font-manrope text-[10px] text-muted-foreground"
               title={SCHOOL_NAME}
             >
               {SCHOOL_NAME}
-            </span>
+            </p>
           </div>
         </div>
       </SidebarHeader>
 
-      {/* Navigation Links */}
-      <SidebarContent className="px-3 py-5 bg-[#030712] scrollbar-thin scrollbar-thumb-white/10">
+      <SidebarContent className="gap-2 py-2">
         <SidebarGroup>
+          <SidebarGroupLabel className="px-3 font-manrope text-[10px] font-semibold tracking-widest text-muted-foreground/70 uppercase">
+            {t("menu")}
+          </SidebarGroupLabel>
           <SidebarGroupContent>
-            <div className="px-3 pb-2 text-[10px] font-semibold tracking-wider text-zinc-600 uppercase font-jakarta">
-              Menu
-            </div>
-            <SidebarMenu className="space-y-1">
+            <SidebarMenu className="gap-0.5">
               {navItems.map((item) => (
-                <NavItemRow key={item.labelKey} item={item} />
+                <NavItemRow
+                  key={item.labelKey}
+                  item={item}
+                  isActive={item.href === activeHref}
+                />
               ))}
+            </SidebarMenu>
+          </SidebarGroupContent>
+        </SidebarGroup>
+
+        <SidebarGroup>
+          <SidebarGroupLabel className="px-3 font-manrope text-[10px] font-semibold tracking-widest text-muted-foreground/70 uppercase">
+            {t("general")}
+          </SidebarGroupLabel>
+          <SidebarGroupContent>
+            <SidebarMenu className="gap-0.5">
+              <SidebarMenuItem>
+                <SidebarMenuButton
+                  onClick={handleLogout}
+                  className={`${NAV_BUTTON_CLASS} hover:bg-red-500/10 hover:text-red-600 dark:hover:text-red-400`}
+                >
+                  <LogOut />
+                  <span>{tCommon("logout")}</span>
+                </SidebarMenuButton>
+              </SidebarMenuItem>
             </SidebarMenu>
           </SidebarGroupContent>
         </SidebarGroup>
       </SidebarContent>
 
-      {/* Footer Profile & Controls */}
-      <SidebarFooter className="px-3 py-4 border-t border-white/6 bg-[#030712]/90 backdrop-blur-md">
-        <div className="flex items-center justify-between px-2 mb-3">
-          <span className="text-zinc-500 text-[10px] font-semibold uppercase tracking-wider font-jakarta">
-            Preferences
-          </span>
-          <div className="bg-white/3 border border-white/6 rounded-lg p-0.5">
-            <LanguageToggle />
-          </div>
-        </div>
-
-        <DropdownMenu>
-          <DropdownMenuTrigger asChild>
-            <button className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl bg-white/2 border border-white/6 hover:bg-white/5 hover:border-white/10 transition-all duration-200 group text-left shadow-sm">
-              <div className="relative">
-                <div className="w-9 h-9 rounded-xl bg-linear-to-tr from-indigo-500/20 to-purple-500/20 border border-indigo-400/30 flex items-center justify-center shrink-0 shadow-inner">
-                  <User className="h-4 w-4 text-indigo-400" />
-                </div>
-                <div className="absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 rounded-full bg-emerald-500 border-2 border-[#030712]" />
-              </div>
-              <div className="flex-1 min-w-0">
-                <p className="text-zinc-200 text-xs font-jakarta font-semibold truncate group-hover:text-white transition-colors">
-                  {user?.email ?? "—"}
-                </p>
-                <p className="text-indigo-400/80 text-[10px] font-medium font-manrope">
-                  {role ? roleLabel[role] : ""}
-                </p>
-              </div>
-              <ChevronDown className="h-3.5 w-3.5 text-zinc-500 group-hover:text-zinc-300 transition-colors shrink-0" />
-            </button>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent
-            side="top"
-            align="start"
-            className="w-56 bg-[#090d16] border border-white/10 rounded-2xl shadow-2xl p-1.5 mb-2 backdrop-blur-2xl"
+      <SidebarFooter className="p-3">
+        <div className="relative overflow-hidden rounded-2xl bg-linear-to-br from-indigo-600 via-indigo-700 to-indigo-950 p-4 text-white">
+          <svg
+            className="pointer-events-none absolute -right-12 -bottom-12 h-40 w-40"
+            viewBox="0 0 160 160"
+            fill="none"
+            aria-hidden="true"
           >
-            <DropdownMenuItem
-              onClick={handleLogout}
-              className="flex items-center gap-2.5 px-3 py-2.5 text-red-400 hover:text-red-300 hover:bg-red-500/10 rounded-xl font-manrope text-xs cursor-pointer transition-colors font-medium"
-            >
-              <LogOut className="h-3.5 w-3.5" />
-              {t("logout")}
-            </DropdownMenuItem>
-          </DropdownMenuContent>
-        </DropdownMenu>
+            {[30, 46, 62, 78].map((r) => (
+              <circle
+                key={r}
+                cx="80"
+                cy="80"
+                r={r}
+                stroke="white"
+                strokeOpacity="0.12"
+              />
+            ))}
+          </svg>
+          <span className="relative flex h-8 w-8 items-center justify-center rounded-full bg-white/15 ring-1 ring-white/20">
+            <Image
+              src="/logo.png"
+              alt=""
+              width={18}
+              height={18}
+              className="object-contain"
+              aria-hidden="true"
+            />
+          </span>
+          <p className="relative mt-3 font-jakarta text-sm leading-snug font-semibold">
+            {t("promoTitle")}
+          </p>
+          <p className="relative mt-1 font-manrope text-[11px] leading-relaxed text-white/70">
+            {t("promoText")}
+          </p>
+          <Button
+            asChild
+            size="sm"
+            className="relative mt-3 h-9 w-full gap-1.5 rounded-full bg-white/15 font-manrope text-xs font-medium text-white shadow-none backdrop-blur hover:bg-white/25"
+          >
+            <Link href="/">
+              {t("promoAction")}
+              <ArrowUpRight className="size-3.5" />
+            </Link>
+          </Button>
+        </div>
       </SidebarFooter>
     </Sidebar>
   );
 }
 
-export function AppSidebar({ children }: { children: React.ReactNode }) {
+function TopBar() {
+  const { user } = useAuthStore();
+  const handleLogout = useLogoutAction();
+  const t = useTranslations("sidebar");
+  const tCommon = useTranslations("common");
+  const greetingKey = useSyncExternalStore(
+    subscribeMinutes,
+    getGreetingKey,
+    getServerGreetingKey,
+  );
+  const role = user?.role as UserRole | undefined;
+  const roleLabel = role ? t(ROLE_LABEL_KEYS[role]) : "";
+  const displayName = getDisplayName(user?.email);
+  const greeting = greetingKey ? t(greetingKey) : t("welcomeBack");
+
   return (
-    <SidebarProvider style={sidebarCssVars}>
-      <div className="flex min-h-screen w-full bg-[#02040a]">
-        <AppSidebarInner />
-        <div className="flex-1 flex flex-col min-w-0 bg-[#030712]">
-          <div className="flex items-center justify-between px-4 py-3.5 border-b border-white/6 bg-[#030712]/80 backdrop-blur-md md:hidden sticky top-0 z-30">
-            <div className="flex items-center gap-3">
-              <SidebarTrigger className="text-zinc-400 hover:text-white transition-colors p-1.5 rounded-lg hover:bg-white/5" />
-              <div className="flex items-center gap-2">
-                <span className="text-white text-sm font-bold font-jakarta tracking-wide">
-                  {SCHOOL_CODE}
-                </span>
-              </div>
-            </div>
+    <header className="sticky top-0 z-30 px-2 pt-2 md:pr-3">
+      <div className="flex h-16 items-center gap-3 rounded-2xl border border-border bg-card/90 px-3 backdrop-blur-xl sm:px-4">
+        <SidebarTrigger className="text-muted-foreground hover:bg-accent hover:text-foreground" />
+        <Separator orientation="vertical" className="h-5" />
+        <div className="min-w-0">
+          <p className="truncate font-jakarta text-sm font-semibold text-foreground">
+            {displayName ? `${greeting}, ${displayName}` : greeting}
+          </p>
+          <p className="hidden truncate font-manrope text-xs text-muted-foreground sm:block">
+            {SCHOOL_NAME}
+          </p>
+        </div>
+
+        <div className="ml-auto flex items-center gap-2">
+          <div className="hidden sm:block">
+            <LanguageToggle />
           </div>
-          <main className="flex-1">{children}</main>
+          <ThemeToggle />
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button
+                variant="ghost"
+                className="h-11 gap-2.5 rounded-full py-1 pr-2 pl-1 hover:bg-accent data-[state=open]:bg-accent"
+              >
+                <Avatar className="h-9 w-9">
+                  <AvatarFallback className="bg-indigo-500/15 font-jakarta text-xs font-bold text-indigo-700 dark:text-indigo-300">
+                    {getInitials(user?.email)}
+                  </AvatarFallback>
+                </Avatar>
+                <span className="hidden max-w-44 min-w-0 text-left md:block">
+                  <span className="block truncate font-jakarta text-sm font-semibold text-foreground">
+                    {displayName || "—"}
+                  </span>
+                  <span className="block truncate font-manrope text-[11px] font-normal text-muted-foreground">
+                    {user?.email ?? "—"}
+                  </span>
+                </span>
+                <ChevronDown className="hidden size-3.5 text-muted-foreground md:block" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent
+              align="end"
+              sideOffset={8}
+              className="w-60 rounded-xl p-1.5"
+            >
+              <DropdownMenuLabel className="px-2.5 py-2 font-normal">
+                <p className="truncate font-jakarta text-xs font-semibold text-foreground">
+                  {user?.email ?? "—"}
+                </p>
+                <p className="mt-0.5 font-manrope text-[10px] text-muted-foreground">
+                  {roleLabel}
+                </p>
+              </DropdownMenuLabel>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem
+                onSelect={handleLogout}
+                className="cursor-pointer gap-2.5 rounded-lg px-2.5 py-2 font-manrope text-xs font-medium text-red-600 focus:bg-red-500/10 focus:text-red-700 dark:text-red-400 dark:focus:text-red-300"
+              >
+                <LogOut className="size-3.5 text-current" />
+                {tCommon("logout")}
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
         </div>
       </div>
+    </header>
+  );
+}
+
+export function AppSidebar({ children }: { children: ReactNode }) {
+  return (
+    <SidebarProvider>
+      <AppSidebarInner />
+      <SidebarInset className="min-w-0 bg-background">
+        <TopBar />
+        <main className="flex-1 px-2 pt-4 pb-6 md:pr-3">{children}</main>
+      </SidebarInset>
     </SidebarProvider>
   );
 }

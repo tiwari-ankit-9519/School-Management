@@ -11,8 +11,11 @@ import {
   updatedTimeTable,
 } from "../controller/timetable.controller";
 import { Module } from "@prisma/client";
+import { controllerContext } from "../config/logger.config";
 
 const router: Router = Router();
+
+router.use(controllerContext("TimeTableController"));
 
 router.post(
   "/create",

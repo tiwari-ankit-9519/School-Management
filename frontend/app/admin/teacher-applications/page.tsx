@@ -1,600 +1,259 @@
 "use client";
-
-import { useState } from "react";
-import { useRouter } from "next/navigation";
-import { motion, AnimatePresence } from "motion/react";
-import Image from "next/image";
+import { useMemo, useState } from "react";
+import { motion } from "motion/react";
+import { CheckCircle2, Clock, RefreshCw, Star, Users } from "lucide-react";
+import { Card } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { Separator } from "@/components/ui/separator";
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
-  Users,
-  ChevronLeft,
-  ChevronRight,
-  SlidersHorizontal,
-  X,
-  ArrowRight,
-  Loader2,
-  User,
-  Search,
-  GraduationCap,
-  Briefcase,
-  Clock,
-  CheckCircle,
-  XCircle,
-  Star,
-} from "lucide-react";
+  CARD_CLASS,
+  TONE_CLASSES,
+  fadeUp,
+} from "@/components/dashboard/DashboardWidgets";
+import { TAB_TRIGGER_CLASS } from "@/components/forms/FormParts";
+import {
+  ApplicationsPagination,
+  StatFilterCard,
+  TableSkeleton,
+} from "@/components/admissions/AdmissionsListParts";
+import {
+  ActiveFilterChips,
+  FiltersPopover,
+  STATUS_CONFIG,
+  STATUS_FILTERS,
+  StatusFilter,
+  TeacherApplicationsTable,
+  TeacherEmptyState,
+  TeacherFilters,
+  countActiveFilters,
+  matchesFilters,
+} from "@/components/teacher-applications/TeacherApplicationsParts";
 import { useGetAllTeacherApplications } from "@/hooks/useTeacher";
+import { useGetDashboardSummary } from "@/hooks/useDashboard";
 import { useTranslations } from "@/hooks/useTranslations";
-import { ApplicationStatus, Gender, TeacherApplicationListItem } from "@/types";
+import { ApplicationStatus } from "@/types";
 
-// ─── Status config ────────────────────────────────────────────────────────────
-const STATUS_TABS: { value: string; label: string; icon: React.ReactNode }[] = [
-  {
-    value: "ALL",
-    label: "All",
-    icon: <Users className="h-3.5 w-3.5" />,
-  },
-  {
-    value: ApplicationStatus.PENDING,
-    label: "Pending",
-    icon: <Clock className="h-3.5 w-3.5" />,
-  },
-  {
-    value: ApplicationStatus.SHORTLISTED,
-    label: "Shortlisted",
-    icon: <Star className="h-3.5 w-3.5" />,
-  },
-  {
-    value: ApplicationStatus.SELECTED,
-    label: "Selected",
-    icon: <CheckCircle className="h-3.5 w-3.5" />,
-  },
-  {
-    value: ApplicationStatus.REJECTED,
-    label: "Rejected",
-    icon: <XCircle className="h-3.5 w-3.5" />,
-  },
-];
+const PAGE_SIZE = 10;
 
-const STATUS_STYLES: Record<
-  string,
-  { border: string; bg: string; text: string; dot: string }
-> = {
-  PENDING: {
-    border: "border-amber-500/20",
-    bg: "bg-amber-500/10",
-    text: "text-amber-400",
-    dot: "bg-amber-400",
-  },
-  SHORTLISTED: {
-    border: "border-indigo-500/20",
-    bg: "bg-indigo-500/10",
-    text: "text-indigo-400",
-    dot: "bg-indigo-400",
-  },
-  SELECTED: {
-    border: "border-emerald-500/20",
-    bg: "bg-emerald-500/10",
-    text: "text-emerald-400",
-    dot: "bg-emerald-400",
-  },
-  REJECTED: {
-    border: "border-red-500/20",
-    bg: "bg-red-500/10",
-    text: "text-red-400",
-    dot: "bg-red-400",
-  },
-};
-
-// ─── Status Badge ─────────────────────────────────────────────────────────────
-const StatusBadge = ({ status }: { status: ApplicationStatus }) => {
-  const s = STATUS_STYLES[status] ?? STATUS_STYLES.PENDING;
-  return (
-    <span
-      className={`inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 font-manrope text-xs font-medium ${s.border} ${s.bg} ${s.text}`}
-    >
-      <span className={`h-1.5 w-1.5 rounded-full ${s.dot}`} />
-      {status.charAt(0) + status.slice(1).toLowerCase()}
-    </span>
-  );
-};
-
-// ─── Gender Badge ─────────────────────────────────────────────────────────────
-const GenderBadge = ({ gender }: { gender: Gender }) => (
-  <span className="inline-flex items-center gap-1 rounded-md border border-white/10 bg-white/5 px-2 py-0.5 font-manrope text-[11px] text-white/40">
-    {gender.charAt(0) + gender.slice(1).toLowerCase()}
-  </span>
-);
-
-// ─── Page ─────────────────────────────────────────────────────────────────────
 const TeacherApplicationsPage = () => {
   const t = useTranslations("teacherApplications");
-  const router = useRouter();
-
-  const [activeStatus, setActiveStatus] = useState("ALL");
+  const [status, setStatus] = useState<StatusFilter>("ALL");
   const [page, setPage] = useState(1);
-  const [isFiltersOpen, setIsFiltersOpen] = useState(false);
+  const [filters, setFilters] = useState<TeacherFilters>({});
+  const [now] = useState(() => Date.now());
 
-  // Filter inputs (staging)
-  const [nameInput, setNameInput] = useState("");
-  const [emailInput, setEmailInput] = useState("");
-  const [qualificationInput, setQualificationInput] = useState("");
-  const [specializationInput, setSpecializationInput] = useState("");
-  const [genderInput, setGenderInput] = useState("");
-
-  // Applied filters (committed)
-  const [appliedFilters, setAppliedFilters] = useState<{
-    name?: string;
-    email?: string;
-    qualification?: string;
-    specialization?: string;
-    gender?: string;
-  }>({});
-
-  const { data, isLoading } = useGetAllTeacherApplications(
+  const { data, isLoading, isFetching, refetch } = useGetAllTeacherApplications(
     page,
-    10,
-    activeStatus,
+    PAGE_SIZE,
+    status,
   );
+  const { data: summary, isLoading: isSummaryLoading } =
+    useGetDashboardSummary();
 
-  // Client-side filter on top of status filter from API
-  const filteredData = data
-    ? {
-        ...data,
-        data: data.data.filter((app) => {
-          const fullName = `${app.firstName} ${app.lastName}`.toLowerCase();
-          if (
-            appliedFilters.name &&
-            !fullName.includes(appliedFilters.name.toLowerCase())
-          )
-            return false;
-          if (
-            appliedFilters.email &&
-            !app.email
-              .toLowerCase()
-              .includes(appliedFilters.email.toLowerCase())
-          )
-            return false;
-          if (
-            appliedFilters.qualification &&
-            !app.qualification
-              .toLowerCase()
-              .includes(appliedFilters.qualification.toLowerCase())
-          )
-            return false;
-          if (
-            appliedFilters.specialization &&
-            !app.specialization
-              ?.toLowerCase()
-              .includes(appliedFilters.specialization.toLowerCase())
-          )
-            return false;
-          if (appliedFilters.gender && app.gender !== appliedFilters.gender)
-            return false;
-          return true;
-        }),
-      }
-    : data;
+  const counts = useMemo<Record<string, number>>(
+    () => summary?.teacherApplications.byStatus ?? {},
+    [summary],
+  );
+  const totalApplications = summary?.teacherApplications.total ?? 0;
 
-  const activeFilterCount = Object.values(appliedFilters).filter(
-    (v) => v !== undefined && v !== "",
-  ).length;
+  const applications = useMemo(
+    () => (data?.data ?? []).filter((app) => matchesFilters(app, filters)),
+    [data, filters],
+  );
+  const activeFilterCount = countActiveFilters(filters);
+  const totalPages = data?.totalPages ?? 1;
 
-  const applyFilters = () => {
-    setAppliedFilters({
-      name: nameInput || undefined,
-      email: emailInput || undefined,
-      qualification: qualificationInput || undefined,
-      specialization: specializationInput || undefined,
-      gender: genderInput || undefined,
-    });
-    setPage(1);
-    setIsFiltersOpen(false);
-  };
-
-  const clearFilters = () => {
-    setNameInput("");
-    setEmailInput("");
-    setQualificationInput("");
-    setSpecializationInput("");
-    setGenderInput("");
-    setAppliedFilters({});
+  const selectStatus = (value: string) => {
+    const next = STATUS_FILTERS.find((filter) => filter === value);
+    if (!next) return;
+    setStatus(next);
     setPage(1);
   };
 
-  const handleStatusChange = (status: string) => {
-    setActiveStatus(status);
-    setPage(1);
-  };
+  const removeFilter = (key: keyof TeacherFilters) =>
+    setFilters((prev) => ({ ...prev, [key]: undefined }));
 
-  const formatDate = (dateStr: string) =>
-    new Date(dateStr).toLocaleDateString("en-IN", {
-      day: "2-digit",
-      month: "short",
-      year: "numeric",
-    });
+  const filterLabel = (value: StatusFilter) =>
+    value === "ALL" ? t("filterAll") : t(STATUS_CONFIG[value].labelKey);
+
+  const filterCount = (value: StatusFilter) =>
+    value === "ALL" ? totalApplications : (counts[value] ?? 0);
 
   return (
-    <div className="relative min-h-screen w-full bg-[#050810] px-3 py-6 sm:px-8 sm:py-10">
-      {/* Background */}
-      <div
-        className="pointer-events-none fixed inset-0 select-none"
-        style={{
-          background:
-            "radial-gradient(ellipse at 20% 20%, #1e3a5f18 0%, transparent 55%), radial-gradient(ellipse at 80% 70%, #6366f10a 0%, transparent 50%)",
-        }}
-      />
-
-      <div className="relative z-10 mx-auto max-w-6xl">
-        {/* Header */}
-        <motion.div
-          initial={{ opacity: 0, y: 24 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.6, ease: [0.16, 1, 0.3, 1] }}
-          className="mb-6 sm:mb-10"
+    <div className="space-y-5">
+      <motion.header
+        {...fadeUp(0)}
+        className="flex flex-col gap-4 px-1 sm:flex-row sm:items-end sm:justify-between"
+      >
+        <div>
+          <div className="flex flex-wrap items-center gap-2.5">
+            <h1 className="font-jakarta text-3xl font-bold tracking-tight text-foreground sm:text-4xl">
+              {t("pageTitle")}
+            </h1>
+            {!isSummaryLoading && (
+              <Badge
+                variant="outline"
+                className={`rounded-full font-manrope text-[11px] font-medium ${TONE_CLASSES.indigo}`}
+              >
+                {totalApplications.toLocaleString("en-IN")} {t("total")}
+              </Badge>
+            )}
+          </div>
+          <p className="mt-1.5 font-manrope text-sm text-muted-foreground">
+            {t("pageSubtitle")}
+          </p>
+        </div>
+        <Button
+          variant="outline"
+          onClick={() => refetch()}
+          disabled={isFetching}
+          className="h-11 gap-2 self-start rounded-full border-border bg-card px-5 font-manrope text-sm font-medium text-foreground shadow-none hover:bg-accent sm:self-auto dark:border-border dark:bg-card dark:hover:bg-accent"
         >
-          <div className="flex items-start justify-between gap-3">
-            <div className="flex items-center gap-3">
-              <div className="flex h-9 w-9 sm:h-11 sm:w-11 items-center justify-center rounded-xl border border-indigo-400/30 bg-indigo-500/20 shrink-0">
-                <Image
-                  src="/logo.png"
-                  alt="EduSphere Logo"
-                  width={22}
-                  height={22}
-                  className="object-contain"
+          <RefreshCw
+            className={`size-4 ${isFetching ? "animate-spin text-indigo-600 dark:text-indigo-400" : ""}`}
+          />
+          {t("refresh")}
+        </Button>
+      </motion.header>
+
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
+        <StatFilterCard
+          highlighted
+          label={t("kpiTotal")}
+          value={totalApplications.toLocaleString("en-IN")}
+          footnote={t("kpiTotalNote")}
+          icon={<Users className="size-4" />}
+          tone="indigo"
+          active={status === "ALL"}
+          onSelect={() => selectStatus("ALL")}
+          loading={isSummaryLoading}
+          delay={0.05}
+        />
+        <StatFilterCard
+          label={t("kpiPending")}
+          value={(counts[ApplicationStatus.PENDING] ?? 0).toLocaleString(
+            "en-IN",
+          )}
+          footnote={t("kpiPendingNote")}
+          icon={<Clock className="size-4" />}
+          tone="amber"
+          active={status === ApplicationStatus.PENDING}
+          onSelect={() => selectStatus(ApplicationStatus.PENDING)}
+          loading={isSummaryLoading}
+          delay={0.1}
+        />
+        <StatFilterCard
+          label={t("kpiShortlisted")}
+          value={(counts[ApplicationStatus.SHORTLISTED] ?? 0).toLocaleString(
+            "en-IN",
+          )}
+          footnote={t("kpiShortlistedNote")}
+          icon={<Star className="size-4" />}
+          tone="indigo"
+          active={status === ApplicationStatus.SHORTLISTED}
+          onSelect={() => selectStatus(ApplicationStatus.SHORTLISTED)}
+          loading={isSummaryLoading}
+          delay={0.15}
+        />
+        <StatFilterCard
+          label={t("kpiSelected")}
+          value={(counts[ApplicationStatus.SELECTED] ?? 0).toLocaleString(
+            "en-IN",
+          )}
+          footnote={t("kpiSelectedNote")}
+          icon={<CheckCircle2 className="size-4" />}
+          tone="emerald"
+          active={status === ApplicationStatus.SELECTED}
+          onSelect={() => selectStatus(ApplicationStatus.SELECTED)}
+          loading={isSummaryLoading}
+          delay={0.2}
+        />
+      </div>
+
+      <motion.div {...fadeUp(0.25)}>
+        <Card className={CARD_CLASS}>
+          <div className="space-y-3 px-4 pt-4 pb-3 sm:px-5">
+            <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+              <Tabs
+                value={status}
+                onValueChange={(value: string) => selectStatus(value)}
+              >
+                <TabsList className="flex h-auto w-full justify-start gap-1.5 overflow-x-auto bg-transparent p-0 scrollbar-none">
+                  {STATUS_FILTERS.map((filter) => (
+                    <TabsTrigger
+                      key={filter}
+                      value={filter}
+                      className={`group ${TAB_TRIGGER_CLASS} px-3.5`}
+                    >
+                      {filter !== "ALL" && (
+                        <span
+                          className={`h-1.5 w-1.5 rounded-full ${STATUS_CONFIG[filter].dot}`}
+                        />
+                      )}
+                      {filterLabel(filter)}
+                      {!isSummaryLoading && (
+                        <span className="rounded-full bg-background px-1.5 py-px text-[10px] text-muted-foreground group-data-[state=active]:bg-primary-foreground/15 group-data-[state=active]:text-primary-foreground/80">
+                          {filterCount(filter)}
+                        </span>
+                      )}
+                    </TabsTrigger>
+                  ))}
+                </TabsList>
+              </Tabs>
+              <div className="flex shrink-0 items-center gap-3">
+                {data && (
+                  <span className="font-manrope text-xs text-muted-foreground">
+                    {applications.length} {t("results")}
+                  </span>
+                )}
+                <FiltersPopover
+                  applied={filters}
+                  onApply={setFilters}
+                  onClear={() => setFilters({})}
                 />
               </div>
-              <div>
-                <h1 className="font-jakarta text-xl sm:text-2xl font-extrabold leading-tight text-white">
-                  {t("pageTitle")}
-                </h1>
-                <p className="font-manrope text-xs sm:text-sm text-white/40 mt-0.5">
-                  {t("pageSubtitle")}
-                </p>
-              </div>
             </div>
+            <ActiveFilterChips filters={filters} onRemove={removeFilter} />
+            {activeFilterCount > 0 && (
+              <p className="font-manrope text-[11px] text-muted-foreground">
+                {t("filterPageHint")}
+              </p>
+            )}
           </div>
 
-          {/* Status tabs + filter button */}
-          <div className="mt-4 flex flex-wrap items-center gap-2">
-            {/* Scrollable status tabs */}
-            <div className="flex items-center gap-1.5 overflow-x-auto pb-0.5 scrollbar-none">
-              {STATUS_TABS.map((tab) => (
-                <button
-                  key={tab.value}
-                  onClick={() => handleStatusChange(tab.value)}
-                  className={`flex h-8 sm:h-9 shrink-0 items-center gap-1.5 rounded-xl px-3 sm:px-3.5 font-manrope text-xs sm:text-sm font-medium transition-all duration-200 ${
-                    activeStatus === tab.value
-                      ? "bg-indigo-600 text-white shadow-md shadow-indigo-500/20"
-                      : "border border-white/10 bg-white/5 text-white/50 hover:border-white/20 hover:text-white"
-                  }`}
-                >
-                  <span
-                    className={
-                      activeStatus === tab.value
-                        ? "text-white"
-                        : "text-white/30"
-                    }
-                  >
-                    {tab.icon}
-                  </span>
-                  {tab.label}
-                </button>
-              ))}
-            </div>
-
-            {/* Filter toggle */}
-            <button
-              onClick={() => setIsFiltersOpen((p) => !p)}
-              className={`relative flex h-8 sm:h-9 items-center gap-1.5 rounded-xl border px-3 font-manrope text-xs sm:text-sm backdrop-blur-sm transition-all duration-200 ${
-                isFiltersOpen || activeFilterCount > 0
-                  ? "border-indigo-500/40 bg-indigo-500/10 text-indigo-300"
-                  : "border-white/10 bg-white/5 text-white/60 hover:border-white/20 hover:text-white"
-              }`}
-            >
-              <SlidersHorizontal className="h-3 w-3 sm:h-3.5 sm:w-3.5" />
-              <span>{t("filters")}</span>
-              {activeFilterCount > 0 && (
-                <span className="flex h-4 w-4 items-center justify-center rounded-full bg-indigo-500 font-jakarta text-[10px] font-bold text-white">
-                  {activeFilterCount}
-                </span>
-              )}
-            </button>
-          </div>
-        </motion.div>
-
-        {/* Filter panel */}
-        <AnimatePresence>
-          {isFiltersOpen && (
-            <motion.div
-              initial={{ opacity: 0, height: 0 }}
-              animate={{ opacity: 1, height: "auto" }}
-              exit={{ opacity: 0, height: 0 }}
-              transition={{ duration: 0.25, ease: [0.16, 1, 0.3, 1] }}
-              className="mb-4 sm:mb-6 overflow-hidden"
-            >
-              <div className="relative rounded-2xl border border-white/10 bg-white/4 p-4 sm:p-5 backdrop-blur-xl">
-                <div className="absolute inset-x-0 top-0 h-px bg-linear-to-r from-transparent via-white/15 to-transparent rounded-t-2xl" />
-                <div className="grid grid-cols-2 gap-2 sm:gap-3 sm:grid-cols-3 lg:grid-cols-5">
-                  {[
-                    {
-                      label: t("filterName"),
-                      value: nameInput,
-                      set: setNameInput,
-                      icon: <User className="h-3.5 w-3.5" />,
-                    },
-                    {
-                      label: t("filterEmail"),
-                      value: emailInput,
-                      set: setEmailInput,
-                      icon: <Search className="h-3.5 w-3.5" />,
-                    },
-                    {
-                      label: t("filterQualification"),
-                      value: qualificationInput,
-                      set: setQualificationInput,
-                      icon: <GraduationCap className="h-3.5 w-3.5" />,
-                    },
-                    {
-                      label: t("filterSpecialization"),
-                      value: specializationInput,
-                      set: setSpecializationInput,
-                      icon: <Briefcase className="h-3.5 w-3.5" />,
-                    },
-                  ].map((field) => (
-                    <div key={field.label} className="relative">
-                      <div className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-indigo-400/60">
-                        {field.icon}
-                      </div>
-                      <input
-                        type="text"
-                        placeholder={field.label}
-                        value={field.value}
-                        onChange={(e) => field.set(e.target.value)}
-                        className="h-9 sm:h-10 w-full rounded-xl border border-white/10 bg-white/5 pl-9 pr-3 font-manrope text-xs sm:text-sm text-white placeholder:text-white/20 focus:border-indigo-500/50 focus:outline-none focus:ring-1 focus:ring-indigo-500/30 transition-colors"
-                      />
-                    </div>
-                  ))}
-
-                  {/* Gender select */}
-                  <div className="relative">
-                    <div className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-indigo-400/60">
-                      <User className="h-3.5 w-3.5" />
-                    </div>
-                    <select
-                      value={genderInput}
-                      onChange={(e) => setGenderInput(e.target.value)}
-                      className="h-9 sm:h-10 w-full appearance-none rounded-xl border border-white/10 bg-white/5 pl-9 pr-3 font-manrope text-xs sm:text-sm text-white focus:border-indigo-500/50 focus:outline-none focus:ring-1 focus:ring-indigo-500/30 transition-colors"
-                    >
-                      <option value="" className="bg-[#070c18]">
-                        {t("filterGender")}
-                      </option>
-                      <option value={Gender.MALE} className="bg-[#070c18]">
-                        Male
-                      </option>
-                      <option value={Gender.FEMALE} className="bg-[#070c18]">
-                        Female
-                      </option>
-                      <option value={Gender.OTHER} className="bg-[#070c18]">
-                        Other
-                      </option>
-                    </select>
-                  </div>
-                </div>
-
-                <div className="mt-3 sm:mt-4 flex items-center justify-end gap-2">
-                  {activeFilterCount > 0 && (
-                    <button
-                      onClick={clearFilters}
-                      className="flex h-8 sm:h-9 items-center gap-1.5 rounded-lg border border-white/10 bg-white/5 px-3 font-manrope text-xs text-white/40 transition-colors hover:border-white/20 hover:text-white/70"
-                    >
-                      <X className="h-3 w-3" />
-                      {t("clearFilters")}
-                    </button>
-                  )}
-                  <button
-                    onClick={applyFilters}
-                    className="flex h-8 sm:h-9 items-center gap-1.5 rounded-lg bg-indigo-600 px-4 font-jakarta text-xs font-bold text-white shadow-md shadow-indigo-500/20 transition-all hover:bg-indigo-500"
-                  >
-                    {t("applyFilters")}
-                  </button>
-                </div>
-              </div>
-            </motion.div>
-          )}
-        </AnimatePresence>
-
-        {/* Table */}
-        <motion.div
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          transition={{ duration: 0.5, delay: 0.15 }}
-          className="relative overflow-hidden rounded-2xl border border-white/10 bg-white/4 backdrop-blur-xl shadow-[0_0_0_1px_rgba(255,255,255,0.04),0_24px_60px_rgba(0,0,0,0.5)]"
-        >
-          <div className="absolute inset-x-0 top-0 h-px bg-linear-to-r from-transparent via-white/15 to-transparent" />
-
-          {/* Desktop header */}
-          <div className="hidden md:grid md:grid-cols-[2fr_1.5fr_1fr_1fr_1fr_1fr_0.5fr] gap-4 border-b border-white/8 px-6 py-3.5">
-            {[
-              t("colName"),
-              t("colEmail"),
-              t("colGender"),
-              t("colQualification"),
-              t("colSpecialization"),
-              t("colStatus"),
-              t("colAction"),
-            ].map((h) => (
-              <span
-                key={h}
-                className="font-manrope text-xs font-medium uppercase tracking-widest text-white/30"
-              >
-                {h}
-              </span>
-            ))}
-          </div>
+          <Separator />
 
           {isLoading ? (
-            <div className="flex items-center justify-center py-16 sm:py-20">
-              <div className="flex flex-col items-center gap-3">
-                <Loader2 className="h-7 w-7 animate-spin text-indigo-400" />
-                <span className="font-manrope text-sm text-white/30">
-                  {t("loading")}
-                </span>
-              </div>
-            </div>
-          ) : !filteredData?.data?.length ? (
-            <div className="flex flex-col items-center justify-center gap-4 py-16 sm:py-20 px-4 text-center">
-              <div className="flex h-12 w-12 sm:h-14 sm:w-14 items-center justify-center rounded-2xl border border-white/10 bg-white/5">
-                <Users className="h-5 w-5 sm:h-6 sm:w-6 text-white/20" />
-              </div>
-              <div>
-                <p className="font-jakarta text-sm font-semibold text-white/40">
-                  {t("emptyTitle")}
-                </p>
-                <p className="mt-0.5 font-manrope text-xs text-white/20">
-                  {t("emptySubtitle")}
-                </p>
-              </div>
-            </div>
+            <TableSkeleton />
+          ) : applications.length === 0 ? (
+            <TeacherEmptyState
+              onClear={
+                activeFilterCount > 0
+                  ? () => setFilters({})
+                  : status !== "ALL"
+                    ? () => selectStatus("ALL")
+                    : undefined
+              }
+            />
           ) : (
-            <div className="divide-y divide-white/6">
-              {filteredData.data.map(
-                (app: TeacherApplicationListItem, i: number) => (
-                  <motion.div
-                    key={app.id}
-                    initial={{ opacity: 0, x: -8 }}
-                    animate={{ opacity: 1, x: 0 }}
-                    transition={{ duration: 0.35, delay: i * 0.04 }}
-                    onClick={() =>
-                      router.push(`/admin/teacher-applications/${app.id}`)
-                    }
-                    className="cursor-pointer transition-colors duration-150 hover:bg-white/3 group"
-                  >
-                    {/* Mobile row */}
-                    <div className="flex md:hidden items-start justify-between gap-3 px-4 py-4">
-                      <div className="flex items-start gap-3 min-w-0">
-                        <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-indigo-500/20 bg-indigo-500/10 mt-0.5">
-                          <User className="h-3.5 w-3.5 text-indigo-400" />
-                        </div>
-                        <div className="min-w-0 flex-1">
-                          <p className="font-jakarta text-sm font-bold text-white truncate">
-                            {app.firstName} {app.lastName}
-                          </p>
-                          <p className="font-manrope text-xs text-white/40 truncate mt-0.5">
-                            {app.email}
-                          </p>
-                          <div className="mt-2 flex flex-wrap items-center gap-1.5">
-                            <StatusBadge status={app.status} />
-                            <GenderBadge gender={app.gender} />
-                          </div>
-                          <div className="mt-1.5 flex flex-wrap items-center gap-x-3 gap-y-1">
-                            {app.qualification && (
-                              <span className="flex items-center gap-1 font-manrope text-[11px] text-white/40">
-                                <GraduationCap className="h-3 w-3 shrink-0" />
-                                {app.qualification}
-                              </span>
-                            )}
-                            {app.specialization && (
-                              <span className="flex items-center gap-1 font-manrope text-[11px] text-white/40">
-                                <Briefcase className="h-3 w-3 shrink-0" />
-                                {app.specialization}
-                              </span>
-                            )}
-                          </div>
-                          <p className="mt-1 font-manrope text-[11px] text-white/25">
-                            {t("applied")} {formatDate(app.appliedAt)}
-                          </p>
-                        </div>
-                      </div>
-                      <ArrowRight className="h-4 w-4 shrink-0 mt-1 text-white/20 transition-all duration-200 group-hover:translate-x-0.5 group-hover:text-indigo-400" />
-                    </div>
-
-                    {/* Desktop row */}
-                    <div className="hidden md:grid md:grid-cols-[2fr_1.5fr_1fr_1fr_1fr_1fr_0.5fr] gap-4 px-6 py-4 items-center">
-                      {/* Name */}
-                      <div className="flex items-center gap-3 min-w-0">
-                        <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-indigo-500/20 bg-indigo-500/10">
-                          <User className="h-3.5 w-3.5 text-indigo-400" />
-                        </div>
-                        <div className="min-w-0">
-                          <p className="font-jakarta text-sm font-bold text-white truncate">
-                            {app.firstName} {app.lastName}
-                          </p>
-                          <p className="font-manrope text-[11px] text-white/30 truncate mt-0.5">
-                            {t("applied")} {formatDate(app.appliedAt)}
-                          </p>
-                        </div>
-                      </div>
-
-                      {/* Email */}
-                      <div className="flex items-center min-w-0">
-                        <span className="font-manrope text-sm text-white/50 truncate">
-                          {app.email}
-                        </span>
-                      </div>
-
-                      {/* Gender */}
-                      <div className="flex items-center">
-                        <GenderBadge gender={app.gender} />
-                      </div>
-
-                      {/* Qualification */}
-                      <div className="flex items-center gap-1.5 min-w-0">
-                        <GraduationCap className="h-3.5 w-3.5 text-white/20 shrink-0" />
-                        <span className="font-manrope text-sm text-white/50 truncate">
-                          {app.qualification}
-                        </span>
-                      </div>
-
-                      {/* Specialization */}
-                      <div className="flex items-center gap-1.5 min-w-0">
-                        <Briefcase className="h-3.5 w-3.5 text-white/20 shrink-0" />
-                        <span className="font-manrope text-sm text-white/50 truncate">
-                          {app.specialization ?? "—"}
-                        </span>
-                      </div>
-
-                      {/* Status */}
-                      <div className="flex items-center">
-                        <StatusBadge status={app.status} />
-                      </div>
-
-                      {/* Arrow */}
-                      <div className="flex items-center justify-end">
-                        <ArrowRight className="h-4 w-4 text-white/20 transition-all duration-200 group-hover:translate-x-0.5 group-hover:text-indigo-400" />
-                      </div>
-                    </div>
-                  </motion.div>
-                ),
-              )}
-            </div>
+            <TeacherApplicationsTable applications={applications} now={now} />
           )}
 
-          {data && data.totalPages > 1 && (
-            <div className="flex items-center justify-between border-t border-white/8 px-4 sm:px-6 py-3 sm:py-4">
-              <span className="font-manrope text-xs text-white/30">
-                {`${t("page")} ${data.page} ${t("of")} ${data.totalPages} · ${data.total} ${t("total")}`}
-              </span>
-              <div className="flex items-center gap-2">
-                <button
-                  onClick={() => setPage((p) => Math.max(1, p - 1))}
-                  disabled={page === 1}
-                  className="flex h-7 w-7 sm:h-8 sm:w-8 items-center justify-center rounded-lg border border-white/10 bg-white/5 text-white/40 transition-colors hover:border-white/20 hover:text-white/70 disabled:opacity-30"
-                >
-                  <ChevronLeft className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
-                </button>
-                <button
-                  onClick={() =>
-                    setPage((p) => Math.min(data.totalPages, p + 1))
-                  }
-                  disabled={page === data.totalPages}
-                  className="flex h-7 w-7 sm:h-8 sm:w-8 items-center justify-center rounded-lg border border-white/10 bg-white/5 text-white/40 transition-colors hover:border-white/20 hover:text-white/70 disabled:opacity-30"
-                >
-                  <ChevronRight className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
-                </button>
-              </div>
-            </div>
+          {data && totalPages > 1 && (
+            <>
+              <Separator />
+              <ApplicationsPagination
+                page={data.page}
+                totalPages={totalPages}
+                total={data.total}
+                onChange={setPage}
+              />
+            </>
           )}
-        </motion.div>
-      </div>
+        </Card>
+      </motion.div>
     </div>
   );
 };

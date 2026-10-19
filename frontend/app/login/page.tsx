@@ -1,350 +1,649 @@
 "use client";
-import { zodResolver } from "@hookform/resolvers/zod";
-import { useForm, useWatch } from "react-hook-form";
-import { Button } from "@/components/ui/button";
-import { useLogin } from "@/hooks/useAuth";
-import { ArrowRight, Lock, User } from "lucide-react";
-import AnimatedInput from "@/components/smoothui/animated-input";
-import { motion } from "motion/react";
+import { useState, ReactNode } from "react";
 import Image from "next/image";
+import Link from "next/link";
+import { zodResolver } from "@hookform/resolvers/zod";
+import { useForm } from "react-hook-form";
+import { motion } from "motion/react";
+import {
+  AlertCircle,
+  ArrowRight,
+  Eye,
+  EyeOff,
+  GraduationCap,
+  IndianRupee,
+  Loader2,
+  TrendingUp,
+  UserPlus,
+  Users,
+} from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Separator } from "@/components/ui/separator";
+import { useLogin } from "@/hooks/useAuth";
 import { LoginFormValues, loginSchema } from "@/validations/validations";
 import { useTranslations } from "@/hooks/useTranslations";
 
 const SCHOOL_NAME = "Nageshwari Devi Shree Krishna Girls Inter College";
 const SCHOOL_CODE = "N.D.S.K.G.I.C.";
+const ATTENDANCE_BARS = [72, 85, 78, 91, 88, 94, 82, 96, 89, 93, 87, 91];
+const EASE = [0.16, 1, 0.3, 1] as const;
+const WINDOW_COLUMNS = [0, 1, 2];
+const WINDOW_ROWS = [0, 1, 2];
+const WINGS = [
+  { x: 72, offset: 0 },
+  { x: 254, offset: 1 },
+];
+
+const ILLUSTRATION_VARS =
+  "[--illus-wall-top:#e0e7ff] [--illus-wall-bottom:#c7d2fe] [--illus-line:rgba(11,16,32,0.14)] [--illus-window-off:rgba(11,16,32,0.08)] [--illus-window-on:#6366f1] [--illus-face:#ffffff] [--illus-ink:#4338ca] [--illus-shadow:rgba(11,16,32,0.08)] [--illus-trunk:#a8a29e] [--illus-dot:#6366f1] [--illus-book:#eef2ff] dark:[--illus-wall-top:#1c2645] dark:[--illus-wall-bottom:#0c1326] dark:[--illus-line:rgba(255,255,255,0.12)] dark:[--illus-window-off:rgba(255,255,255,0.06)] dark:[--illus-window-on:#818cf8] dark:[--illus-face:#050810] dark:[--illus-ink:#c7d2fe] dark:[--illus-shadow:rgba(0,0,0,0.45)] dark:[--illus-trunk:#3f3f46] dark:[--illus-dot:#c7d2fe] dark:[--illus-book:#1c2645]";
+
+const tileClass =
+  "absolute z-10 rounded-2xl border border-border bg-background/85 p-3.5 shadow-[0_16px_40px_rgba(11,16,32,0.08)] backdrop-blur-xl dark:shadow-[0_16px_40px_rgba(0,0,0,0.5)]";
+
+const fieldClass = (hasError: boolean) =>
+  `h-11 rounded-full bg-card px-4 font-manrope text-sm text-foreground placeholder:text-muted-foreground/60 shadow-none focus-visible:ring-0 ${
+    hasError
+      ? "border-red-500/50 focus-visible:border-red-500"
+      : "border-input focus-visible:border-indigo-500"
+  }`;
+
+const tileMotion = (delay: number) => ({
+  initial: { opacity: 0, y: 16 },
+  animate: { opacity: 1, y: 0 },
+  transition: { duration: 0.6, delay, ease: EASE },
+});
+
+const FieldError = ({ message }: { message?: string }) => {
+  if (!message) return null;
+  return (
+    <motion.p
+      initial={{ opacity: 0, y: -4 }}
+      animate={{ opacity: 1, y: 0 }}
+      className="mt-1.5 ml-1 flex items-center gap-1 font-manrope text-xs text-red-600 dark:text-red-400"
+    >
+      <AlertCircle className="h-3 w-3 shrink-0" />
+      {message}
+    </motion.p>
+  );
+};
+
+const TileIcon = ({ children }: { children: ReactNode }) => (
+  <span className="flex h-6 w-6 items-center justify-center rounded-md bg-muted text-foreground/70">
+    {children}
+  </span>
+);
+
+const SchoolIllustration = () => (
+  <svg
+    viewBox="0 0 400 300"
+    fill="none"
+    xmlns="http://www.w3.org/2000/svg"
+    className="h-auto w-full"
+    aria-hidden="true"
+  >
+    <defs>
+      <linearGradient id="school-wall" x1="0" y1="0" x2="0" y2="1">
+        <stop offset="0" stopColor="var(--illus-wall-top)" />
+        <stop offset="1" stopColor="var(--illus-wall-bottom)" />
+      </linearGradient>
+      <linearGradient id="school-roof" x1="0" y1="0" x2="0" y2="1">
+        <stop offset="0" stopColor="#818cf8" />
+        <stop offset="1" stopColor="#4338ca" />
+      </linearGradient>
+      <radialGradient id="school-glow" cx="0.5" cy="0.55" r="0.5">
+        <stop offset="0" stopColor="#6366f1" stopOpacity="0.25" />
+        <stop offset="1" stopColor="#6366f1" stopOpacity="0" />
+      </radialGradient>
+    </defs>
+
+    <ellipse cx="200" cy="165" rx="200" ry="140" fill="url(#school-glow)" />
+    <ellipse cx="200" cy="252" rx="165" ry="9" fill="var(--illus-shadow)" />
+    <path d="M14 250H386" stroke="var(--illus-line)" strokeWidth="1.5" />
+
+    <rect
+      x="36"
+      y="222"
+      width="4"
+      height="28"
+      rx="1"
+      fill="var(--illus-trunk)"
+    />
+    <circle cx="38" cy="210" r="18" fill="#059669" fillOpacity="0.55" />
+    <circle cx="30" cy="218" r="11" fill="#10b981" fillOpacity="0.45" />
+    <rect
+      x="360"
+      y="222"
+      width="4"
+      height="28"
+      rx="1"
+      fill="var(--illus-trunk)"
+    />
+    <circle cx="362" cy="210" r="18" fill="#059669" fillOpacity="0.55" />
+    <circle cx="370" cy="218" r="11" fill="#10b981" fillOpacity="0.45" />
+
+    {WINGS.map((wing) => (
+      <g key={wing.x}>
+        <rect
+          x={wing.x}
+          y="152"
+          width="74"
+          height="98"
+          fill="url(#school-wall)"
+          stroke="var(--illus-line)"
+        />
+        <rect
+          x={wing.x - 4}
+          y="145"
+          width="82"
+          height="8"
+          rx="2"
+          fill="#4338ca"
+        />
+        {WINDOW_ROWS.map((row) =>
+          WINDOW_COLUMNS.map((col) => {
+            const isLit = (row + col + wing.offset) % 2 === 0;
+            return (
+              <rect
+                key={`${row}-${col}`}
+                x={wing.x + 9 + col * 21}
+                y={164 + row * 27}
+                width="14"
+                height="17"
+                rx="2"
+                fill={
+                  isLit ? "var(--illus-window-on)" : "var(--illus-window-off)"
+                }
+                fillOpacity={isLit ? 0.6 : 1}
+              />
+            );
+          }),
+        )}
+      </g>
+    ))}
+
+    <rect
+      x="140"
+      y="122"
+      width="120"
+      height="128"
+      fill="url(#school-wall)"
+      stroke="var(--illus-line)"
+    />
+    <path d="M128 126L200 80L272 126Z" fill="url(#school-roof)" />
+    <path
+      d="M128 126H272"
+      stroke="#c7d2fe"
+      strokeOpacity="0.6"
+      strokeWidth="2"
+    />
+    <circle
+      cx="200"
+      cy="106"
+      r="11"
+      fill="var(--illus-face)"
+      stroke="#c7d2fe"
+    />
+    <path
+      d="M200 99V106L205 109"
+      stroke="var(--illus-ink)"
+      strokeWidth="1.5"
+      strokeLinecap="round"
+    />
+
+    <path d="M200 80V36" stroke="var(--illus-line)" strokeWidth="1.5" />
+    <rect x="201" y="38" width="24" height="5" fill="#ff9933" />
+    <rect
+      x="201"
+      y="43"
+      width="24"
+      height="5"
+      fill="#f8fafc"
+      stroke="var(--illus-line)"
+      strokeWidth="0.5"
+    />
+    <rect x="201" y="48" width="24" height="5" fill="#138808" />
+    <circle cx="213" cy="45.5" r="1.6" fill="#1e3a8a" />
+
+    {[150, 170, 222, 242].map((x) => (
+      <rect
+        key={x}
+        x={x}
+        y="132"
+        width="8"
+        height="108"
+        rx="1"
+        fill="var(--illus-window-off)"
+      />
+    ))}
+    <rect
+      x="186"
+      y="150"
+      width="28"
+      height="22"
+      rx="2"
+      fill="var(--illus-window-on)"
+      fillOpacity="0.55"
+    />
+    <path
+      d="M186 240V212C186 204.268 192.268 198 200 198C207.732 198 214 204.268 214 212V240Z"
+      fill="#6366f1"
+      fillOpacity="0.3"
+      stroke="#818cf8"
+    />
+    <rect
+      x="170"
+      y="240"
+      width="60"
+      height="5"
+      rx="1"
+      fill="var(--illus-window-off)"
+    />
+    <rect
+      x="162"
+      y="245"
+      width="76"
+      height="5"
+      rx="1"
+      fill="var(--illus-window-off)"
+    />
+
+    <g opacity="0.8">
+      <path d="M52 62L70 54L88 62L70 70Z" fill="#818cf8" />
+      <path
+        d="M60 66V74C60 74 64 78 70 78C76 78 80 74 80 74V66"
+        stroke="#818cf8"
+        strokeWidth="2"
+      />
+      <path d="M88 62V72" stroke="var(--illus-ink)" strokeWidth="1.5" />
+    </g>
+    <g opacity="0.8">
+      <path
+        d="M318 60H338C341 60 342 62 342 64V84H322C320 84 318 83 318 80Z"
+        fill="var(--illus-book)"
+        stroke="#818cf8"
+      />
+      <path
+        d="M342 64C342 62 343 60 346 60H362V80C362 83 360 84 358 84H342"
+        fill="var(--illus-book)"
+        stroke="#818cf8"
+      />
+      <path
+        d="M324 68H336M324 74H336M348 68H356M348 74H356"
+        stroke="var(--illus-ink)"
+        strokeOpacity="0.6"
+      />
+    </g>
+    {[
+      [110, 40],
+      [290, 30],
+      [24, 120],
+      [376, 130],
+      [150, 22],
+    ].map(([cx, cy]) => (
+      <circle
+        key={`${cx}-${cy}`}
+        cx={cx}
+        cy={cy}
+        r="1.6"
+        fill="var(--illus-dot)"
+        fillOpacity="0.6"
+      />
+    ))}
+  </svg>
+);
+
+function ShowcasePanel() {
+  const t = useTranslations("login");
+
+  return (
+    <aside
+      className={`relative hidden overflow-hidden rounded-3xl border border-border bg-card lg:flex lg:flex-col ${ILLUSTRATION_VARS}`}
+    >
+      <div
+        className="pointer-events-none absolute inset-0"
+        style={{
+          backgroundImage:
+            "radial-gradient(color-mix(in oklab, var(--foreground) 7%, transparent) 1px, transparent 1px)",
+          backgroundSize: "22px 22px",
+          maskImage:
+            "radial-gradient(ellipse at center, black 30%, transparent 75%)",
+          WebkitMaskImage:
+            "radial-gradient(ellipse at center, black 30%, transparent 75%)",
+        }}
+      />
+      <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(ellipse_at_50%_45%,rgba(99,102,241,0.10),transparent_60%)] dark:bg-[radial-gradient(ellipse_at_50%_45%,rgba(99,102,241,0.14),transparent_60%)]" />
+
+      <motion.div {...tileMotion(0.1)} className="relative z-10 px-10 pt-28">
+        <p className="font-manrope text-[11px] tracking-widest text-muted-foreground uppercase">
+          {t("institutionOverview")}
+        </p>
+        <p className="mt-1 font-jakarta text-2xl font-bold text-foreground xl:text-3xl">
+          {t("schoolDashboard")}
+        </p>
+      </motion.div>
+
+      <div className="relative z-10 flex flex-1 items-center px-6 py-6 xl:px-10">
+        <div className="relative mx-auto w-full max-w-xl">
+          <motion.div
+            initial={{ opacity: 0, scale: 0.96 }}
+            animate={{ opacity: 1, scale: 1 }}
+            transition={{ duration: 0.8, ease: EASE }}
+            className="px-12 py-14 xl:px-16"
+          >
+            <SchoolIllustration />
+          </motion.div>
+
+          <motion.div
+            {...tileMotion(0.25)}
+            className={`${tileClass} top-0 left-0 w-44`}
+          >
+            <div className="flex items-center gap-2">
+              <TileIcon>
+                <Users className="size-3" />
+              </TileIcon>
+              <p className="font-manrope text-[11px] text-muted-foreground">
+                {t("students")}
+              </p>
+            </div>
+            <p className="mt-2.5 font-jakarta text-xl leading-none font-bold text-foreground">
+              1,240
+            </p>
+            <p className="mt-1 font-manrope text-[10px] text-emerald-600 dark:text-emerald-400">
+              +3.1% {t("thisMonth")}
+            </p>
+            <Separator className="my-2.5" />
+            <div className="flex justify-between gap-2 font-manrope text-[10px] text-muted-foreground">
+              <span>
+                {t("teachingStaff")}{" "}
+                <span className="font-jakarta font-semibold text-foreground">
+                  68
+                </span>
+              </span>
+              <span>
+                {t("classSections")}{" "}
+                <span className="font-jakarta font-semibold text-foreground">
+                  42
+                </span>
+              </span>
+            </div>
+          </motion.div>
+
+          <motion.div
+            {...tileMotion(0.4)}
+            className={`${tileClass} top-6 right-0 w-52`}
+          >
+            <div className="flex items-center justify-between">
+              <p className="font-manrope text-[10px] tracking-wider text-muted-foreground uppercase">
+                {t("attendanceRate")}
+              </p>
+              <span className="flex items-center gap-1 font-manrope text-[10px] font-medium text-emerald-600 dark:text-emerald-400">
+                <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-emerald-500" />
+                {t("live")}
+              </span>
+            </div>
+            <div className="mt-3 flex h-10 items-end gap-0.75">
+              {ATTENDANCE_BARS.map((height, i) => (
+                <div
+                  key={i}
+                  className="flex-1 rounded-xs"
+                  style={{
+                    height: `${height}%`,
+                    background:
+                      i === ATTENDANCE_BARS.length - 1
+                        ? "linear-gradient(to top, #6366f1, #818cf8)"
+                        : i > 8
+                          ? "rgba(99,102,241,0.5)"
+                          : "color-mix(in oklab, var(--foreground) 10%, transparent)",
+                  }}
+                />
+              ))}
+            </div>
+            <div className="mt-2.5 flex items-end justify-between">
+              <span className="font-jakarta text-xl font-bold text-foreground">
+                91.4%
+              </span>
+              <span className="font-manrope text-[10px] text-muted-foreground">
+                {t("thisSession")}
+              </span>
+            </div>
+          </motion.div>
+
+          <motion.div
+            {...tileMotion(0.55)}
+            className={`${tileClass} bottom-4 left-2 w-40`}
+          >
+            <div className="flex items-center gap-2">
+              <TileIcon>
+                <IndianRupee className="size-3" />
+              </TileIcon>
+              <p className="font-manrope text-[11px] text-muted-foreground">
+                {t("feeCollection")}
+              </p>
+            </div>
+            <p className="mt-2.5 font-jakarta text-xl leading-none font-bold text-foreground">
+              ₹18.6L
+            </p>
+            <p className="mt-1 font-manrope text-[10px] text-muted-foreground">
+              {t("thisMonth")}
+            </p>
+          </motion.div>
+
+          <motion.div
+            {...tileMotion(0.7)}
+            className={`${tileClass} right-4 bottom-0 w-40`}
+          >
+            <div className="flex items-center gap-2">
+              <TileIcon>
+                <TrendingUp className="size-3" />
+              </TileIcon>
+              <p className="font-manrope text-[11px] text-muted-foreground">
+                {t("avgPerformance")}
+              </p>
+            </div>
+            <p className="mt-2.5 font-jakarta text-xl leading-none font-bold text-foreground">
+              81.2%
+            </p>
+            <p className="mt-1 font-manrope text-[10px] text-muted-foreground">
+              {t("boardExams")}
+            </p>
+          </motion.div>
+        </div>
+      </div>
+    </aside>
+  );
+}
 
 const LoginPage = () => {
   const t = useTranslations("login");
   const { mutate: login, isPending } = useLogin();
+  const [showPassword, setShowPassword] = useState(false);
+
   const {
+    register,
     handleSubmit,
     formState: { errors },
-    control,
-    setValue,
   } = useForm<LoginFormValues>({
     resolver: zodResolver(loginSchema),
+    mode: "onTouched",
     defaultValues: { identifier: "", password: "" },
   });
-  const identifierValue = useWatch({ control, name: "identifier" });
-  const passwordValue = useWatch({ control, name: "password" });
+
   const onSubmit = (data: LoginFormValues) => {
     login(data);
   };
+
   return (
-    <div className="relative min-h-screen w-full overflow-hidden bg-[#050810] flex items-center justify-center px-4 py-12 sm:px-6">
-      <div className="absolute inset-0 overflow-hidden pointer-events-none select-none">
-        <div
-          className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[140%] h-[140%]"
-          style={{
-            background:
-              "radial-gradient(ellipse at 30% 50%, #1e3a5f22 0%, transparent 60%), radial-gradient(ellipse at 75% 40%, #0ea5e910 0%, transparent 55%), radial-gradient(ellipse at 50% 80%, #6366f108 0%, transparent 50%)",
-          }}
-        />
-        <div
-          className="absolute top-1/2 left-[26%] -translate-x-1/2 -translate-y-1/2 w-175 h-175 opacity-[0.05]"
-          style={{
-            maskImage:
-              "radial-gradient(circle at center, black 0%, black 30%, transparent 68%)",
-            WebkitMaskImage:
-              "radial-gradient(circle at center, black 0%, black 30%, transparent 68%)",
-          }}
-        >
-          <Image
-            src="/logo.png"
-            alt=""
-            fill
-            className="object-contain"
-            aria-hidden="true"
-          />
-        </div>
+    <div className="grid min-h-screen w-full grid-cols-1 gap-3 bg-background p-3 lg:grid-cols-2">
+      <ShowcasePanel />
+
+      <div className="flex items-center justify-center px-4 pt-24 pb-12 sm:px-8 lg:pt-12">
         <motion.div
-          initial={{ opacity: 0, rotate: -6, y: 60 }}
-          animate={{ opacity: 1, rotate: -6, y: 0 }}
-          transition={{ duration: 1.2, ease: [0.16, 1, 0.3, 1] }}
-          className="absolute -right-16 top-[-8%] w-[58vw] max-w-215 h-[75vh] min-h-130 rounded-3xl overflow-hidden shadow-2xl"
-          style={{ transformOrigin: "center center" }}
+          initial={{ opacity: 0, y: 24 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.6, ease: EASE }}
+          className="w-full max-w-sm"
         >
-          <div className="absolute inset-0 bg-linear-to-br from-[#0f2847] via-[#0c1e3a] to-[#071224]" />
-          <div
-            className="absolute inset-0 opacity-[0.035]"
-            style={{
-              backgroundImage:
-                "url(\"data:image/svg+xml,%3Csvg width='60' height='60' viewBox='0 0 60 60' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='none' fill-rule='evenodd'%3E%3Cg fill='%23ffffff' fill-opacity='1'%3E%3Cpath d='M36 34v-4h-2v4h-4v2h4v4h2v-4h4v-2h-4zm0-30V0h-2v4h-4v2h4v4h2V6h4V4h-4zM6 34v-4H4v4H0v2h4v4h2v-4h4v-2H6zM6 4V0H4v4H0v2h4v4h2V6h4V4H6z'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E\")",
-            }}
-          />
-          <div className="absolute inset-0 flex flex-col justify-between p-8 xl:p-12">
-            <div className="flex items-start justify-between">
-              <div>
-                <div className="text-white/30 text-xs font-manrope uppercase tracking-widest mb-1">
-                  {t("institutionOverview")}
-                </div>
-                <div className="text-white text-lg font-bold font-jakarta">
-                  {t("schoolDashboard")}
-                </div>
-              </div>
-              <div className="flex gap-1.5">
-                {["bg-red-400/60", "bg-yellow-400/60", "bg-green-400/60"].map(
-                  (c, i) => (
-                    <div key={i} className={`w-2.5 h-2.5 rounded-full ${c}`} />
-                  ),
-                )}
-              </div>
-            </div>
-            <div className="flex flex-col gap-4">
-              <div className="grid grid-cols-3 gap-3">
-                {[
-                  {
-                    labelKey: "students",
-                    value: "1,240",
-                    delta: "+3.1%",
-                    up: true,
-                  },
-                  {
-                    labelKey: "teachingStaff",
-                    value: "68",
-                    delta: "+2",
-                    up: true,
-                  },
-                  {
-                    labelKey: "classSections",
-                    value: "42",
-                    delta: "12",
-                    up: true,
-                  },
-                ].map((s) => (
-                  <div
-                    key={s.labelKey}
-                    className="bg-white/5 border border-white/10 rounded-2xl p-3.5 backdrop-blur-sm"
-                  >
-                    <div className="text-white/40 text-xs font-manrope mb-1.5">
-                      {t(s.labelKey as Parameters<typeof t>[0])}
-                    </div>
-                    <div className="text-white text-lg font-bold font-jakarta leading-none mb-1">
-                      {s.value}
-                    </div>
-                    <div
-                      className={`text-xs font-manrope ${s.up ? "text-emerald-400" : "text-red-400"}`}
-                    >
-                      {s.delta} {t("thisMonth")}
-                    </div>
-                  </div>
-                ))}
-              </div>
-              <div className="bg-white/5 border border-white/10 rounded-2xl p-4 backdrop-blur-sm">
-                <div className="flex items-center justify-between mb-3">
-                  <span className="text-white/40 text-xs font-manrope uppercase tracking-wider">
-                    {t("attendanceRate")}
-                  </span>
-                  <span className="text-emerald-400 text-xs font-manrope font-medium">
-                    {t("live")}
-                  </span>
-                </div>
-                <div className="flex items-end gap-1 h-10">
-                  {[72, 85, 78, 91, 88, 94, 82, 96, 89, 93, 87, 91].map(
-                    (h, i) => (
-                      <div
-                        key={i}
-                        className="flex-1 rounded-sm"
-                        style={{
-                          height: `${h}%`,
-                          background:
-                            i === 11
-                              ? "linear-gradient(to top, #6366f1, #818cf8)"
-                              : i > 8
-                                ? "rgba(99,102,241,0.5)"
-                                : "rgba(255,255,255,0.08)",
-                        }}
-                      />
-                    ),
-                  )}
-                </div>
-                <div className="flex items-center justify-between mt-2">
-                  <span className="text-white text-2xl font-bold font-jakarta">
-                    91.4%
-                  </span>
-                  <span className="text-white/30 text-xs font-manrope">
-                    {t("thisSession")}
-                  </span>
-                </div>
-              </div>
-              <div className="grid grid-cols-2 gap-3">
-                {[
-                  {
-                    labelKey: "feeCollection",
-                    value: "₹18.6L",
-                    subKey: "thisMonth",
-                    color: "from-indigo-500/20 to-indigo-600/5",
-                  },
-                  {
-                    labelKey: "avgPerformance",
-                    value: "81.2%",
-                    subKey: "boardExams",
-                    color: "from-sky-500/20 to-sky-600/5",
-                  },
-                ].map((c) => (
-                  <div
-                    key={c.labelKey}
-                    className={`bg-linear-to-br ${c.color} border border-white/10 rounded-2xl p-3.5 backdrop-blur-sm`}
-                  >
-                    <div className="text-white/40 text-xs font-manrope mb-1">
-                      {t(c.labelKey as Parameters<typeof t>[0])}
-                    </div>
-                    <div className="text-white text-xl font-bold font-jakarta">
-                      {c.value}
-                    </div>
-                    <div className="text-white/30 text-xs font-manrope mt-0.5">
-                      {t(c.subKey as Parameters<typeof t>[0])}
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
+          <div className="mb-8 flex items-center justify-center gap-2.5 lg:hidden">
+            <Image
+              src="/logo.png"
+              alt={SCHOOL_NAME}
+              width={28}
+              height={28}
+              className="object-contain"
+            />
+            <span className="font-jakarta text-sm font-bold tracking-wide text-foreground">
+              {SCHOOL_CODE}
+            </span>
           </div>
-          <div className="absolute inset-0 bg-linear-to-r from-[#050810] via-[#050810]/30 to-transparent pointer-events-none" />
-          <div className="absolute inset-0 bg-linear-to-t from-[#050810]/60 via-transparent to-transparent pointer-events-none" />
-        </motion.div>
-      </div>
-      <motion.div
-        initial={{ opacity: 0, y: 32 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.7, ease: [0.16, 1, 0.3, 1] }}
-        className="relative z-10 w-full max-w-120"
-      >
-        <div className="relative bg-white/4 border border-white/10 rounded-3xl p-8 sm:p-10 backdrop-blur-2xl shadow-[0_0_0_1px_rgba(255,255,255,0.05),0_32px_80px_rgba(0,0,0,0.6)]">
-          <div className="absolute inset-0 rounded-3xl overflow-hidden pointer-events-none">
-            <div className="absolute inset-x-0 top-0 h-px bg-linear-to-r from-transparent via-white/20 to-transparent" />
-            <div className="absolute inset-x-0 bottom-0 h-px bg-linear-to-r from-transparent via-white/5 to-transparent" />
-          </div>
-          <div className="mb-8">
-            <div className="flex items-center gap-3 mb-8">
-              <Image
-                src="/logo.png"
-                alt={`${SCHOOL_NAME} Logo`}
-                width={40}
-                height={40}
-                className="object-contain"
-              />
-              <div className="min-w-0">
-                <span className="text-white text-sm font-bold font-jakarta tracking-tight block leading-tight truncate">
-                  {t("schoolName")}
-                </span>
-                <span className="text-indigo-300/70 text-xs font-manrope tracking-wide">
-                  {SCHOOL_CODE}
-                </span>
-              </div>
-            </div>
-            <h1 className="text-2xl sm:text-3xl font-extrabold font-jakarta text-white leading-tight mb-1.5">
+
+          <div className="text-center">
+            <h1 className="font-jakarta text-2xl font-bold text-foreground sm:text-3xl">
               {t("signIn")}
             </h1>
-            <p className="text-sm text-white/40 font-manrope">
+            <p className="mt-2 font-manrope text-sm text-muted-foreground">
               {t("signInSub")}
             </p>
           </div>
-          <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
-            <div className="space-y-1.5">
-              <AnimatedInput
-                label={t("emailOrReg")}
-                icon={<User className="h-4 w-4 text-indigo-400" />}
-                value={identifierValue}
-                onChange={(val) =>
-                  setValue("identifier", val, { shouldValidate: true })
-                }
-                inputClassName="h-12 rounded-xl border-white/10 bg-white/5 text-white placeholder:text-white/20 focus-visible:ring-indigo-500/50 focus-visible:border-indigo-500/50"
-                labelClassName="text-white/40"
-              />
-              {errors.identifier && (
-                <motion.p
-                  initial={{ opacity: 0, y: -4 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  className="text-xs text-red-400 font-manrope ml-1"
-                >
-                  {errors.identifier.message}
-                </motion.p>
-              )}
-            </div>
-            <div className="space-y-1.5">
-              <AnimatedInput
-                label={t("password")}
-                icon={<Lock className="h-4 w-4 text-indigo-400" />}
-                type="password"
-                value={passwordValue}
-                onChange={(val) =>
-                  setValue("password", val, { shouldValidate: true })
-                }
-                inputClassName="h-12 rounded-xl border-white/10 bg-white/5 text-white placeholder:text-white/20 focus-visible:ring-indigo-500/50 focus-visible:border-indigo-500/50"
-                labelClassName="text-white/40"
-              />
-              {errors.password && (
-                <motion.p
-                  initial={{ opacity: 0, y: -4 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  className="text-xs text-red-400 font-manrope ml-1"
-                >
-                  {errors.password.message}
-                </motion.p>
-              )}
-            </div>
-            <div className="flex justify-end pt-0.5">
-              <a
-                href="#"
-                className="text-xs text-indigo-400 font-manrope hover:text-indigo-300 transition-colors"
+
+          <form
+            onSubmit={handleSubmit(onSubmit)}
+            className="mt-8 space-y-5"
+            noValidate
+          >
+            <div>
+              <Label
+                htmlFor="identifier"
+                className="mb-1.5 ml-1 block font-manrope text-xs font-normal text-foreground/70"
               >
-                {t("forgotPassword")}
-              </a>
+                {t("emailOrReg")}
+              </Label>
+              <Input
+                id="identifier"
+                autoComplete="username"
+                placeholder={t("identifierPlaceholder")}
+                aria-invalid={!!errors.identifier}
+                className={fieldClass(!!errors.identifier)}
+                {...register("identifier")}
+              />
+              <FieldError message={errors.identifier?.message} />
             </div>
+
+            <div>
+              <div className="mb-1.5 flex items-center justify-between">
+                <Label
+                  htmlFor="password"
+                  className="ml-1 font-manrope text-xs font-normal text-foreground/70"
+                >
+                  {t("password")}
+                </Label>
+                <Button
+                  asChild
+                  variant="link"
+                  className="h-auto p-0 font-manrope text-xs font-normal text-indigo-600 hover:text-indigo-500 dark:text-indigo-400 dark:hover:text-indigo-300"
+                >
+                  <Link href="#">{t("forgotPassword")}</Link>
+                </Button>
+              </div>
+              <div className="relative">
+                <Input
+                  id="password"
+                  type={showPassword ? "text" : "password"}
+                  autoComplete="current-password"
+                  placeholder={t("passwordPlaceholder")}
+                  aria-invalid={!!errors.password}
+                  className={`${fieldClass(!!errors.password)} pr-12`}
+                  {...register("password")}
+                />
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="icon"
+                  onClick={() => setShowPassword((prev) => !prev)}
+                  aria-label={
+                    showPassword ? t("hidePassword") : t("showPassword")
+                  }
+                  className="absolute top-1/2 right-1.5 h-8 w-8 -translate-y-1/2 rounded-full text-muted-foreground hover:bg-accent hover:text-foreground"
+                >
+                  {showPassword ? (
+                    <EyeOff className="size-4" />
+                  ) : (
+                    <Eye className="size-4" />
+                  )}
+                </Button>
+              </div>
+              <FieldError message={errors.password?.message} />
+            </div>
+
             <Button
               type="submit"
               disabled={isPending}
-              className="w-full h-12 rounded-xl font-jakarta font-bold text-sm bg-indigo-600 hover:bg-indigo-500 text-white border-0 transition-all duration-200 shadow-lg shadow-indigo-500/20 hover:shadow-indigo-500/30 group mt-1"
+              className="group h-11 w-full gap-2 rounded-full bg-primary font-manrope text-sm font-semibold text-primary-foreground hover:bg-primary/90"
             >
               {isPending ? (
-                <span className="flex items-center gap-2">
-                  <svg
-                    className="animate-spin h-4 w-4"
-                    viewBox="0 0 24 24"
-                    fill="none"
-                  >
-                    <circle
-                      className="opacity-25"
-                      cx="12"
-                      cy="12"
-                      r="10"
-                      stroke="currentColor"
-                      strokeWidth="4"
-                    />
-                    <path
-                      className="opacity-75"
-                      fill="currentColor"
-                      d="M4 12a8 8 0 018-8v8H4z"
-                    />
-                  </svg>
+                <>
+                  <Loader2 className="size-4 animate-spin" />
                   {t("signingIn")}
-                </span>
+                </>
               ) : (
-                <span className="flex items-center gap-2">
+                <>
                   {t("signInBtn")}
-                  <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-1" />
-                </span>
+                  <ArrowRight className="size-4 transition-transform group-hover:translate-x-1" />
+                </>
               )}
             </Button>
           </form>
-          <div className="mt-6 pt-6 border-t border-white/6">
-            <p className="text-center text-xs text-white/30 font-manrope">
-              {t("needAccess")}{" "}
-              <a
-                href="#"
-                className="text-indigo-400 hover:text-indigo-300 transition-colors font-medium"
-              >
-                {t("contactAdmin")}
-              </a>
-            </p>
+
+          <div className="my-6 flex items-center gap-3">
+            <Separator className="w-auto flex-1" />
+            <span className="font-manrope text-xs text-muted-foreground">
+              {t("orDivider")}
+            </span>
+            <Separator className="w-auto flex-1" />
           </div>
-        </div>
-        <p className="text-center text-[11px] text-white/20 font-manrope mt-5">
-          {t("footer")}
-        </p>
-      </motion.div>
+
+          <div className="grid grid-cols-1 gap-2.5 sm:grid-cols-2">
+            <Button
+              asChild
+              variant="outline"
+              className="h-11 gap-2 rounded-full border-border bg-card font-manrope text-xs font-medium text-foreground/80 shadow-none hover:bg-accent hover:text-foreground"
+            >
+              <Link href="/admission">
+                <GraduationCap className="size-4" />
+                {t("applyAdmission")}
+              </Link>
+            </Button>
+            <Button
+              asChild
+              variant="outline"
+              className="h-11 gap-2 rounded-full border-border bg-card font-manrope text-xs font-medium text-foreground/80 shadow-none hover:bg-accent hover:text-foreground"
+            >
+              <Link href="/teacher-application">
+                <UserPlus className="size-4" />
+                {t("applyTeacher")}
+              </Link>
+            </Button>
+          </div>
+
+          <p className="mt-8 text-center font-manrope text-xs text-muted-foreground">
+            {t("needAccess")}{" "}
+            <Button
+              asChild
+              variant="link"
+              className="h-auto p-0 font-manrope text-xs font-medium text-indigo-600 hover:text-indigo-500 dark:text-indigo-400 dark:hover:text-indigo-300"
+            >
+              <Link href="#">{t("contactAdmin")}</Link>
+            </Button>
+          </p>
+
+          <p className="mt-6 text-center font-manrope text-[11px] text-muted-foreground/70">
+            {t("footer")}
+          </p>
+        </motion.div>
+      </div>
     </div>
   );
 };
+
 export default LoginPage;

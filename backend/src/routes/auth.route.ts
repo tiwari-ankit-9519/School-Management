@@ -7,8 +7,11 @@ import {
   resetPassword,
 } from "../controller/auth.controller";
 import { authenticate } from "../middlewares/auth.middleware";
+import { controllerContext } from "../config/logger.config";
 
 const router: Router = Router();
+
+router.use(controllerContext("AuthController"));
 
 router.post("/login", loginUser);
 router.post("/logout", authenticate, logoutUser);

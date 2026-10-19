@@ -241,13 +241,11 @@ export async function errorHandler(
   const errorType = classifyError(error);
   const requestId = req.requestId ?? "unknown";
   const userId = req.user?.id ?? null;
-  const schoolId = req.user?.schoolId ?? null;
   const ip = req.ip ?? req.socket?.remoteAddress ?? "unknown";
 
   const baseLogContext = {
     requestId,
     userId,
-    schoolId,
     errorType,
     path: req.path,
     method: req.method,
@@ -338,7 +336,6 @@ export async function errorHandler(
   ) {
     logSecurityEvent(`JWT_ERROR_${errorType}`, ip, userId, {
       requestId,
-      schoolId,
       path: req.path,
       method: req.method,
       errorName: error.name,
@@ -369,7 +366,6 @@ export async function errorHandler(
   if (error.statusCode === HTTP_STATUS.UNAUTHORIZED) {
     logSecurityEvent("UNAUTHORIZED_ACCESS_ATTEMPT", ip, userId, {
       requestId,
-      schoolId,
       path: req.path,
       method: req.method,
       message: error.message,
@@ -392,7 +388,6 @@ export async function errorHandler(
   if (error.statusCode === HTTP_STATUS.FORBIDDEN) {
     logSecurityEvent("FORBIDDEN_ACCESS_ATTEMPT", ip, userId, {
       requestId,
-      schoolId,
       path: req.path,
       method: req.method,
       role: req.user?.role,
@@ -418,7 +413,6 @@ export async function errorHandler(
   if (error.statusCode === HTTP_STATUS.TOO_MANY_REQUESTS) {
     logSecurityEvent("RATE_LIMIT_EXCEEDED", ip, userId, {
       requestId,
-      schoolId,
       path: req.path,
       method: req.method,
       retryAfter: error.retryAfter,
@@ -464,7 +458,6 @@ export async function errorHandler(
 
   await logAudit("UNHANDLED_ERROR", userId ?? "system", null, {
     requestId,
-    schoolId,
     errorType,
     errorMessage: error.message,
     path: req.path,
@@ -496,7 +489,6 @@ export function notFoundHandler(
   log.warn("Route not found", {
     requestId,
     userId,
-    schoolId: req.user?.schoolId ?? null,
     method: req.method,
     path: req.path,
     originalUrl: req.originalUrl,

@@ -1,8 +1,11 @@
 import { Router } from "express";
 import { authenticate, authorize } from "../middlewares/auth.middleware";
 import { getDashboardCounts } from "../controller/dashboard.controller";
+import { controllerContext } from "../config/logger.config";
 
 const router: Router = Router();
+
+router.use(controllerContext("DashboardController"));
 
 router.get(
   "/summary",

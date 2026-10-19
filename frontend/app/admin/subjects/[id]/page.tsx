@@ -1,617 +1,429 @@
 "use client";
-
-import { useState, useMemo } from "react";
-import { useParams, useRouter } from "next/navigation";
-import { motion, AnimatePresence } from "motion/react";
-import Image from "next/image";
+import { useState } from "react";
+import Link from "next/link";
+import { useParams } from "next/navigation";
+import { motion } from "motion/react";
 import {
-  FlaskConical,
-  Hash,
-  ChevronLeft,
-  UserCheck,
-  UserX,
-  Search,
-  X,
-  Loader2,
-  User,
+  AlertCircle,
+  ArrowLeft,
   BookOpen,
-  AlertTriangle,
-  Check,
-  GraduationCap,
-  Briefcase,
+  CalendarClock,
+  CalendarDays,
+  CheckCircle2,
+  Hash,
+  Info,
+  Layers,
   ToggleLeft,
-  FileText,
+  UserCheck,
+  Users,
+  UserX,
 } from "lucide-react";
+import { Card } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Separator } from "@/components/ui/separator";
 import {
-  useGetSingleSubject,
+  CARD_CLASS,
+  TONE_CLASSES,
+  fadeUp,
+} from "@/components/dashboard/DashboardWidgets";
+import {
+  OUTLINE_PILL_CLASS,
+  PRIMARY_PILL_CLASS,
+} from "@/components/forms/FormParts";
+import {
+  InfoTile,
+  formatDate,
+} from "@/components/admissions/AdmissionDetailParts";
+import {
+  SUBJECT_DETAIL_PATH,
+  getMonogram,
+} from "@/components/subjects/SubjectsParts";
+import {
+  AssignTeacherDialog,
+  AssignedTeacherRow,
+  SubjectDetailSkeleton,
+  UnassignTeacherDialog,
+} from "@/components/subjects/SubjectDetailParts";
+import {
   useAssignTeacherToSubject,
+  useGetSingleSubject,
   useUnassignTeacherFromSubject,
 } from "@/hooks/useSubject";
-import { useGetAllTeachers } from "@/hooks/useTeacher";
 import { useTranslations } from "@/hooks/useTranslations";
-
-// ─── Skeleton ────────────────────────────────────────────────────────────────
-const Skeleton = ({ className }: { className?: string }) => (
-  <div className={`animate-pulse rounded-lg bg-white/5 ${className ?? ""}`} />
-);
-
-// ─── Info Card ────────────────────────────────────────────────────────────────
-const InfoCard = ({
-  icon,
-  label,
-  value,
-}: {
-  icon: React.ReactNode;
-  label: string;
-  value?: string | null;
-}) => (
-  <div className="relative overflow-hidden rounded-2xl border border-white/10 bg-white/4 p-4 sm:p-5 backdrop-blur-xl">
-    <div className="absolute inset-x-0 top-0 h-px bg-linear-to-r from-transparent via-white/10 to-transparent" />
-    <div className="mb-3 flex h-9 w-9 items-center justify-center rounded-xl border border-indigo-400/20 bg-indigo-500/10">
-      <span className="text-indigo-400">{icon}</span>
-    </div>
-    <p className="font-manrope text-xs text-white/30 uppercase tracking-widest mb-1">
-      {label}
-    </p>
-    <p className="font-jakarta text-sm font-bold text-white truncate">
-      {value ?? "—"}
-    </p>
-  </div>
-);
 
 const SubjectDetailPage = () => {
   const t = useTranslations("subjectDetail");
-  const router = useRouter();
-  const params = useParams();
-  const subjectId = params.id as string;
+  const params = useParams<{ id: string }>();
+  const subjectId = params?.id ?? "";
+  const [isAssignOpen, setIsAssignOpen] = useState(false);
+  const [isUnassignOpen, setIsUnassignOpen] = useState(false);
 
-  const [isAssignModalOpen, setIsAssignModalOpen] = useState(false);
-  const [isUnassignModalOpen, setIsUnassignModalOpen] = useState(false);
-  const [teacherSearch, setTeacherSearch] = useState("");
-  const [selectedTeacherId, setSelectedTeacherId] = useState<string | null>(
-    null,
-  );
-
-  const { data: subject, isLoading: isSubjectLoading } =
-    useGetSingleSubject(subjectId);
-
+  const { data: subject, isLoading, isError } = useGetSingleSubject(subjectId);
   const { mutate: assignTeacher, isPending: isAssigning } =
     useAssignTeacherToSubject();
-
   const { mutate: unassignTeacher, isPending: isUnassigning } =
     useUnassignTeacherFromSubject();
 
-  const primaryTeacherSubject =
-    subject?.teacherSubjects?.find((ts) => ts.isPrimary) ??
-    subject?.teacherSubjects?.[0] ??
-    null;
-  const assignedTeacher = primaryTeacherSubject?.teacher ?? null;
-  const hasTeacher = (subject?.teacherSubjects?.length ?? 0) > 0;
+  const backButton = (
+    <Button
+      asChild
+      variant="ghost"
+      className="h-9 gap-1.5 rounded-full px-3 font-manrope text-xs text-muted-foreground hover:bg-accent hover:text-foreground dark:hover:bg-accent"
+    >
+      <Link href={SUBJECT_DETAIL_PATH}>
+        <ArrowLeft className="size-4" />
+        {t("back")}
+      </Link>
+    </Button>
+  );
 
-  const { data: teachersData, isLoading: isTeachersLoading } =
-    useGetAllTeachers(
-      "ALL",
-      "",
-      "",
-      "",
-      subject?.name ?? "",
-      undefined,
-      1,
-      100,
+  if (isLoading) return <SubjectDetailSkeleton />;
+
+  if (isError || !subject) {
+    return (
+      <div className="flex min-h-[60vh] items-center justify-center">
+        <Card
+          className={`${CARD_CLASS} w-full max-w-sm items-center gap-4 px-6 py-8 text-center`}
+        >
+          <span className="flex h-11 w-11 items-center justify-center rounded-full bg-red-500/10 text-red-600 dark:text-red-400">
+            <AlertCircle className="size-5" />
+          </span>
+          <div>
+            <p className="font-jakarta text-base font-semibold text-foreground">
+              {t("notFoundTitle")}
+            </p>
+            <p className="mt-1 font-manrope text-sm text-muted-foreground">
+              {t("notFoundSub")}
+            </p>
+          </div>
+          {backButton}
+        </Card>
+      </div>
     );
+  }
 
-  const filteredTeachers = useMemo(() => {
-    const list = teachersData?.data ?? [];
-    if (!teacherSearch.trim()) return list;
-    const q = teacherSearch.toLowerCase();
-    return list.filter(
-      (teacher) =>
-        teacher.firstName?.toLowerCase().includes(q) ||
-        teacher.lastName?.toLowerCase().includes(q) ||
-        teacher.user?.email?.toLowerCase().includes(q),
-    );
-  }, [teachersData, teacherSearch]);
+  const teacherSubjects = subject.teacherSubjects ?? [];
+  const hasTeacher = teacherSubjects.length > 0;
+  const primary =
+    teacherSubjects.find((ts) => ts.isPrimary) ?? teacherSubjects[0];
+  const primaryName = primary?.teacher
+    ? `${primary.teacher.firstName} ${primary.teacher.lastName}`
+    : "";
+  const periodCount = subject.timetables?.length ?? 0;
 
-  const handleAssign = () => {
-    if (!selectedTeacherId) return;
+  const handleAssign = (teacherId: string) => {
     assignTeacher(
-      { subjectId, data: { teacherId: selectedTeacherId } },
-      {
-        onSuccess: () => {
-          setIsAssignModalOpen(false);
-          setSelectedTeacherId(null);
-          setTeacherSearch("");
-        },
-      },
+      { subjectId, data: { teacherId } },
+      { onSuccess: () => setIsAssignOpen(false) },
     );
   };
 
   const handleUnassign = () => {
-    unassignTeacher(subjectId, {
-      onSuccess: () => setIsUnassignModalOpen(false),
-    });
+    unassignTeacher(subjectId, { onSuccess: () => setIsUnassignOpen(false) });
   };
 
-  const handleCloseAssignModal = () => {
-    setIsAssignModalOpen(false);
-    setSelectedTeacherId(null);
-    setTeacherSearch("");
-  };
+  const actionButton = hasTeacher ? (
+    <Button
+      type="button"
+      variant="outline"
+      onClick={() => setIsUnassignOpen(true)}
+      className="h-11 gap-2 rounded-full border-red-500/20 bg-red-500/10 px-5 font-manrope text-sm font-semibold text-red-700 shadow-none hover:bg-red-500/15 dark:border-red-500/20 dark:bg-red-500/10 dark:text-red-300 dark:hover:bg-red-500/15"
+    >
+      <UserX className="size-4" />
+      {t("unassignBtn")}
+    </Button>
+  ) : (
+    <Button
+      type="button"
+      onClick={() => setIsAssignOpen(true)}
+      className="h-11 gap-2 rounded-full bg-linear-to-r from-indigo-600 to-indigo-800 px-5 font-manrope text-sm font-semibold text-white shadow-none hover:opacity-90"
+    >
+      <UserCheck className="size-4" />
+      {t("assignBtn")}
+    </Button>
+  );
 
   return (
-    <div className="relative min-h-screen w-full bg-[#050810] px-3 py-6 sm:px-8 sm:py-10">
-      {/* Background */}
-      <div
-        className="pointer-events-none fixed inset-0 select-none"
-        style={{
-          background:
-            "radial-gradient(ellipse at 20% 20%, #1e3a5f18 0%, transparent 55%), radial-gradient(ellipse at 80% 70%, #6366f10a 0%, transparent 50%)",
-        }}
-      />
+    <div className="space-y-5">
+      <motion.header
+        {...fadeUp(0)}
+        className="flex flex-wrap items-center justify-between gap-3 px-1"
+      >
+        {backButton}
+        {actionButton}
+      </motion.header>
 
-      <div className="relative z-10 mx-auto max-w-4xl">
-        {/* Header */}
-        <motion.div
-          initial={{ opacity: 0, y: 24 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.6, ease: [0.16, 1, 0.3, 1] }}
-          className="mb-6 sm:mb-10"
-        >
-          <button
-            onClick={() => router.back()}
-            className="mb-4 flex items-center gap-1.5 font-manrope text-xs text-white/30 transition-colors hover:text-white/60"
+      <motion.div {...fadeUp(0.05)}>
+        <Card className="relative gap-0 overflow-hidden rounded-2xl border-0 bg-linear-to-br from-indigo-500 via-indigo-600 to-indigo-800 p-6 text-white shadow-none sm:p-7">
+          <svg
+            className="pointer-events-none absolute -top-16 -right-16 h-64 w-64"
+            viewBox="0 0 200 200"
+            fill="none"
+            aria-hidden="true"
           >
-            <ChevronLeft className="h-3.5 w-3.5" />
-            {t("back")}
-          </button>
-
-          <div className="flex items-start justify-between gap-3">
-            <div className="flex items-center gap-3">
-              <div className="flex h-9 w-9 sm:h-11 sm:w-11 items-center justify-center rounded-xl border border-indigo-400/30 bg-indigo-500/20 shrink-0">
-                <Image
-                  src="/logo.png"
-                  alt="EduSphere Logo"
-                  width={22}
-                  height={22}
-                  className="object-contain"
-                />
-              </div>
-              <div>
-                {isSubjectLoading ? (
-                  <>
-                    <Skeleton className="h-7 w-40 mb-1" />
-                    <Skeleton className="h-4 w-24" />
-                  </>
-                ) : (
-                  <>
-                    <h1 className="font-jakarta text-xl sm:text-2xl font-extrabold leading-tight text-white">
-                      {subject?.name ?? "—"}
-                    </h1>
-                    <p className="font-manrope text-xs sm:text-sm text-white/40 mt-0.5">
-                      {t("pageSubtitle")}
-                    </p>
-                  </>
-                )}
-              </div>
-            </div>
-
-            {/* Assign / Unassign button */}
-            {!isSubjectLoading && (
-              <div className="flex shrink-0 items-center gap-2">
-                {hasTeacher ? (
-                  <Button
-                    onClick={() => setIsUnassignModalOpen(true)}
-                    className="flex h-9 sm:h-10 items-center gap-1.5 rounded-xl border border-red-500/30 bg-red-500/10 px-3 sm:px-4 font-jakarta text-xs sm:text-sm font-bold text-red-400 shadow-none transition-all duration-200 hover:bg-red-500/20"
-                  >
-                    <UserX className="h-3.5 w-3.5" />
-                    <span className="hidden sm:inline">{t("unassignBtn")}</span>
-                  </Button>
-                ) : (
-                  <Button
-                    onClick={() => setIsAssignModalOpen(true)}
-                    className="flex h-9 sm:h-10 items-center gap-1.5 rounded-xl border-0 bg-indigo-600 px-3 sm:px-4 font-jakarta text-xs sm:text-sm font-bold text-white shadow-lg shadow-indigo-500/20 transition-all duration-200 hover:bg-indigo-500"
-                  >
-                    <UserCheck className="h-3.5 w-3.5" />
-                    <span className="hidden sm:inline">{t("assignBtn")}</span>
-                  </Button>
-                )}
-              </div>
-            )}
-          </div>
-        </motion.div>
-
-        {/* Info Cards */}
-        <motion.div
-          initial={{ opacity: 0, y: 16 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.5, delay: 0.1 }}
-          className="mb-6 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5"
-        >
-          {isSubjectLoading ? (
-            <>
-              {Array.from({ length: 5 }).map((_, i) => (
-                <Skeleton key={i} className="h-28 rounded-2xl" />
-              ))}
-            </>
-          ) : (
-            <>
-              <InfoCard
-                icon={<FlaskConical className="h-4 w-4" />}
-                label={t("infoName")}
-                value={subject?.name}
+            {[40, 60, 80, 100].map((r) => (
+              <circle
+                key={r}
+                cx="100"
+                cy="100"
+                r={r}
+                stroke="white"
+                strokeOpacity="0.1"
               />
-              <InfoCard
-                icon={<Hash className="h-4 w-4" />}
-                label={t("infoCode")}
-                value={subject?.code}
-              />
-              <InfoCard
-                icon={<BookOpen className="h-4 w-4" />}
-                label={t("infoStatus")}
-                value={subject?.isActive ? t("active") : t("inactive")}
-              />
-              <InfoCard
-                icon={<ToggleLeft className="h-4 w-4" />}
-                label={t("infoElective")}
-                value={subject?.isElective ? t("yes") : t("no")}
-              />
-              <InfoCard
-                icon={<FileText className="h-4 w-4" />}
-                label={t("infoDescription")}
-                value={subject?.description}
-              />
-            </>
-          )}
-        </motion.div>
-
-        {/* Assigned Teacher Section */}
-        <motion.div
-          initial={{ opacity: 0, y: 16 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.5, delay: 0.2 }}
-          className="relative overflow-hidden rounded-2xl border border-white/10 bg-white/4 backdrop-blur-xl shadow-[0_0_0_1px_rgba(255,255,255,0.04),0_24px_60px_rgba(0,0,0,0.5)]"
-        >
-          <div className="absolute inset-x-0 top-0 h-px bg-linear-to-r from-transparent via-white/15 to-transparent" />
-
-          <div className="border-b border-white/8 px-5 sm:px-6 py-4">
-            <h2 className="font-jakarta text-sm font-bold text-white/70">
-              {t("assignedTeacherTitle")}
-            </h2>
-          </div>
-
-          {isSubjectLoading ? (
-            <div className="px-5 sm:px-6 py-6">
-              <div className="flex items-center gap-4">
-                <Skeleton className="h-12 w-12 rounded-xl shrink-0" />
-                <div className="flex-1 space-y-2">
-                  <Skeleton className="h-4 w-36" />
-                  <Skeleton className="h-3 w-24" />
-                </div>
-              </div>
-            </div>
-          ) : hasTeacher ? (
-            <div className="divide-y divide-white/6">
-              {subject!.teacherSubjects.map((ts) => (
-                <div
-                  key={ts.id}
-                  className="flex items-center gap-4 px-5 sm:px-6 py-5"
-                >
-                  <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl border border-emerald-500/20 bg-emerald-500/10">
-                    <User className="h-5 w-5 text-emerald-400" />
-                  </div>
-                  <div className="min-w-0 flex-1">
-                    <p className="font-jakarta text-sm font-bold text-white truncate">
-                      {ts.teacher?.firstName} {ts.teacher?.lastName}
-                    </p>
-                    <p className="font-manrope text-xs text-white/40 truncate mt-0.5">
-                      {ts.teacher?.user?.email}
-                    </p>
-                    <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
-                      {ts.isPrimary && (
-                        <span className="inline-flex items-center gap-1 rounded-full border border-indigo-500/20 bg-indigo-500/10 px-2 py-0.5 font-manrope text-[11px] font-medium text-indigo-400">
-                          <GraduationCap className="h-2.5 w-2.5" />
-                          {t("primaryTeacher")}
-                        </span>
-                      )}
-                      {ts.teacher?.specialization && (
-                        <span className="inline-flex items-center gap-1 rounded-full border border-white/10 bg-white/5 px-2 py-0.5 font-manrope text-[11px] text-white/40">
-                          <Briefcase className="h-2.5 w-2.5" />
-                          {ts.teacher.specialization}
-                        </span>
-                      )}
-                    </div>
-                  </div>
-                  <span className="flex items-center gap-1.5 rounded-full border border-emerald-500/20 bg-emerald-500/10 px-2.5 py-1 font-manrope text-xs font-medium text-emerald-400 shrink-0">
-                    <UserCheck className="h-3 w-3" />
-                    {t("assigned")}
-                  </span>
-                </div>
-              ))}
-            </div>
-          ) : (
-            <div className="flex flex-col items-center justify-center gap-4 px-4 py-10 text-center">
-              <div className="flex h-12 w-12 items-center justify-center rounded-2xl border border-white/10 bg-white/5">
-                <UserX className="h-5 w-5 text-white/20" />
-              </div>
-              <div>
-                <p className="font-jakarta text-sm font-semibold text-white/40">
-                  {t("noTeacherTitle")}
-                </p>
-                <p className="mt-0.5 font-manrope text-xs text-white/20">
-                  {t("noTeacherSubtitle")}
-                </p>
-              </div>
-              <button
-                onClick={() => setIsAssignModalOpen(true)}
-                className="flex items-center gap-1.5 rounded-xl border border-indigo-500/30 bg-indigo-500/10 px-4 py-2 font-manrope text-xs font-medium text-indigo-400 transition-colors hover:bg-indigo-500/15"
-              >
-                <UserCheck className="h-3.5 w-3.5" />
-                {t("assignBtn")}
-              </button>
-            </div>
-          )}
-        </motion.div>
-      </div>
-
-      {/* ── Assign Teacher Modal ─────────────────────────────────────────────── */}
-      <AnimatePresence>
-        {isAssignModalOpen && (
-          <>
-            <motion.div
-              key="assign-backdrop"
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              transition={{ duration: 0.2 }}
-              className="fixed inset-0 z-40 bg-black/60 backdrop-blur-sm"
-              onClick={handleCloseAssignModal}
-            />
-            <motion.div
-              key="assign-modal"
-              initial={{ opacity: 0, scale: 0.96, y: 16 }}
-              animate={{ opacity: 1, scale: 1, y: 0 }}
-              exit={{ opacity: 0, scale: 0.96, y: 16 }}
-              transition={{ duration: 0.3, ease: [0.16, 1, 0.3, 1] }}
-              className="fixed inset-0 z-50 flex items-center justify-center px-4"
-            >
-              <div className="relative w-full max-w-md rounded-3xl border border-white/10 bg-[#070c18] p-6 sm:p-8 shadow-[0_0_0_1px_rgba(255,255,255,0.05),0_32px_80px_rgba(0,0,0,0.7)] backdrop-blur-2xl">
-                <div className="pointer-events-none absolute inset-0 overflow-hidden rounded-3xl">
-                  <div className="absolute inset-x-0 top-0 h-px bg-linear-to-r from-transparent via-white/20 to-transparent" />
-                </div>
-
-                {/* Modal Header */}
-                <div className="mb-5 flex items-start justify-between">
-                  <div>
-                    <div className="mb-3 flex h-10 w-10 items-center justify-center rounded-xl border border-indigo-400/30 bg-indigo-500/20">
-                      <UserCheck className="h-5 w-5 text-indigo-400" />
-                    </div>
-                    <h2 className="font-jakarta text-xl font-extrabold text-white">
-                      {t("assignModalTitle")}
-                    </h2>
-                    <p className="mt-0.5 font-manrope text-sm text-white/40">
-                      {subject?.name
-                        ? t("assignModalSubtitle").replace(
-                            "{subject}",
-                            subject.name,
-                          )
-                        : t("assignModalSubtitleFallback")}
-                    </p>
-                  </div>
-                  <button
-                    onClick={handleCloseAssignModal}
-                    className="flex h-8 w-8 items-center justify-center rounded-lg border border-white/10 bg-white/5 text-white/40 transition-colors hover:border-white/20 hover:text-white/70"
-                  >
-                    <X className="h-4 w-4" />
-                  </button>
-                </div>
-
-                {/* Search */}
-                <div className="relative mb-3">
-                  <Search className="pointer-events-none absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-indigo-400/60" />
-                  <input
-                    type="text"
-                    placeholder={t("searchTeacher")}
-                    value={teacherSearch}
-                    onChange={(e) => setTeacherSearch(e.target.value)}
-                    className="h-10 w-full rounded-xl border border-white/10 bg-white/5 pl-9 pr-3 font-manrope text-sm text-white placeholder:text-white/20 focus:border-indigo-500/50 focus:outline-none focus:ring-1 focus:ring-indigo-500/30 transition-colors"
+            ))}
+          </svg>
+          <div className="relative flex flex-col gap-6 lg:flex-row lg:items-center">
+            <span className="flex h-20 w-20 shrink-0 items-center justify-center rounded-2xl bg-white/15 font-jakarta text-2xl font-bold ring-4 ring-white/10">
+              {getMonogram(subject.name)}
+            </span>
+            <div className="min-w-0 flex-1">
+              <div className="flex flex-wrap gap-1.5">
+                <Badge className="gap-1 rounded-full border-white/25 bg-white/15 font-mono text-[11px] font-medium text-white">
+                  <Hash className="size-3" />
+                  {subject.code}
+                </Badge>
+                <Badge className="rounded-full border-white/25 bg-white/15 font-manrope text-[11px] font-medium text-white">
+                  {subject.isElective ? t("typeElective") : t("typeCore")}
+                </Badge>
+                <Badge className="gap-1.5 rounded-full border-white/25 bg-white/15 font-manrope text-[11px] font-medium text-white">
+                  <span
+                    className={`h-1.5 w-1.5 rounded-full ${subject.isActive ? "bg-emerald-300" : "bg-amber-300"}`}
                   />
-                </div>
-
-                {/* Specialization hint */}
-                {subject?.name && (
-                  <div className="mb-3 flex items-center gap-1.5 rounded-xl border border-indigo-500/20 bg-indigo-500/8 px-3 py-2">
-                    <GraduationCap className="h-3.5 w-3.5 shrink-0 text-indigo-400" />
-                    <p className="font-manrope text-xs text-indigo-300/70">
-                      {t("specializationHint").replace(
-                        "{subject}",
-                        subject.name,
-                      )}
-                    </p>
-                  </div>
-                )}
-
-                {/* Teacher list */}
-                <div className="max-h-60 overflow-y-auto rounded-xl border border-white/10 bg-white/3 scrollbar-thin">
-                  {isTeachersLoading ? (
-                    <div className="flex items-center justify-center py-8">
-                      <Loader2 className="h-5 w-5 animate-spin text-indigo-400" />
-                    </div>
-                  ) : filteredTeachers.length === 0 ? (
-                    <div className="flex flex-col items-center justify-center gap-2 py-8 text-center">
-                      <User className="h-6 w-6 text-white/10" />
-                      <p className="font-manrope text-xs text-white/30">
-                        {t("noTeachersFound")}
-                      </p>
-                    </div>
-                  ) : (
-                    <div className="divide-y divide-white/6">
-                      {filteredTeachers.map((teacher) => (
-                        <button
-                          key={teacher.id}
-                          onClick={() =>
-                            setSelectedTeacherId(
-                              selectedTeacherId === teacher.id
-                                ? null
-                                : teacher.id,
-                            )
-                          }
-                          className={`flex w-full items-center gap-3 px-4 py-3 text-left transition-colors duration-150 ${
-                            selectedTeacherId === teacher.id
-                              ? "bg-indigo-500/15"
-                              : "hover:bg-white/4"
-                          }`}
-                        >
-                          <div
-                            className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border transition-colors ${
-                              selectedTeacherId === teacher.id
-                                ? "border-indigo-500/40 bg-indigo-500/20"
-                                : "border-white/10 bg-white/5"
-                            }`}
-                          >
-                            {selectedTeacherId === teacher.id ? (
-                              <Check className="h-3.5 w-3.5 text-indigo-400" />
-                            ) : (
-                              <User className="h-3.5 w-3.5 text-white/30" />
-                            )}
-                          </div>
-                          <div className="min-w-0 flex-1">
-                            <p
-                              className={`font-jakarta text-sm font-bold truncate transition-colors ${
-                                selectedTeacherId === teacher.id
-                                  ? "text-indigo-300"
-                                  : "text-white"
-                              }`}
-                            >
-                              {teacher.firstName} {teacher.lastName}
-                            </p>
-                            <div className="mt-0.5 flex items-center gap-2 flex-wrap">
-                              <p className="font-manrope text-xs text-white/30 truncate">
-                                {teacher?.user?.email}
-                              </p>
-                              {teacher.specialization && (
-                                <span className="inline-flex items-center gap-1 rounded-full border border-indigo-500/15 bg-indigo-500/8 px-1.5 py-0.5 font-manrope text-[10px] text-indigo-400/80">
-                                  <Briefcase className="h-2 w-2" />
-                                  {teacher.specialization}
-                                </span>
-                              )}
-                            </div>
-                          </div>
-                        </button>
-                      ))}
-                    </div>
-                  )}
-                </div>
-
-                {/* Actions */}
-                <div className="mt-4 flex gap-3">
-                  <Button
-                    type="button"
-                    onClick={handleCloseAssignModal}
-                    className="h-12 flex-1 rounded-xl border border-white/10 bg-white/5 font-jakarta text-sm font-bold text-white/60 hover:bg-white/8 hover:text-white transition-all duration-200"
-                  >
-                    {t("cancelBtn")}
-                  </Button>
-                  <Button
-                    type="button"
-                    disabled={!selectedTeacherId || isAssigning}
-                    onClick={handleAssign}
-                    className="h-12 flex-1 rounded-xl border-0 bg-indigo-600 font-jakarta text-sm font-bold text-white shadow-lg shadow-indigo-500/20 transition-all duration-200 hover:bg-indigo-500 disabled:opacity-40"
-                  >
-                    {isAssigning ? (
-                      <span className="flex items-center gap-2">
-                        <Loader2 className="h-4 w-4 animate-spin" />
-                        {t("assigning")}
-                      </span>
-                    ) : (
-                      <span className="flex items-center gap-2">
-                        <UserCheck className="h-4 w-4" />
-                        {t("confirmAssignBtn")}
-                      </span>
-                    )}
-                  </Button>
-                </div>
+                  {subject.isActive ? t("active") : t("inactive")}
+                </Badge>
               </div>
-            </motion.div>
-          </>
-        )}
-      </AnimatePresence>
-
-      {/* ── Unassign Confirm Modal ───────────────────────────────────────────── */}
-      <AnimatePresence>
-        {isUnassignModalOpen && (
-          <>
-            <motion.div
-              key="unassign-backdrop"
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              transition={{ duration: 0.2 }}
-              className="fixed inset-0 z-40 bg-black/60 backdrop-blur-sm"
-              onClick={() => setIsUnassignModalOpen(false)}
-            />
-            <motion.div
-              key="unassign-modal"
-              initial={{ opacity: 0, scale: 0.96, y: 16 }}
-              animate={{ opacity: 1, scale: 1, y: 0 }}
-              exit={{ opacity: 0, scale: 0.96, y: 16 }}
-              transition={{ duration: 0.3, ease: [0.16, 1, 0.3, 1] }}
-              className="fixed inset-0 z-50 flex items-center justify-center px-4"
-            >
-              <div className="relative w-full max-w-sm rounded-3xl border border-white/10 bg-[#070c18] p-6 sm:p-8 shadow-[0_0_0_1px_rgba(255,255,255,0.05),0_32px_80px_rgba(0,0,0,0.7)] backdrop-blur-2xl">
-                <div className="pointer-events-none absolute inset-0 overflow-hidden rounded-3xl">
-                  <div className="absolute inset-x-0 top-0 h-px bg-linear-to-r from-transparent via-red-500/20 to-transparent" />
-                </div>
-
-                <div className="mb-5 flex flex-col items-center text-center">
-                  <div className="mb-4 flex h-12 w-12 items-center justify-center rounded-2xl border border-red-500/30 bg-red-500/10">
-                    <AlertTriangle className="h-5 w-5 text-red-400" />
-                  </div>
-                  <h2 className="font-jakarta text-lg font-extrabold text-white">
-                    {t("unassignModalTitle")}
-                  </h2>
-                  <p className="mt-1.5 font-manrope text-sm text-white/40">
-                    {t("unassignModalBody").replace(
-                      "{teacher}",
-                      assignedTeacher
-                        ? `${assignedTeacher.firstName} ${assignedTeacher.lastName}`
-                        : "",
-                    )}
+              <h1 className="mt-3 font-jakarta text-3xl font-bold tracking-tight sm:text-4xl">
+                {subject.name}
+              </h1>
+              <p className="mt-1.5 line-clamp-2 max-w-2xl font-manrope text-sm text-white/80">
+                {subject.description || t("pageSubtitle")}
+              </p>
+            </div>
+            <div className="grid grid-cols-2 gap-3 lg:w-64">
+              {[
+                {
+                  icon: Users,
+                  value: teacherSubjects.length,
+                  label: t("statTeachers"),
+                },
+                {
+                  icon: CalendarClock,
+                  value: periodCount,
+                  label: t("statPeriods"),
+                },
+              ].map((stat) => (
+                <div
+                  key={stat.label}
+                  className="rounded-2xl bg-white/10 p-4 ring-1 ring-white/15"
+                >
+                  <stat.icon className="size-4 text-white/70" />
+                  <p className="mt-2 font-jakarta text-2xl font-bold">
+                    {stat.value}
+                  </p>
+                  <p className="font-manrope text-[11px] text-white/70">
+                    {stat.label}
                   </p>
                 </div>
+              ))}
+            </div>
+          </div>
+        </Card>
+      </motion.div>
 
-                <div className="flex gap-3">
-                  <Button
-                    type="button"
-                    onClick={() => setIsUnassignModalOpen(false)}
-                    className="h-12 flex-1 rounded-xl border border-white/10 bg-white/5 font-jakarta text-sm font-bold text-white/60 hover:bg-white/8 hover:text-white transition-all duration-200"
-                  >
-                    {t("cancelBtn")}
-                  </Button>
-                  <Button
-                    type="button"
-                    disabled={isUnassigning}
-                    onClick={handleUnassign}
-                    className="h-12 flex-1 rounded-xl border border-red-500/30 bg-red-500/10 font-jakarta text-sm font-bold text-red-400 transition-all duration-200 hover:bg-red-500/20 disabled:opacity-40 shadow-none"
-                  >
-                    {isUnassigning ? (
-                      <span className="flex items-center gap-2">
-                        <Loader2 className="h-4 w-4 animate-spin" />
-                        {t("unassigning")}
-                      </span>
-                    ) : (
-                      <span className="flex items-center gap-2">
-                        <UserX className="h-4 w-4" />
-                        {t("confirmUnassignBtn")}
-                      </span>
-                    )}
-                  </Button>
+      <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
+        <div className="space-y-4 lg:col-span-2">
+          <motion.div {...fadeUp(0.1)}>
+            <Card className={`${CARD_CLASS} p-5`}>
+              <div className="mb-4 flex items-center gap-3">
+                <span
+                  className={`flex h-10 w-10 items-center justify-center rounded-xl border ${TONE_CLASSES.indigo}`}
+                >
+                  <BookOpen className="size-4" />
+                </span>
+                <div>
+                  <h3 className="font-jakarta text-base font-semibold text-foreground">
+                    {t("aboutTitle")}
+                  </h3>
+                  <p className="font-manrope text-xs text-muted-foreground">
+                    {t("aboutSub")}
+                  </p>
                 </div>
               </div>
-            </motion.div>
-          </>
-        )}
-      </AnimatePresence>
+              <p className="mb-4 rounded-xl border border-border bg-muted/40 p-4 font-manrope text-sm leading-relaxed text-foreground/85">
+                {subject.description || (
+                  <span className="text-muted-foreground italic">
+                    {t("noDescription")}
+                  </span>
+                )}
+              </p>
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                <InfoTile
+                  icon={<Hash className="size-3.5" />}
+                  label={t("infoCode")}
+                  value={subject.code}
+                />
+                <InfoTile
+                  icon={<Layers className="size-3.5" />}
+                  label={t("infoType")}
+                  value={subject.isElective ? t("typeElective") : t("typeCore")}
+                />
+                <InfoTile
+                  icon={<CheckCircle2 className="size-3.5" />}
+                  label={t("infoStatus")}
+                  value={subject.isActive ? t("active") : t("inactive")}
+                />
+                <InfoTile
+                  icon={<ToggleLeft className="size-3.5" />}
+                  label={t("infoElective")}
+                  value={subject.isElective ? t("yes") : t("no")}
+                />
+              </div>
+            </Card>
+          </motion.div>
+
+          <motion.div {...fadeUp(0.15)}>
+            <Card className={`${CARD_CLASS} p-5`}>
+              <div className="mb-4 flex items-center justify-between gap-3">
+                <div className="flex items-center gap-3">
+                  <span
+                    className={`flex h-10 w-10 items-center justify-center rounded-xl border ${TONE_CLASSES.emerald}`}
+                  >
+                    <Users className="size-4" />
+                  </span>
+                  <div>
+                    <h3 className="font-jakarta text-base font-semibold text-foreground">
+                      {t("assignedTeacherTitle")}
+                    </h3>
+                    <p className="font-manrope text-xs text-muted-foreground">
+                      {t("teachersAssignedSub")}
+                    </p>
+                  </div>
+                </div>
+                <Badge
+                  variant="outline"
+                  className="rounded-full border-border bg-muted font-manrope text-[11px] text-foreground/70"
+                >
+                  {teacherSubjects.length}
+                </Badge>
+              </div>
+              {hasTeacher ? (
+                <div className="divide-y divide-border">
+                  {teacherSubjects.map((ts) => (
+                    <AssignedTeacherRow key={ts.id} teacherSubject={ts} />
+                  ))}
+                </div>
+              ) : (
+                <div className="flex flex-col items-center justify-center gap-4 rounded-xl border border-dashed border-border px-4 py-10 text-center">
+                  <span className="flex h-12 w-12 items-center justify-center rounded-2xl border border-border bg-muted">
+                    <UserX className="size-5 text-muted-foreground" />
+                  </span>
+                  <div>
+                    <p className="font-jakarta text-sm font-semibold text-foreground">
+                      {t("noTeacherTitle")}
+                    </p>
+                    <p className="mt-1 font-manrope text-xs text-muted-foreground">
+                      {t("noTeacherSubtitle")}
+                    </p>
+                  </div>
+                  <Button
+                    type="button"
+                    onClick={() => setIsAssignOpen(true)}
+                    className={`h-9 gap-2 px-4 text-xs ${PRIMARY_PILL_CLASS}`}
+                  >
+                    <UserCheck className="size-3.5" />
+                    {t("assignBtn")}
+                  </Button>
+                </div>
+              )}
+            </Card>
+          </motion.div>
+        </div>
+
+        <div className="space-y-4 lg:sticky lg:top-24 lg:self-start">
+          <motion.div {...fadeUp(0.1)}>
+            <Card className={`${CARD_CLASS} gap-4 p-5`}>
+              <div>
+                <h3 className="font-jakarta text-base font-semibold text-foreground">
+                  {t("actionsTitle")}
+                </h3>
+                <p className="mt-1 font-manrope text-xs leading-relaxed text-muted-foreground">
+                  {hasTeacher
+                    ? t("actionsAssignedSub").replace("{teacher}", primaryName)
+                    : t("actionsEmptySub")}
+                </p>
+              </div>
+              <div className="flex items-start gap-2.5 rounded-xl border border-border bg-muted/40 p-3">
+                <Info className="mt-0.5 size-4 shrink-0 text-muted-foreground" />
+                <p className="font-manrope text-xs leading-relaxed text-muted-foreground">
+                  {t("actionsHint")}
+                </p>
+              </div>
+              {hasTeacher ? (
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => setIsUnassignOpen(true)}
+                  className="h-11 w-full gap-2 rounded-full border-red-500/20 bg-red-500/10 font-manrope text-sm font-semibold text-red-700 shadow-none hover:bg-red-500/15 dark:border-red-500/20 dark:bg-red-500/10 dark:text-red-300 dark:hover:bg-red-500/15"
+                >
+                  <UserX className="size-4" />
+                  {t("unassignBtn")}
+                </Button>
+              ) : (
+                <Button
+                  type="button"
+                  onClick={() => setIsAssignOpen(true)}
+                  className={`h-11 w-full gap-2 text-sm ${PRIMARY_PILL_CLASS}`}
+                >
+                  <UserCheck className="size-4" />
+                  {t("assignBtn")}
+                </Button>
+              )}
+            </Card>
+          </motion.div>
+
+          <motion.div {...fadeUp(0.15)}>
+            <Card className={`${CARD_CLASS} gap-3 p-5`}>
+              <h3 className="font-jakarta text-base font-semibold text-foreground">
+                {t("recordTitle")}
+              </h3>
+              <InfoTile
+                icon={<CalendarDays className="size-3.5" />}
+                label={t("createdOn")}
+                value={formatDate(subject.createdAt)}
+              />
+              <InfoTile
+                icon={<CalendarClock className="size-3.5" />}
+                label={t("updatedOn")}
+                value={formatDate(subject.updatedAt)}
+              />
+              <Separator />
+              <Button
+                asChild
+                variant="outline"
+                className={`h-10 w-full text-xs ${OUTLINE_PILL_CLASS}`}
+              >
+                <Link href={SUBJECT_DETAIL_PATH}>{t("viewAllSubjects")}</Link>
+              </Button>
+            </Card>
+          </motion.div>
+        </div>
+      </div>
+
+      <AssignTeacherDialog
+        open={isAssignOpen}
+        onOpenChange={setIsAssignOpen}
+        subjectName={subject.name}
+        onAssign={handleAssign}
+        isAssigning={isAssigning}
+      />
+      <UnassignTeacherDialog
+        open={isUnassignOpen}
+        onOpenChange={setIsUnassignOpen}
+        teacherName={primaryName}
+        onConfirm={handleUnassign}
+        isUnassigning={isUnassigning}
+      />
     </div>
   );
 };

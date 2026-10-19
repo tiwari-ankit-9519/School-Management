@@ -9,8 +9,12 @@ import {
   getAcademicYear,
 } from "../controller/academic-year.controller";
 import { Module } from "@prisma/client";
+import { controllerContext } from "../config/logger.config";
+import { ro } from "zod/v4/locales";
 
 const router: Router = Router();
+
+router.use(controllerContext("AcademicyearController"));
 
 router.post(
   "/create",

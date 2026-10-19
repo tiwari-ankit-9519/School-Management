@@ -5,8 +5,11 @@ import {
   getFeeStructureForClass,
   updateFeeStructure,
 } from "../controller/fees.controller";
+import { controllerContext } from "../config/logger.config";
 
 const router: Router = Router();
+
+router.use(controllerContext("FeesController"));
 
 router.post(
   "/create/:classGroupId",

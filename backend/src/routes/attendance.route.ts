@@ -13,8 +13,11 @@ import {
   markTeacherAttendance,
 } from "../controller/attendance.controller";
 import { Module } from "@prisma/client";
+import { controllerContext } from "../config/logger.config";
 
 const router: Router = Router();
+
+router.use(controllerContext("AttendanceController"));
 
 router.post(
   "/student",

@@ -4,8 +4,11 @@ import {
   getSchoolSettings,
   updateSchoolSettings,
 } from "../controller/schoolsettings.controller";
+import { controllerContext } from "../config/logger.config";
 
 const router: Router = Router();
+
+router.use(controllerContext("SchoolSettingController"));
 
 router.get("/settings", authenticate, authorize("ADMIN"), getSchoolSettings);
 router.patch(

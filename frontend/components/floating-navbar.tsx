@@ -1,169 +1,207 @@
 "use client";
 import { useState, useEffect } from "react";
-import { motion, AnimatePresence } from "motion/react";
+import { motion } from "motion/react";
 import Image from "next/image";
-import { usePathname } from "next/navigation";
-import { GraduationCap, UserPlus, LogIn, Menu, X } from "lucide-react";
 import Link from "next/link";
+import { usePathname } from "next/navigation";
+import { GraduationCap, UserPlus, LogIn, Menu } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import {
+  Sheet,
+  SheetClose,
+  SheetContent,
+  SheetDescription,
+  SheetHeader,
+  SheetTitle,
+  SheetTrigger,
+} from "@/components/ui/sheet";
+import { Separator } from "@/components/ui/separator";
 import { useTranslations } from "@/hooks/useTranslations";
 import { LanguageToggle } from "@/components/LanguageToggle";
+import { ThemeToggle } from "@/components/ThemeToggle";
+
+const SCHOOL_CODE = "N.D.S.K.G.I.C.";
+
+const NAV_LINKS = [
+  { labelKey: "admission", href: "/admission", icon: GraduationCap },
+  {
+    labelKey: "teacherApplication",
+    href: "/teacher-application",
+    icon: UserPlus,
+  },
+] as const;
+
+const isLinkActive = (pathname: string, href: string): boolean =>
+  pathname === href || pathname.startsWith(`${href}/`);
 
 export function FloatingNavbar() {
   const [scrolled, setScrolled] = useState(false);
-  const [mobileOpen, setMobileOpen] = useState(false);
   const pathname = usePathname();
   const t = useTranslations("navbar");
-
-  const NAV_LINKS = [
-    { labelKey: "admission", href: "/admission", icon: GraduationCap },
-    {
-      labelKey: "teacherApplication",
-      href: "/teacher-application",
-      icon: UserPlus,
-    },
-  ];
+  const tCommon = useTranslations("common");
 
   useEffect(() => {
     const onScroll = () => setScrolled(window.scrollY > 20);
+    onScroll();
     window.addEventListener("scroll", onScroll, { passive: true });
     return () => window.removeEventListener("scroll", onScroll);
   }, []);
 
-  useEffect(() => {
-    const timer = setTimeout(() => setMobileOpen(false), 0);
-    return () => clearTimeout(timer);
-  }, [pathname]);
-
   return (
-    <>
-      <motion.nav
-        initial={{ y: -20, opacity: 0 }}
-        animate={{ y: 0, opacity: 1 }}
-        transition={{ duration: 0.5, ease: [0.16, 1, 0.3, 1] }}
-        className="fixed top-4 left-1/2 -translate-x-1/2 z-50 w-[calc(100%-2rem)] max-w-3xl"
+    <motion.header
+      initial={{ y: -20, opacity: 0 }}
+      animate={{ y: 0, opacity: 1 }}
+      transition={{ duration: 0.5, ease: [0.16, 1, 0.3, 1] }}
+      className="fixed top-4 left-1/2 z-50 w-[calc(100%-2rem)] max-w-3xl -translate-x-1/2"
+    >
+      <nav
+        className={`flex items-center justify-between gap-3 rounded-full border py-2 pr-2 pl-4 transition-all duration-300 ${
+          scrolled
+            ? "border-border bg-background/95 shadow-[0_8px_32px_rgba(0,0,0,0.12)] backdrop-blur-xl dark:shadow-[0_8px_32px_rgba(0,0,0,0.4)]"
+            : "border-border bg-background/80 backdrop-blur-lg"
+        }`}
       >
-        <div
-          className={`flex items-center justify-between px-4 py-2.5 rounded-2xl border transition-all duration-300 ${
-            scrolled
-              ? "bg-[#060a14]/95 border-white/12 shadow-[0_8px_32px_rgba(0,0,0,0.4)] backdrop-blur-xl"
-              : "bg-[#060a14]/80 border-white/8 backdrop-blur-lg"
-          }`}
-        >
-          <Link href="/" className="flex items-center gap-2.5 shrink-0">
-            <Image
-              src="/logo.png"
-              alt="EduSphere"
-              width={16}
-              height={16}
-              className="object-contain"
-            />
-            <span className="text-white text-sm font-bold font-jakarta tracking-tight">
-              N.D.S.K.G.I.C.
-            </span>
-          </Link>
-          <div className="hidden md:flex items-center gap-1">
-            {NAV_LINKS.map((link) => {
-              const isActive = pathname === link.href;
-              return (
+        <Link href="/" className="flex shrink-0 items-center gap-2">
+          <Image
+            src="/logo.png"
+            alt={SCHOOL_CODE}
+            width={18}
+            height={18}
+            className="object-contain"
+          />
+          <span className="font-jakarta text-sm font-bold tracking-tight text-foreground">
+            {SCHOOL_CODE}
+          </span>
+        </Link>
+
+        <div className="hidden items-center gap-1.5 md:flex">
+          {NAV_LINKS.map((link) => {
+            const isActive = isLinkActive(pathname, link.href);
+            return (
+              <Button
+                key={link.href}
+                asChild
+                size="sm"
+                className={`h-8 gap-1.5 rounded-full px-3.5 font-manrope text-xs font-medium shadow-none ${
+                  isActive
+                    ? "bg-primary text-primary-foreground hover:bg-primary/90"
+                    : "bg-muted text-foreground/70 hover:bg-accent hover:text-foreground"
+                }`}
+              >
                 <Link
-                  key={link.href}
                   href={link.href}
-                  className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-manrope font-medium transition-all duration-200 ${
-                    isActive
-                      ? "bg-indigo-500/15 text-indigo-300 border border-indigo-400/20"
-                      : "text-white/50 hover:text-white/80 hover:bg-white/5"
-                  }`}
+                  aria-current={isActive ? "page" : undefined}
                 >
-                  <link.icon className="h-3.5 w-3.5" />
-                  {t(link.labelKey as Parameters<typeof t>[0])}
+                  <link.icon className="size-3.5" />
+                  {t(link.labelKey)}
                 </Link>
-              );
-            })}
-          </div>
-          <div className="hidden md:flex items-center gap-2">
-            <Link
-              href="/login"
-              className="flex items-center gap-1.5 px-4 py-1.5 rounded-xl text-xs font-manrope font-medium text-white/60 hover:text-white hover:bg-white/5 border border-white/8 hover:border-white/15 transition-all duration-200"
-            >
-              <LogIn className="h-3.5 w-3.5" />
+              </Button>
+            );
+          })}
+        </div>
+
+        <div className="hidden items-center gap-2 md:flex">
+          <LanguageToggle />
+          <ThemeToggle />
+          <Button
+            asChild
+            variant="outline"
+            size="sm"
+            className="h-8 gap-1.5 rounded-full border-border bg-transparent px-4 font-manrope text-xs font-medium text-foreground/80 shadow-none hover:bg-accent hover:text-foreground"
+          >
+            <Link href="/login">
+              <LogIn className="size-3.5" />
               {t("signIn")}
             </Link>
-            <LanguageToggle />
-          </div>
-          <div className="md:hidden flex items-center gap-2">
-            <LanguageToggle />
-            <button
-              onClick={() => setMobileOpen((o) => !o)}
-              className="w-8 h-8 flex items-center justify-center rounded-lg text-white/50 hover:text-white hover:bg-white/8 transition-all"
-            >
-              <AnimatePresence mode="wait" initial={false}>
-                {mobileOpen ? (
-                  <motion.div
-                    key="close"
-                    initial={{ rotate: -90, opacity: 0 }}
-                    animate={{ rotate: 0, opacity: 1 }}
-                    exit={{ rotate: 90, opacity: 0 }}
-                    transition={{ duration: 0.15 }}
-                  >
-                    <X className="h-4 w-4" />
-                  </motion.div>
-                ) : (
-                  <motion.div
-                    key="menu"
-                    initial={{ rotate: 90, opacity: 0 }}
-                    animate={{ rotate: 0, opacity: 1 }}
-                    exit={{ rotate: -90, opacity: 0 }}
-                    transition={{ duration: 0.15 }}
-                  >
-                    <Menu className="h-4 w-4" />
-                  </motion.div>
-                )}
-              </AnimatePresence>
-            </button>
-          </div>
+          </Button>
         </div>
-        <AnimatePresence>
-          {mobileOpen && (
-            <motion.div
-              initial={{ opacity: 0, y: -8, scale: 0.97 }}
-              animate={{ opacity: 1, y: 0, scale: 1 }}
-              exit={{ opacity: 0, y: -8, scale: 0.97 }}
-              transition={{ duration: 0.2, ease: [0.16, 1, 0.3, 1] }}
-              className="mt-2 bg-[#060a14]/95 backdrop-blur-xl border border-white/10 rounded-2xl overflow-hidden shadow-[0_8px_32px_rgba(0,0,0,0.4)]"
+
+        <div className="flex items-center gap-2 md:hidden">
+          <LanguageToggle />
+          <Sheet>
+            <SheetTrigger asChild>
+              <Button
+                variant="ghost"
+                size="icon"
+                aria-label={t("menu")}
+                className="h-8 w-8 rounded-full text-muted-foreground hover:bg-accent hover:text-foreground"
+              >
+                <Menu className="size-4" />
+              </Button>
+            </SheetTrigger>
+            <SheetContent
+              side="right"
+              className="w-72 gap-0 border-border bg-background p-0 text-foreground"
             >
-              <div className="p-2 space-y-0.5">
+              <SheetHeader className="flex-row items-center gap-2 px-5 pt-5 pb-4">
+                <Image
+                  src="/logo.png"
+                  alt={SCHOOL_CODE}
+                  width={20}
+                  height={20}
+                  className="object-contain"
+                />
+                <SheetTitle className="font-jakarta text-sm font-bold text-foreground">
+                  {SCHOOL_CODE}
+                </SheetTitle>
+                <SheetDescription className="sr-only">
+                  {t("menu")}
+                </SheetDescription>
+              </SheetHeader>
+
+              <Separator />
+
+              <div className="flex flex-col gap-1 p-3">
                 {NAV_LINKS.map((link) => {
-                  const isActive = pathname === link.href;
+                  const isActive = isLinkActive(pathname, link.href);
                   return (
-                    <Link
-                      key={link.href}
-                      href={link.href}
-                      className={`flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-manrope transition-all duration-200 ${
-                        isActive
-                          ? "bg-indigo-500/15 text-indigo-300"
-                          : "text-white/50 hover:text-white/80 hover:bg-white/5"
-                      }`}
-                    >
-                      <link.icon className="h-4 w-4 shrink-0" />
-                      {t(link.labelKey as Parameters<typeof t>[0])}
-                    </Link>
+                    <SheetClose key={link.href} asChild>
+                      <Button
+                        asChild
+                        variant="ghost"
+                        className={`h-10 justify-start gap-3 rounded-lg px-3 font-manrope text-sm font-normal ${
+                          isActive
+                            ? "bg-accent font-medium text-foreground hover:bg-accent hover:text-foreground"
+                            : "text-foreground/70 hover:bg-accent hover:text-foreground"
+                        }`}
+                      >
+                        <Link
+                          href={link.href}
+                          aria-current={isActive ? "page" : undefined}
+                        >
+                          <link.icon className="size-4" />
+                          {t(link.labelKey)}
+                        </Link>
+                      </Button>
+                    </SheetClose>
                   );
                 })}
               </div>
-              <div className="px-2 pb-2">
-                <div className="h-px bg-white/6 mb-2" />
-                <Link
-                  href="/login"
-                  className="flex items-center justify-center gap-2 w-full px-4 py-2.5 rounded-xl text-sm font-manrope font-medium bg-indigo-600 hover:bg-indigo-500 text-white transition-all duration-200"
-                >
-                  <LogIn className="h-4 w-4" />
-                  {t("signIn")}
-                </Link>
+
+              <div className="mt-auto space-y-3 p-3">
+                <Separator />
+                <div className="flex items-center justify-between px-1">
+                  <span className="font-manrope text-xs text-muted-foreground">
+                    {tCommon("toggleTheme")}
+                  </span>
+                  <ThemeToggle />
+                </div>
+                <SheetClose asChild>
+                  <Button
+                    asChild
+                    className="h-10 w-full gap-2 rounded-full bg-primary font-manrope text-sm font-semibold text-primary-foreground hover:bg-primary/90"
+                  >
+                    <Link href="/login">
+                      <LogIn className="size-4" />
+                      {t("signIn")}
+                    </Link>
+                  </Button>
+                </SheetClose>
               </div>
-            </motion.div>
-          )}
-        </AnimatePresence>
-      </motion.nav>
-    </>
+            </SheetContent>
+          </Sheet>
+        </div>
+      </nav>
+    </motion.header>
   );
 }

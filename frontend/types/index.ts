@@ -381,11 +381,6 @@ export interface AdminAttendance {
   createdAt: string;
   updatedAt: string;
 }
-
-// ─────────────────────────────────────────────
-// TEACHER
-// ─────────────────────────────────────────────
-
 export interface Teacher {
   id: string;
   userId: string;

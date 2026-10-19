@@ -131,10 +131,6 @@ export const SubjectSchema = z.object({
     .trim(),
 });
 
-// ─────────────────────────────────────────────
-// PERMISSIONS & MODERATOR
-// ─────────────────────────────────────────────
-
 export const modulePermissionSchema = z.object({
   module: z.enum(Module),
   canCreate: z.boolean().default(false),

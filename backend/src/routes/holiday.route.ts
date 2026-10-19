@@ -10,8 +10,11 @@ import {
   getAllHolidays,
 } from "../controller/holiday.controller";
 import { Module } from "@prisma/client";
+import { controllerContext } from "../config/logger.config";
 
 const router: Router = Router();
+
+router.use(controllerContext("HolidayController"));
 
 router.post(
   "/",

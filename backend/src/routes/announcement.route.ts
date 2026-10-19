@@ -13,8 +13,11 @@ import {
   deleteAnnouncement,
 } from "../controller/announcement.controller";
 import { Module } from "@prisma/client";
+import { controllerContext } from "../config/logger.config";
 
 const router: Router = Router();
+
+router.use(controllerContext("AnnouncementController"));
 
 router.post(
   "/create",

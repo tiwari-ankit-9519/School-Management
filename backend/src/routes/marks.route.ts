@@ -12,8 +12,11 @@ import {
   getMarksForStudent,
 } from "@/src/controller/marks.controller";
 import { Module } from "@prisma/client";
+import { controllerContext } from "../config/logger.config";
 
 const router: Router = Router();
+
+router.use(controllerContext("MarksController"));
 
 router.post("/:subjectId/grade", authenticate, authorize("TEACHER"), gradeExam);
 

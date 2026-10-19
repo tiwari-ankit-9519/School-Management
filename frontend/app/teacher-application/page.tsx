@@ -1,101 +1,84 @@
+/* eslint-disable @typescript-eslint/no-unused-vars */
 "use client";
-import { useState, useRef, type KeyboardEvent } from "react";
-import {
-  useForm,
-  useWatch,
-  Controller,
-  FieldErrors,
-  Resolver,
-} from "react-hook-form";
-import { zodResolver } from "@hookform/resolvers/zod";
-import { motion, AnimatePresence } from "motion/react";
+import { useState } from "react";
 import Image from "next/image";
+import { useRouter } from "next/navigation";
+import { FieldErrors, Resolver, useForm, useWatch } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
+import { AnimatePresence, motion } from "motion/react";
 import {
-  User,
-  MapPin,
-  GraduationCap,
-  Briefcase,
-  FileText,
-  ChevronRight,
-  ChevronLeft,
   Check,
-  Upload,
-  X,
+  ChevronLeft,
+  ChevronRight,
   Loader2,
-  AlertCircle,
-  ImageIcon,
-  Phone,
-  Mail,
-  Star,
   Search,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import AnimatedInput from "@/components/smoothui/animated-input";
+import { Input } from "@/components/ui/input";
+import { Badge } from "@/components/ui/badge";
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import {
+  DatePickerField,
+  DocumentUploader,
+  FieldLabel,
+  OUTLINE_PILL_CLASS,
+  PRIMARY_PILL_CLASS,
+  PhotoPicker,
+  PillGroup,
+  Section,
+  TAB_TRIGGER_CLASS,
+  TextField,
+  UploadedDocument,
+  fieldClass,
+  isValidDate,
+  toDateOnly,
+} from "@/components/forms/FormParts";
 import { useCreateTeacherApplication } from "@/hooks/useTeacher";
 import {
   teacherApplicationSchema,
   TeacherApplicationFormValues,
 } from "@/validations/validations";
-import { Gender, DocumentType } from "@/types";
+import { DocumentType, Gender } from "@/types";
 import { useTranslations } from "@/hooks/useTranslations";
-import { useRouter } from "next/navigation";
-import { Input } from "@/components/ui/input";
 
 const STEPS = [
-  { id: 0, labelKey: "stepPersonal", icon: User },
-  { id: 1, labelKey: "stepAddress", icon: MapPin },
-  { id: 2, labelKey: "stepProfessional", icon: Briefcase },
-  { id: 3, labelKey: "stepDocuments", icon: FileText },
-];
+  { id: 0, labelKey: "stepPersonal" },
+  { id: 1, labelKey: "stepAddress" },
+  { id: 2, labelKey: "stepProfessional" },
+  { id: 3, labelKey: "stepDocuments" },
+] as const;
 
 const GENDER_OPTIONS = [
   { value: Gender.MALE, labelKey: "genderMale" },
   { value: Gender.FEMALE, labelKey: "genderFemale" },
   { value: Gender.OTHER, labelKey: "genderOther" },
+] as const;
+
+const SUGGESTED_DOCUMENTS = [
+  DocumentType.RESUME,
+  DocumentType.QUALIFICATION_CERTIFICATE,
+  DocumentType.ID_PROOF,
+  DocumentType.MEDICAL_CERTIFICATE,
 ];
 
-const DOCUMENT_TYPE_OPTIONS = Object.values(DocumentType).map((d) => ({
-  value: d,
-  label: d.replace(/_/g, " "),
-}));
+const STEP_FIELDS: (keyof TeacherApplicationFormValues)[][] = [
+  ["firstName", "lastName", "email", "phone", "gender", "dateOfBirth"],
+  ["address", "city", "state", "pincode"],
+  ["qualification", "experience", "specialization"],
+  [],
+];
 
-const inputClass =
-  "h-12 rounded-xl border-white/10 bg-white/5 text-white placeholder:text-white/20 focus-visible:ring-indigo-500/50 focus-visible:border-indigo-500/50";
-const labelClass = "text-white/40";
-
-const ErrorMsg = ({
-  errors,
-  field,
-}: {
-  errors: FieldErrors<TeacherApplicationFormValues>;
-  field: keyof TeacherApplicationFormValues;
-}) => {
-  const error = errors[field];
-  if (!error) return null;
-  return (
-    <motion.p
-      initial={{ opacity: 0, y: -4 }}
-      animate={{ opacity: 1, y: 0 }}
-      className="ml-1 mt-1 flex items-center gap-1 font-manrope text-xs text-red-400"
-    >
-      <AlertCircle className="h-3 w-3 shrink-0" />
-      {error.message as string}
-    </motion.p>
-  );
-};
+const MIN_BIRTH_MONTH = new Date(new Date().getFullYear() - 70, 0);
+const MAX_BIRTH_MONTH = new Date();
 
 const TeacherApplicationPage = () => {
   const t = useTranslations("teacherApplication");
-
+  const router = useRouter();
   const [currentStep, setCurrentStep] = useState(0);
   const [photoFile, setPhotoFile] = useState<File | null>(null);
   const [photoPreview, setPhotoPreview] = useState<string | null>(null);
-  const [documentFiles, setDocumentFiles] = useState<
-    { file: File; documentType: DocumentType; title: string }[]
-  >([]);
-
-  const photoInputRef = useRef<HTMLInputElement>(null);
-  const docInputRef = useRef<HTMLInputElement>(null);
+  const [documentFiles, setDocumentFiles] = useState<UploadedDocument[]>([]);
+  const [searchValue, setSearchValue] = useState("");
 
   const { mutate: submitApplication, isPending } =
     useCreateTeacherApplication();
@@ -140,6 +123,7 @@ const TeacherApplicationPage = () => {
   const lastNameValue = useWatch({ control, name: "lastName" });
   const emailValue = useWatch({ control, name: "email" });
   const phoneValue = useWatch({ control, name: "phone" });
+  const genderValue = useWatch({ control, name: "gender" });
   const dateOfBirthValue = useWatch({ control, name: "dateOfBirth" });
   const addressValue = useWatch({ control, name: "address" });
   const cityValue = useWatch({ control, name: "city" });
@@ -149,75 +133,57 @@ const TeacherApplicationPage = () => {
   const experienceValue = useWatch({ control, name: "experience" });
   const specializationValue = useWatch({ control, name: "specialization" });
 
-  const STEP_FIELDS: (keyof TeacherApplicationFormValues)[][] = [
-    ["firstName", "lastName", "email", "phone", "gender", "dateOfBirth"],
-    ["address", "city", "state", "pincode"],
-    ["qualification", "experience"],
-    [],
-  ];
-
-  const handleNext = async () => {
-    const valid = await trigger(STEP_FIELDS[currentStep]);
-    if (valid) {
-      clearErrors();
-      setCurrentStep((p) => Math.min(STEPS.length - 1, p + 1));
-    }
+  const handleSearch = () => {
+    const trimmed = searchValue.trim();
+    if (trimmed) router.push(`/teacher-application/status/${trimmed}`);
   };
 
-  const handleBack = () => {
+  const goToStep = async (target: number) => {
+    if (target === currentStep) return;
+    if (target < currentStep) {
+      clearErrors();
+      setCurrentStep(target);
+      return;
+    }
+    for (let step = currentStep; step < target; step++) {
+      const valid = await trigger(STEP_FIELDS[step]);
+      if (!valid) {
+        setCurrentStep(step);
+        return;
+      }
+    }
     clearErrors();
-    setCurrentStep((p) => Math.max(0, p - 1));
+    setCurrentStep(target);
   };
 
   const handlePhotoChange = (file: File) => {
-    const url = URL.createObjectURL(file);
+    if (photoPreview) URL.revokeObjectURL(photoPreview);
     setPhotoFile(file);
-    setPhotoPreview(url);
+    setPhotoPreview(URL.createObjectURL(file));
   };
 
-  const handleAddDocument = (file: File) => {
+  const handlePhotoRemove = () => {
+    if (photoPreview) URL.revokeObjectURL(photoPreview);
+    setPhotoFile(null);
+    setPhotoPreview(null);
+  };
+
+  const addDocuments = (files: File[]) => {
     setDocumentFiles((prev) => [
       ...prev,
-      { file, documentType: DocumentType.OTHER, title: file.name },
+      ...files.map((file) => ({
+        file,
+        documentType: DocumentType.OTHER,
+        title: file.name,
+      })),
     ]);
-  };
-
-  const handleRemoveDocument = (index: number) => {
-    setDocumentFiles((prev) => prev.filter((_, i) => i !== index));
-  };
-
-  const [searchValue, setSearchValue] = useState("");
-  const router = useRouter();
-  const handleSearch = () => {
-    const trimmed = searchValue.trim();
-    if (trimmed) {
-      router.push(`/teacher-application/status/${trimmed}`);
-    }
-  };
-
-  const handleSearchKeyDown = (e: KeyboardEvent<HTMLInputElement>) => {
-    if (e.key === "Enter") {
-      handleSearch();
-    }
-  };
-
-  const updateDocumentMeta = (
-    index: number,
-    field: "documentType" | "title",
-    value: string,
-  ) => {
-    setDocumentFiles((prev) =>
-      prev.map((d, i) => (i === index ? { ...d, [field]: value } : d)),
-    );
   };
 
   const onSubmit = (data: TeacherApplicationFormValues) => {
     submitApplication({
       formData: {
         ...data,
-        dateOfBirth: data.dateOfBirth
-          .toISOString()
-          .split("T")[0] as unknown as Date,
+        dateOfBirth: toDateOnly(data.dateOfBirth) as unknown as Date,
         documents: documentFiles.map((d) => ({
           documentType: d.documentType,
           title: d.title,
@@ -227,690 +193,422 @@ const TeacherApplicationPage = () => {
     });
   };
 
-  return (
-    <div className="relative min-h-screen w-full bg-[#050810] px-3 pt-20 pb-6 sm:px-6 sm:pt-24 sm:pb-10">
-      <div
-        className="pointer-events-none fixed inset-0 select-none"
-        style={{
-          background:
-            "radial-gradient(ellipse at 20% 20%, #1e3a5f18 0%, transparent 55%), radial-gradient(ellipse at 80% 70%, #6366f10a 0%, transparent 50%)",
-        }}
-      />
+  const onInvalid = (formErrors: FieldErrors<TeacherApplicationFormValues>) => {
+    const stepWithError = STEP_FIELDS.findIndex((fields) =>
+      fields.some((field) => formErrors[field]),
+    );
+    if (stepWithError >= 0) setCurrentStep(stepWithError);
+  };
 
-      <div className="relative z-10 mx-auto max-w-6xl">
-        <motion.div
-          initial={{ opacity: 0, y: 24 }}
+  return (
+    <div className="relative min-h-screen w-full bg-background px-4 pt-24 pb-10 sm:px-8 sm:pt-28">
+      <div className="pointer-events-none fixed inset-0 bg-[radial-gradient(ellipse_at_15%_0%,rgba(99,102,241,0.08),transparent_50%)]" />
+
+      <div className="relative z-10 mx-auto max-w-5xl">
+        <motion.header
+          initial={{ opacity: 0, y: 16 }}
           animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.6, ease: [0.16, 1, 0.3, 1] }}
-          className="mb-8"
+          transition={{ duration: 0.5, ease: [0.16, 1, 0.3, 1] }}
+          className="flex flex-col gap-6 lg:flex-row lg:items-end lg:justify-between"
         >
           <div className="flex items-center gap-3">
-            <div className="flex h-9 w-9 sm:h-11 sm:w-11 shrink-0 items-center justify-center rounded-xl border border-indigo-400/30 bg-indigo-500/20">
+            <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-indigo-500/10 ring-1 ring-indigo-500/20">
               <Image
                 src="/logo.png"
                 alt="EduSphere"
-                width={22}
-                height={22}
+                width={24}
+                height={24}
                 className="object-contain"
               />
-            </div>
+            </span>
             <div>
-              <h1 className="font-jakarta text-xl sm:text-2xl font-extrabold leading-tight text-white">
+              <h1 className="font-jakarta text-3xl font-bold tracking-tight text-foreground">
                 {t("pageTitle")}
               </h1>
-              <p className="font-manrope text-xs sm:text-sm text-white/40 mt-0.5">
+              <p className="mt-0.5 font-manrope text-sm text-muted-foreground">
                 {t("pageSubtitle")}
               </p>
             </div>
           </div>
-        </motion.div>
 
-        <h1 className="text-gray-500 mb-5">
-          If you already have the application id then you can check the status
-          of your application
-        </h1>
-
-        <motion.div
-          initial={{ opacity: 0, y: 16 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.5, delay: 0.05, ease: [0.16, 1, 0.3, 1] }}
-          className="mb-8 flex items-center gap-3 rounded-xl border border-white/8 bg-white/4 p-1.5 backdrop-blur-sm"
-        >
-          <div className="flex flex-1 items-center gap-2 px-2">
-            <Search className="h-4 w-4 shrink-0 text-white/30" />
-            <Input
-              value={searchValue}
-              onChange={(e) => setSearchValue(e.target.value)}
-              onKeyDown={handleSearchKeyDown}
-              placeholder={t("searchPlaceholder")}
-              className="h-9 border-0 bg-transparent font-manrope text-sm text-white placeholder:text-white/20 focus-visible:ring-0 focus-visible:ring-offset-0"
-            />
-          </div>
-          <Button
-            onClick={handleSearch}
-            disabled={!searchValue.trim()}
-            className="h-9 shrink-0 gap-2 rounded-lg border-0 bg-indigo-600 px-4 font-jakarta text-xs font-bold text-white transition-all duration-200 hover:bg-indigo-500 disabled:opacity-40"
-          >
-            <Search className="h-3.5 w-3.5" />
-            {t("searchButton")}
-          </Button>
-        </motion.div>
-
-        <motion.div
-          initial={{ opacity: 0, y: 16 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.5, delay: 0.1 }}
-          className="mb-6 flex items-center justify-between"
-        >
-          {STEPS.map((step, i) => {
-            const Icon = step.icon;
-            const isCompleted = i < currentStep;
-            const isActive = i === currentStep;
-            return (
-              <div key={step.id} className="flex flex-1 items-center">
-                <div className="flex flex-col items-center gap-1.5">
-                  <div
-                    className={`flex h-8 w-8 sm:h-9 sm:w-9 items-center justify-center rounded-full border transition-all duration-300 ${
-                      isCompleted
-                        ? "border-indigo-500 bg-indigo-500"
-                        : isActive
-                          ? "border-indigo-400 bg-indigo-500/20"
-                          : "border-white/10 bg-white/5"
-                    }`}
-                  >
-                    {isCompleted ? (
-                      <Check className="h-3.5 w-3.5 text-white" />
-                    ) : (
-                      <Icon
-                        className={`h-3.5 w-3.5 ${isActive ? "text-indigo-400" : "text-white/20"}`}
-                      />
-                    )}
-                  </div>
-                  <span
-                    className={`hidden sm:block font-manrope text-[10px] font-medium transition-colors ${
-                      isActive
-                        ? "text-indigo-400"
-                        : isCompleted
-                          ? "text-white/50"
-                          : "text-white/20"
-                    }`}
-                  >
-                    {t(step.labelKey as Parameters<typeof t>[0])}
-                  </span>
-                </div>
-                {i < STEPS.length - 1 && (
-                  <div
-                    className={`mx-1 sm:mx-2 h-px flex-1 transition-all duration-500 ${
-                      i < currentStep ? "bg-indigo-500" : "bg-white/10"
-                    }`}
-                  />
-                )}
+          <div className="w-full lg:max-w-sm">
+            <FieldLabel htmlFor="teacher-application-search">
+              {t("searchHint")}
+            </FieldLabel>
+            <div className="flex items-center gap-2">
+              <div className="relative flex-1">
+                <Search className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted-foreground" />
+                <Input
+                  id="teacher-application-search"
+                  value={searchValue}
+                  onChange={(e) => setSearchValue(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") handleSearch();
+                  }}
+                  placeholder={t("searchPlaceholder")}
+                  className={`${fieldClass(false)} pl-9`}
+                />
               </div>
-            );
-          })}
-        </motion.div>
+              <Button
+                type="button"
+                onClick={handleSearch}
+                disabled={!searchValue.trim()}
+                className={`h-10 shrink-0 px-4 text-xs ${PRIMARY_PILL_CLASS}`}
+              >
+                {t("searchButton")}
+              </Button>
+            </div>
+          </div>
+        </motion.header>
 
         <motion.div
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          transition={{ duration: 0.4, delay: 0.15 }}
-          className="relative overflow-hidden rounded-2xl border border-white/10 bg-white/4 backdrop-blur-xl shadow-[0_0_0_1px_rgba(255,255,255,0.04),0_24px_60px_rgba(0,0,0,0.5)]"
+          initial={{ opacity: 0, y: 8 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.4, delay: 0.1 }}
+          className="mt-8"
         >
-          <div className="absolute inset-x-0 top-0 h-px bg-linear-to-r from-transparent via-white/20 to-transparent" />
-          <div className="absolute inset-x-0 bottom-0 h-px bg-linear-to-r from-transparent via-white/5 to-transparent" />
-
-          <div className="p-5 sm:p-8">
-            <AnimatePresence mode="wait">
-              {currentStep === 0 && (
-                <motion.div
-                  key="step0"
-                  initial={{ opacity: 0, x: 20 }}
-                  animate={{ opacity: 1, x: 0 }}
-                  exit={{ opacity: 0, x: -20 }}
-                  transition={{ duration: 0.25 }}
-                  className="space-y-4"
+          <Tabs
+            value={String(currentStep)}
+            onValueChange={(value: string) => goToStep(Number(value))}
+          >
+            <TabsList className="flex h-auto w-full justify-start gap-2 overflow-x-auto bg-transparent p-0 scrollbar-none">
+              {STEPS.map((step, i) => (
+                <TabsTrigger
+                  key={step.id}
+                  value={String(step.id)}
+                  className={TAB_TRIGGER_CLASS}
                 >
-                  <div className="mb-5">
-                    <h2 className="font-jakarta text-lg font-bold text-white">
-                      {t("stepPersonalTitle")}
-                    </h2>
-                    <p className="font-manrope text-xs text-white/40 mt-0.5">
-                      {t("stepPersonalSub")}
-                    </p>
-                  </div>
+                  {i < currentStep && <Check className="size-3" />}
+                  {t(step.labelKey)}
+                </TabsTrigger>
+              ))}
+            </TabsList>
+          </Tabs>
+        </motion.div>
 
-                  {/* Photo upload */}
-                  <div className="flex items-center gap-4">
-                    <div
-                      onClick={() => photoInputRef.current?.click()}
-                      className="relative flex h-20 w-20 shrink-0 cursor-pointer items-center justify-center overflow-hidden rounded-2xl border border-dashed border-white/20 bg-white/5 transition-colors hover:border-indigo-500/40 hover:bg-indigo-500/5"
-                    >
-                      {photoPreview ? (
-                        <Image
-                          src={photoPreview}
-                          alt="Photo"
-                          fill
-                          className="object-cover"
-                        />
-                      ) : (
-                        <div className="flex flex-col items-center gap-1">
-                          <ImageIcon className="h-5 w-5 text-white/20" />
-                          <span className="font-manrope text-[10px] text-white/20">
-                            {t("photo")}
-                          </span>
-                        </div>
-                      )}
-                      <input
-                        ref={photoInputRef}
-                        type="file"
-                        accept="image/*"
-                        className="hidden"
-                        onChange={(e) => {
-                          const file = e.target.files?.[0];
-                          if (file) handlePhotoChange(file);
-                        }}
-                      />
-                    </div>
-                    <div>
-                      <p className="font-jakarta text-sm font-semibold text-white">
-                        {t("teacherPhoto")}
-                      </p>
-                      <p className="mt-0.5 font-manrope text-xs text-white/30">
-                        {t("photoHint")}
-                      </p>
-                      {photoFile && (
-                        <button
-                          type="button"
-                          onClick={() => {
-                            setPhotoFile(null);
-                            setPhotoPreview(null);
-                          }}
-                          className="mt-1.5 flex items-center gap-1 font-manrope text-xs text-red-400 hover:text-red-300"
-                        >
-                          <X className="h-3 w-3" /> {t("removePhoto")}
-                        </button>
-                      )}
-                    </div>
-                  </div>
-
-                  {/* Name row */}
-                  <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-                    <div className="space-y-1">
-                      <AnimatedInput
+        <AnimatePresence mode="wait">
+          <motion.div
+            key={currentStep}
+            initial={{ opacity: 0, y: 8 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -8 }}
+            transition={{ duration: 0.2 }}
+            className="mt-2"
+          >
+            {currentStep === 0 && (
+              <>
+                <Section
+                  title={t("stepPersonalTitle")}
+                  description={t("stepPersonalSub")}
+                >
+                  <div className="grid grid-cols-1 gap-6 md:grid-cols-[1fr_auto]">
+                    <div className="grid grid-cols-1 content-start gap-4 sm:grid-cols-2">
+                      <TextField
                         label={t("firstName")}
-                        icon={<User className="h-4 w-4 text-indigo-400" />}
                         value={firstNameValue}
                         onChange={(v) =>
                           setValue("firstName", v, { shouldValidate: true })
                         }
-                        inputClassName={inputClass}
-                        labelClassName={labelClass}
+                        error={errors.firstName?.message}
                       />
-                      <ErrorMsg errors={errors} field="firstName" />
-                    </div>
-                    <div className="space-y-1">
-                      <AnimatedInput
+                      <TextField
                         label={t("lastName")}
-                        icon={<User className="h-4 w-4 text-indigo-400" />}
                         value={lastNameValue}
                         onChange={(v) =>
                           setValue("lastName", v, { shouldValidate: true })
                         }
-                        inputClassName={inputClass}
-                        labelClassName={labelClass}
-                      />
-                      <ErrorMsg errors={errors} field="lastName" />
-                    </div>
-                  </div>
-
-                  <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-                    <div className="space-y-1">
-                      <AnimatedInput
-                        label={t("email")}
-                        icon={<Mail className="h-4 w-4 text-indigo-400" />}
-                        value={emailValue}
-                        onChange={(v) =>
-                          setValue("email", v, { shouldValidate: true })
-                        }
-                        inputClassName={inputClass}
-                        labelClassName={labelClass}
-                      />
-                      <ErrorMsg errors={errors} field="email" />
-                    </div>
-                    <div className="space-y-1">
-                      <AnimatedInput
-                        label={t("phone")}
-                        icon={<Phone className="h-4 w-4 text-indigo-400" />}
-                        value={phoneValue}
-                        onChange={(v) =>
-                          setValue("phone", v, { shouldValidate: true })
-                        }
-                        inputClassName={inputClass}
-                        labelClassName={labelClass}
-                      />
-                      <ErrorMsg errors={errors} field="phone" />
-                    </div>
-                  </div>
-
-                  <div className="space-y-1">
-                    <p className="font-manrope text-xs text-white/40 mb-2">
-                      {t("gender")}
-                    </p>
-                    <Controller
-                      control={control}
-                      name="gender"
-                      render={({ field }) => (
-                        <div className="flex gap-2">
-                          {GENDER_OPTIONS.map((opt) => (
-                            <button
-                              key={opt.value}
-                              type="button"
-                              onClick={() => {
-                                field.onChange(opt.value);
-                                clearErrors("gender");
-                              }}
-                              className={`flex-1 rounded-xl border py-2.5 font-manrope text-xs font-medium transition-all duration-200 ${
-                                field.value === opt.value
-                                  ? "border-indigo-500/40 bg-indigo-500/15 text-indigo-300"
-                                  : "border-white/10 bg-white/5 text-white/40 hover:border-white/20 hover:text-white/70"
-                              }`}
-                            >
-                              {t(opt.labelKey as Parameters<typeof t>[0])}
-                            </button>
-                          ))}
-                        </div>
-                      )}
-                    />
-                    <ErrorMsg errors={errors} field="gender" />
-                  </div>
-
-                  <div className="space-y-1">
-                    <label className="font-manrope text-xs text-white/40">
-                      {t("dateOfBirth")}
-                    </label>
-                    <div className="flex h-12 items-center gap-3 rounded-xl border border-white/10 bg-white/5 px-4 focus-within:border-indigo-500/50">
-                      <User className="h-4 w-4 shrink-0 text-indigo-400" />
-                      <input
-                        type="date"
-                        value={
-                          dateOfBirthValue
-                            ? new Date(dateOfBirthValue)
-                                .toISOString()
-                                .split("T")[0]
-                            : ""
-                        }
-                        onChange={(e) =>
-                          setValue("dateOfBirth", new Date(e.target.value), {
-                            shouldValidate: true,
-                          })
-                        }
-                        className="flex-1 bg-transparent font-manrope text-sm text-white focus:outline-none scheme-dark"
+                        error={errors.lastName?.message}
                       />
                     </div>
-                    <ErrorMsg errors={errors} field="dateOfBirth" />
+                    <div className="order-first md:order-0">
+                      <PhotoPicker
+                        preview={photoPreview}
+                        alt={t("teacherPhoto")}
+                        editLabel={t("editPhoto")}
+                        removeLabel={t("removePhoto")}
+                        hint={t("photoHint")}
+                        onPick={handlePhotoChange}
+                        onRemove={handlePhotoRemove}
+                      />
+                    </div>
                   </div>
-                </motion.div>
-              )}
+                </Section>
 
-              {currentStep === 1 && (
-                <motion.div
-                  key="step1"
-                  initial={{ opacity: 0, x: 20 }}
-                  animate={{ opacity: 1, x: 0 }}
-                  exit={{ opacity: 0, x: -20 }}
-                  transition={{ duration: 0.25 }}
-                  className="space-y-4"
+                <Section
+                  title={t("contactTitle")}
+                  description={t("contactSub")}
                 >
-                  <div className="mb-5">
-                    <h2 className="font-jakarta text-lg font-bold text-white">
-                      {t("stepAddressTitle")}
-                    </h2>
-                    <p className="font-manrope text-xs text-white/40 mt-0.5">
-                      {t("stepAddressSub")}
-                    </p>
-                  </div>
-
-                  <div className="space-y-1">
-                    <AnimatedInput
-                      label={t("address")}
-                      icon={<MapPin className="h-4 w-4 text-indigo-400" />}
-                      value={addressValue}
-                      onChange={(v) =>
-                        setValue("address", v, { shouldValidate: true })
-                      }
-                      inputClassName={inputClass}
-                      labelClassName={labelClass}
-                    />
-                    <ErrorMsg errors={errors} field="address" />
-                  </div>
-
                   <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-                    <div className="space-y-1">
-                      <AnimatedInput
-                        label={t("city")}
-                        icon={<MapPin className="h-4 w-4 text-indigo-400" />}
-                        value={cityValue}
-                        onChange={(v) =>
-                          setValue("city", v, { shouldValidate: true })
-                        }
-                        inputClassName={inputClass}
-                        labelClassName={labelClass}
-                      />
-                      <ErrorMsg errors={errors} field="city" />
-                    </div>
-                    <div className="space-y-1">
-                      <AnimatedInput
-                        label={t("state")}
-                        icon={<MapPin className="h-4 w-4 text-indigo-400" />}
-                        value={stateValue}
-                        onChange={(v) =>
-                          setValue("state", v, { shouldValidate: true })
-                        }
-                        inputClassName={inputClass}
-                        labelClassName={labelClass}
-                      />
-                      <ErrorMsg errors={errors} field="state" />
-                    </div>
-                  </div>
-
-                  <div className="space-y-1">
-                    <AnimatedInput
-                      label={t("pincode")}
-                      icon={<MapPin className="h-4 w-4 text-indigo-400" />}
-                      value={pincodeValue}
+                    <TextField
+                      label={t("email")}
+                      type="email"
+                      inputMode="email"
+                      value={emailValue}
                       onChange={(v) =>
-                        setValue("pincode", v, { shouldValidate: true })
+                        setValue("email", v, { shouldValidate: true })
                       }
-                      inputClassName={inputClass}
-                      labelClassName={labelClass}
+                      error={errors.email?.message}
                     />
-                    <ErrorMsg errors={errors} field="pincode" />
+                    <TextField
+                      label={t("phone")}
+                      type="tel"
+                      inputMode="tel"
+                      value={phoneValue}
+                      onChange={(v) =>
+                        setValue("phone", v, { shouldValidate: true })
+                      }
+                      error={errors.phone?.message}
+                    />
                   </div>
-                </motion.div>
-              )}
+                </Section>
 
-              {currentStep === 2 && (
-                <motion.div
-                  key="step2"
-                  initial={{ opacity: 0, x: 20 }}
-                  animate={{ opacity: 1, x: 0 }}
-                  exit={{ opacity: 0, x: -20 }}
-                  transition={{ duration: 0.25 }}
-                  className="space-y-4"
+                <Section
+                  title={t("personalDetailsTitle")}
+                  description={t("personalDetailsSub")}
                 >
-                  <div className="mb-5">
-                    <h2 className="font-jakarta text-lg font-bold text-white">
-                      {t("stepProfessionalTitle")}
-                    </h2>
-                    <p className="font-manrope text-xs text-white/40 mt-0.5">
-                      {t("stepProfessionalSub")}
-                    </p>
+                  <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                    <PillGroup
+                      label={t("gender")}
+                      options={GENDER_OPTIONS.map((opt) => ({
+                        value: opt.value,
+                        label: t(opt.labelKey),
+                      }))}
+                      value={genderValue as Gender | undefined}
+                      onSelect={(value) => {
+                        setValue("gender", value, { shouldValidate: true });
+                        clearErrors("gender");
+                      }}
+                      error={errors.gender?.message}
+                    />
+                    <DatePickerField
+                      label={t("dateOfBirth")}
+                      value={
+                        isValidDate(dateOfBirthValue)
+                          ? dateOfBirthValue
+                          : undefined
+                      }
+                      onChange={(date) =>
+                        setValue("dateOfBirth", date, { shouldValidate: true })
+                      }
+                      placeholder={t("pickDate")}
+                      startMonth={MIN_BIRTH_MONTH}
+                      endMonth={MAX_BIRTH_MONTH}
+                      error={errors.dateOfBirth?.message}
+                    />
                   </div>
+                </Section>
+              </>
+            )}
 
-                  {/* Qualification */}
-                  <div className="space-y-1">
-                    <AnimatedInput
+            {currentStep === 1 && (
+              <Section
+                title={t("stepAddressTitle")}
+                description={t("stepAddressSub")}
+              >
+                <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+                  <TextField
+                    className="sm:col-span-3"
+                    label={t("address")}
+                    value={addressValue}
+                    onChange={(v) =>
+                      setValue("address", v, { shouldValidate: true })
+                    }
+                    error={errors.address?.message}
+                  />
+                  <TextField
+                    label={t("city")}
+                    value={cityValue}
+                    onChange={(v) =>
+                      setValue("city", v, { shouldValidate: true })
+                    }
+                    error={errors.city?.message}
+                  />
+                  <TextField
+                    label={t("state")}
+                    value={stateValue}
+                    onChange={(v) =>
+                      setValue("state", v, { shouldValidate: true })
+                    }
+                    error={errors.state?.message}
+                  />
+                  <TextField
+                    label={t("pincode")}
+                    inputMode="numeric"
+                    value={pincodeValue}
+                    onChange={(v) =>
+                      setValue("pincode", v, { shouldValidate: true })
+                    }
+                    error={errors.pincode?.message}
+                  />
+                </div>
+              </Section>
+            )}
+
+            {currentStep === 2 && (
+              <>
+                <Section
+                  title={t("stepProfessionalTitle")}
+                  description={t("stepProfessionalSub")}
+                >
+                  <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                    <TextField
                       label={t("qualification")}
-                      icon={
-                        <GraduationCap className="h-4 w-4 text-indigo-400" />
-                      }
                       value={qualificationValue}
                       onChange={(v) =>
                         setValue("qualification", v, { shouldValidate: true })
                       }
-                      inputClassName={inputClass}
-                      labelClassName={labelClass}
+                      error={errors.qualification?.message}
                     />
-                    <ErrorMsg errors={errors} field="qualification" />
+                    <TextField
+                      label={t("experience")}
+                      type="number"
+                      inputMode="numeric"
+                      placeholder="0"
+                      suffix={t("years")}
+                      value={
+                        experienceValue === undefined ||
+                        experienceValue === null
+                          ? ""
+                          : String(experienceValue)
+                      }
+                      onChange={(v) =>
+                        setValue(
+                          "experience",
+                          v === ""
+                            ? (undefined as unknown as number)
+                            : Number(v),
+                          { shouldValidate: true },
+                        )
+                      }
+                      error={errors.experience?.message}
+                    />
                   </div>
+                </Section>
 
-                  <div className="space-y-1">
-                    <label className="font-manrope text-xs text-white/40">
-                      {t("experience")}
-                    </label>
-                    <div className="flex h-12 items-center gap-3 rounded-xl border border-white/10 bg-white/5 px-4 focus-within:border-indigo-500/50">
-                      <Briefcase className="h-4 w-4 shrink-0 text-indigo-400" />
-                      <input
-                        type="number"
-                        min={0}
-                        max={60}
-                        placeholder="0"
-                        value={experienceValue ?? ""}
-                        onChange={(e) =>
-                          setValue(
-                            "experience",
-                            e.target.value === ""
-                              ? (undefined as unknown as number)
-                              : Number(e.target.value),
-                            { shouldValidate: true },
-                          )
-                        }
-                        className="flex-1 bg-transparent font-manrope text-sm text-white placeholder:text-white/20 focus:outline-none [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
-                      />
-                      <span className="font-manrope text-xs text-white/30 shrink-0">
-                        {t("years")}
-                      </span>
-                    </div>
-                    <ErrorMsg errors={errors} field="experience" />
-                  </div>
-
-                  {/* Specialization — optional */}
-                  <div className="relative rounded-xl border border-white/8 bg-white/3 p-4">
-                    <p className="mb-3 font-manrope text-xs font-medium uppercase tracking-widest text-white/30">
-                      {t("specializationOptional")}
-                    </p>
-                    <div className="space-y-1">
-                      <AnimatedInput
-                        label={t("specialization")}
-                        icon={<Star className="h-4 w-4 text-indigo-400" />}
-                        value={specializationValue ?? ""}
-                        onChange={(v) =>
-                          setValue("specialization", v || undefined, {
-                            shouldValidate: true,
-                          })
-                        }
-                        inputClassName={inputClass}
-                        labelClassName={labelClass}
-                      />
-                      <ErrorMsg errors={errors} field="specialization" />
-                    </div>
-                  </div>
-                </motion.div>
-              )}
-
-              {currentStep === 3 && (
-                <motion.div
-                  key="step3"
-                  initial={{ opacity: 0, x: 20 }}
-                  animate={{ opacity: 1, x: 0 }}
-                  exit={{ opacity: 0, x: -20 }}
-                  transition={{ duration: 0.25 }}
-                  className="space-y-4"
+                <Section
+                  title={t("specializationOptional")}
+                  description={t("specializationSub")}
                 >
-                  <div className="mb-5">
-                    <h2 className="font-jakarta text-lg font-bold text-white">
-                      {t("stepDocumentsTitle")}
-                    </h2>
-                    <p className="font-manrope text-xs text-white/40 mt-0.5">
-                      {t("stepDocumentsSub")}
-                    </p>
-                  </div>
-
-                  {/* Suggested document types hint */}
-                  <div className="flex flex-wrap gap-1.5">
-                    {[
-                      DocumentType.RESUME,
-                      DocumentType.QUALIFICATION_CERTIFICATE,
-                      DocumentType.ID_PROOF,
-                      DocumentType.MEDICAL_CERTIFICATE,
-                    ].map((type) => (
-                      <span
-                        key={type}
-                        className="rounded-lg border border-white/8 bg-white/5 px-2.5 py-1 font-manrope text-[10px] text-white/30"
-                      >
-                        {type.replace(/_/g, " ")}
-                      </span>
-                    ))}
-                    <span className="rounded-lg border border-white/8 bg-white/5 px-2.5 py-1 font-manrope text-[10px] text-white/20">
-                      + {t("moreDocuments")}
-                    </span>
-                  </div>
-
-                  {/* Drop zone */}
-                  <div
-                    onClick={() => docInputRef.current?.click()}
-                    className="flex cursor-pointer flex-col items-center justify-center gap-3 rounded-2xl border border-dashed border-white/15 bg-white/3 py-8 transition-colors hover:border-indigo-500/30 hover:bg-indigo-500/5"
-                  >
-                    <div className="flex h-10 w-10 items-center justify-center rounded-xl border border-white/10 bg-white/5">
-                      <Upload className="h-4 w-4 text-white/30" />
-                    </div>
-                    <div className="text-center">
-                      <p className="font-jakarta text-sm font-semibold text-white/50">
-                        {t("uploadDocuments")}
-                      </p>
-                      <p className="mt-0.5 font-manrope text-xs text-white/20">
-                        {t("uploadHint")}
-                      </p>
-                    </div>
-                    <input
-                      ref={docInputRef}
-                      type="file"
-                      multiple
-                      className="hidden"
-                      onChange={(e) => {
-                        Array.from(e.target.files ?? []).forEach(
-                          handleAddDocument,
-                        );
-                        e.target.value = "";
-                      }}
+                  <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                    <TextField
+                      label={t("specialization")}
+                      value={specializationValue ?? ""}
+                      onChange={(v) =>
+                        setValue("specialization", v || undefined, {
+                          shouldValidate: true,
+                        })
+                      }
+                      error={errors.specialization?.message}
                     />
                   </div>
+                </Section>
+              </>
+            )}
 
-                  {documentFiles.length > 0 ? (
-                    <div className="space-y-2">
-                      {documentFiles.map((doc, i) => (
-                        <motion.div
-                          key={i}
-                          initial={{ opacity: 0, y: 8 }}
-                          animate={{ opacity: 1, y: 0 }}
-                          className="relative rounded-xl border border-white/10 bg-white/5 p-3"
-                        >
-                          <div className="mb-2 flex items-center justify-between">
-                            <div className="flex items-center gap-2 min-w-0">
-                              <FileText className="h-3.5 w-3.5 shrink-0 text-indigo-400" />
-                              <span className="font-manrope text-xs text-white/60 truncate">
-                                {doc.file.name}
-                              </span>
-                            </div>
-                            <button
-                              type="button"
-                              onClick={() => handleRemoveDocument(i)}
-                              className="ml-2 shrink-0 text-white/20 hover:text-red-400 transition-colors"
-                            >
-                              <X className="h-3.5 w-3.5" />
-                            </button>
-                          </div>
-                          <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
-                            <input
-                              type="text"
-                              placeholder={t("docTitle")}
-                              value={doc.title}
-                              onChange={(e) =>
-                                updateDocumentMeta(i, "title", e.target.value)
-                              }
-                              className="h-8 w-full rounded-lg border border-white/10 bg-white/5 px-3 font-manrope text-xs text-white placeholder:text-white/20 focus:border-indigo-500/50 focus:outline-none"
-                            />
-                            <select
-                              value={doc.documentType}
-                              onChange={(e) =>
-                                updateDocumentMeta(
-                                  i,
-                                  "documentType",
-                                  e.target.value as DocumentType,
-                                )
-                              }
-                              className="h-8 w-full rounded-lg border border-white/10 bg-[#0d1424] px-3 font-manrope text-xs text-white/60 focus:border-indigo-500/50 focus:outline-none"
-                            >
-                              {DOCUMENT_TYPE_OPTIONS.map((opt) => (
-                                <option key={opt.value} value={opt.value}>
-                                  {opt.label}
-                                </option>
-                              ))}
-                            </select>
-                          </div>
-                        </motion.div>
-                      ))}
-                    </div>
-                  ) : (
-                    <p className="text-center font-manrope text-xs text-white/20">
-                      {t("noDocuments")}
-                    </p>
-                  )}
-                </motion.div>
-              )}
-            </AnimatePresence>
-
-            <div className="mt-8 flex items-center justify-between gap-3 border-t border-white/8 pt-6">
-              <Button
-                type="button"
-                onClick={handleBack}
-                disabled={currentStep === 0}
-                className="flex h-11 items-center gap-2 rounded-xl border border-white/10 bg-white/5 px-5 font-jakarta text-sm font-bold text-white/60 transition-all duration-200 hover:bg-white/8 hover:text-white disabled:opacity-30"
+            {currentStep === 3 && (
+              <Section
+                title={t("stepDocumentsTitle")}
+                description={t("stepDocumentsSub")}
               >
-                <ChevronLeft className="h-4 w-4" />
-                {t("back")}
-              </Button>
+                <div className="mb-4 flex flex-wrap gap-1.5">
+                  {SUGGESTED_DOCUMENTS.map((type) => (
+                    <Badge
+                      key={type}
+                      variant="outline"
+                      className="rounded-full border-border bg-muted font-manrope text-[11px] font-normal text-foreground/70"
+                    >
+                      {type.replace(/_/g, " ")}
+                    </Badge>
+                  ))}
+                  <Badge
+                    variant="outline"
+                    className="rounded-full border-dashed border-border bg-transparent font-manrope text-[11px] font-normal text-muted-foreground"
+                  >
+                    + {t("moreDocuments")}
+                  </Badge>
+                </div>
+                <DocumentUploader
+                  documents={documentFiles}
+                  onAdd={addDocuments}
+                  onRemove={(index) =>
+                    setDocumentFiles((prev) =>
+                      prev.filter((_, i) => i !== index),
+                    )
+                  }
+                  onTitleChange={(index, title) =>
+                    setDocumentFiles((prev) =>
+                      prev.map((d, i) => (i === index ? { ...d, title } : d)),
+                    )
+                  }
+                  onTypeChange={(index, documentType) =>
+                    setDocumentFiles((prev) =>
+                      prev.map((d, i) =>
+                        i === index ? { ...d, documentType } : d,
+                      ),
+                    )
+                  }
+                  labels={{
+                    upload: t("uploadDocuments"),
+                    hint: t("uploadHint"),
+                    empty: t("noDocuments"),
+                    title: t("docTitle"),
+                    type: t("docType"),
+                    remove: t("removeDocument"),
+                  }}
+                />
+              </Section>
+            )}
+          </motion.div>
+        </AnimatePresence>
 
-              {/* Progress dots */}
-              <div className="flex items-center gap-1.5">
-                {STEPS.map((_, i) => (
-                  <div
-                    key={i}
-                    className={`h-1.5 rounded-full transition-all duration-300 ${
-                      i === currentStep
-                        ? "w-5 bg-indigo-500"
-                        : i < currentStep
-                          ? "w-1.5 bg-indigo-500/40"
-                          : "w-1.5 bg-white/10"
-                    }`}
-                  />
-                ))}
-              </div>
+        <div className="mt-2 flex items-center justify-between gap-3 border-t border-border pt-6">
+          <Button
+            type="button"
+            variant="outline"
+            onClick={() => goToStep(Math.max(0, currentStep - 1))}
+            disabled={currentStep === 0}
+            className={`h-10 gap-1.5 px-4 text-sm font-normal ${OUTLINE_PILL_CLASS}`}
+          >
+            <ChevronLeft className="size-4" />
+            {t("back")}
+          </Button>
 
-              {currentStep < STEPS.length - 1 ? (
-                <Button
-                  type="button"
-                  onClick={handleNext}
-                  className="flex h-11 items-center gap-2 rounded-xl border-0 bg-indigo-600 px-5 font-jakarta text-sm font-bold text-white shadow-lg shadow-indigo-500/20 transition-all duration-200 hover:bg-indigo-500 hover:shadow-indigo-500/30"
-                >
-                  {t("next")}
-                  <ChevronRight className="h-4 w-4" />
-                </Button>
+          <span className="font-manrope text-xs text-muted-foreground">
+            {currentStep + 1} / {STEPS.length}
+          </span>
+
+          {currentStep < STEPS.length - 1 ? (
+            <Button
+              type="button"
+              onClick={() =>
+                goToStep(Math.min(STEPS.length - 1, currentStep + 1))
+              }
+              className={`h-10 gap-1.5 px-5 text-sm ${PRIMARY_PILL_CLASS}`}
+            >
+              {t("next")}
+              <ChevronRight className="size-4" />
+            </Button>
+          ) : (
+            <Button
+              type="button"
+              onClick={handleSubmit(onSubmit, onInvalid)}
+              disabled={isPending}
+              className={`h-10 gap-1.5 px-5 text-sm ${PRIMARY_PILL_CLASS}`}
+            >
+              {isPending ? (
+                <>
+                  <Loader2 className="size-4 animate-spin" />
+                  {t("submitting")}
+                </>
               ) : (
-                <Button
-                  type="button"
-                  onClick={handleSubmit(onSubmit, (errs) =>
-                    console.log("Submit errors:", errs),
-                  )}
-                  disabled={isPending}
-                  className="flex h-11 items-center gap-2 rounded-xl border-0 bg-indigo-600 px-5 font-jakarta text-sm font-bold text-white shadow-lg shadow-indigo-500/20 transition-all duration-200 hover:bg-indigo-500 hover:shadow-indigo-500/30 disabled:opacity-70"
-                >
-                  {isPending ? (
-                    <>
-                      <Loader2 className="h-4 w-4 animate-spin" />
-                      {t("submitting")}
-                    </>
-                  ) : (
-                    <>
-                      <Check className="h-4 w-4" />
-                      {t("submit")}
-                    </>
-                  )}
-                </Button>
+                <>
+                  <Check className="size-4" />
+                  {t("submit")}
+                </>
               )}
-            </div>
-          </div>
-        </motion.div>
+            </Button>
+          )}
+        </div>
       </div>
     </div>
   );
