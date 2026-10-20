@@ -1085,8 +1085,12 @@
     "classLabel": "Class"
   },
   "settings": {
+    "billingSub": "Due dates and how fees can be paid",
+    "fieldPartialPayments": "Allow part payments",
+    "partialOnHint": "Parents can pay a bill in instalments. Each payment gets its own receipt.",
+    "partialOffHint": "Only the full remaining balance of a bill can be collected.",
+    "saveBilling": "Save billing settings",
     "sectionBilling": "Fee billing",
-    "billingSub": "When recurring fees are due each month",
     "fieldDueDay": "Due day",
     "ofEveryMonth": "of every month",
     "dueDayHint": "Applies to new bills only. Existing bills keep their due date. Days 29–31 aren't allowed so every month has a valid due date.",
@@ -1244,6 +1248,8 @@
     "clockTitle": "Today"
   },
   "feeStructure": {
+    "activate": "Activate",
+    "deactivate": "Deactivate",
     "recurringSub": "Billed automatically every month or once a year",
     "oneTimeSub": "Billed once, e.g. at admission",
     "fieldFrequency": "How often?",

@@ -43,4 +43,7 @@ export const QUERY_KEYS = {
   MY_PROFILE: ["my_profile"],
   MARKS: ["marks"] as const,
   MY_TODAY: ["my-today"] as const,
+  FEE_PAYMENTS: ["fee-payments"] as const,
+  FEE_PAYMENT: ["fee-payment"] as const,
+  MY_FEES: ["my-fees"] as const,
 };

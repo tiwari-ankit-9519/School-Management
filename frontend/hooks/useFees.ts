@@ -42,6 +42,17 @@ const feeApi = {
     );
     return response.data;
   },
+
+  updateFeeStructureStatus: async (
+    feeId: string,
+    isActive: boolean,
+  ): Promise<ApiResponse<FeeStructure>> => {
+    const response = await api.patch<ApiResponse<FeeStructure>>(
+      `/school/fee/status/${feeId}`,
+      { isActive },
+    );
+    return response.data;
+  },
 };
 
 export const useGetFeeStructureForClass = (
@@ -81,6 +92,21 @@ export const useUpdateFeeStructure = (feeId: string) => {
       queryClient.invalidateQueries({ queryKey: QUERY_KEYS.FEES });
       queryClient.invalidateQueries({ queryKey: QUERY_KEYS.FEE });
       toast.success(response.message ?? "Fee structure updated successfully");
+    },
+    onError: (error) => {
+      toast.error(getErrorMessage(error));
+    },
+  });
+};
+
+export const useUpdateFeeStructureStatus = (feeId: string) => {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (isActive: boolean) =>
+      feeApi.updateFeeStructureStatus(feeId, isActive),
+    onSuccess: (response) => {
+      queryClient.invalidateQueries({ queryKey: QUERY_KEYS.FEES });
+      toast.success(response.message ?? "Fee status updated");
     },
     onError: (error) => {
       toast.error(getErrorMessage(error));

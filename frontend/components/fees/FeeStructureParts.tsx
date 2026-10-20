@@ -1,15 +1,7 @@
 "use client";
 import { Controller, useForm, useWatch } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import {
-  CheckCircle2,
-  Loader2,
-  Pencil,
-  Plus,
-  Repeat,
-  Wallet,
-  XCircle,
-} from "lucide-react";
+import { Loader2, Pencil, Plus, Repeat, Wallet } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -47,7 +39,11 @@ import {
   PRIMARY_PILL_CLASS,
   fieldClass,
 } from "@/components/forms/FormParts";
-import { useCreateFeeStructure, useUpdateFeeStructure } from "@/hooks/useFees";
+import {
+  useCreateFeeStructure,
+  useUpdateFeeStructure,
+  useUpdateFeeStructureStatus,
+} from "@/hooks/useFees";
 import { useTranslations } from "@/hooks/useTranslations";
 import {
   FeesStructureSchema,
@@ -99,20 +95,37 @@ const TypeBadge = ({ fee }: { fee: FeeStructure }) => {
   );
 };
 
-const StatusBadge = ({ isActive }: { isActive: boolean }) => {
+const FeeActiveSwitch = ({ fee }: { fee: FeeStructure }) => {
   const t = useTranslations("feeStructure");
+  const { mutate: updateStatus, isPending } = useUpdateFeeStructureStatus(
+    fee.id,
+  );
+
   return (
-    <Badge
-      variant="outline"
-      className={`gap-1.5 rounded-full font-manrope text-[11px] font-medium ${isActive ? TONE_CLASSES.emerald : SLATE_TONE}`}
-    >
-      {isActive ? (
-        <CheckCircle2 className="size-3" />
-      ) : (
-        <XCircle className="size-3" />
-      )}
-      {isActive ? t("active") : t("inactive")}
-    </Badge>
+    <div className="flex items-center gap-2">
+      <Switch
+        checked={fee.isActive}
+        disabled={isPending}
+        onCheckedChange={(checked) => updateStatus(checked)}
+        aria-label={`${fee.isActive ? t("deactivate") : t("activate")} ${fee.name}`}
+        className="data-[state=checked]:bg-emerald-600 dark:data-[state=checked]:bg-emerald-600"
+      />
+      <span
+        className={`font-manrope text-xs font-medium ${
+          fee.isActive
+            ? "text-emerald-700 dark:text-emerald-300"
+            : "text-muted-foreground"
+        }`}
+      >
+        {isPending ? (
+          <Loader2 className="size-3.5 animate-spin" />
+        ) : fee.isActive ? (
+          t("active")
+        ) : (
+          t("inactive")
+        )}
+      </span>
+    </div>
   );
 };
 
@@ -184,7 +197,7 @@ export const FeesTable = ({ fees, onEdit }: FeesTableProps) => {
                   <TypeBadge fee={fee} />
                 </TableCell>
                 <TableCell className="px-5 py-3.5">
-                  <StatusBadge isActive={fee.isActive} />
+                  <FeeActiveSwitch fee={fee} />
                 </TableCell>
                 <TableCell className="px-5 py-3.5 text-right">
                   {editButton(fee)}
@@ -213,7 +226,7 @@ export const FeesTable = ({ fees, onEdit }: FeesTableProps) => {
             </div>
             <div className="flex flex-wrap items-center gap-2">
               <TypeBadge fee={fee} />
-              <StatusBadge isActive={fee.isActive} />
+              <FeeActiveSwitch fee={fee} />
             </div>
             {editButton(fee)}
           </div>

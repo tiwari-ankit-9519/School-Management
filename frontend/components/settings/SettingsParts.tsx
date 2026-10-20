@@ -1,6 +1,6 @@
 "use client";
 import { useEffect, useMemo, useState } from "react";
-import { useForm, useWatch } from "react-hook-form";
+import { useForm, useWatch, Controller } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import {
@@ -49,6 +49,7 @@ import {
 import { useTranslations } from "@/hooks/useTranslations";
 import { UpdateSchoolSettingsType } from "@/validations/validations";
 import { SchoolConfig } from "@/types";
+import { Switch } from "@/components/ui/switch";
 
 type Translate = ReturnType<typeof useTranslations<"settings">>;
 
@@ -690,6 +691,7 @@ const buildBillingSchema = (t: Translate) =>
       .int({ error: t("errDueDay") })
       .min(1, { error: t("errDueDay") })
       .max(MAX_DUE_DAY, { error: t("errDueDay") }),
+    allowPartialPayments: z.boolean(),
   });
 
 type BillingFormValues = z.infer<ReturnType<typeof buildBillingSchema>>;
@@ -715,7 +717,10 @@ export const SchoolBillingCard = ({ settings }: { settings: SchoolConfig }) => {
   const { mutate: updateSettings, isPending } = useUpdateSchoolSettings();
   const [today] = useState(() => new Date());
 
-  const defaults: BillingFormValues = { feeDueDay: settings.feeDueDay ?? 10 };
+  const defaults: BillingFormValues = {
+    feeDueDay: settings.feeDueDay ?? 10,
+    allowPartialPayments: settings.allowPartialPayments ?? true,
+  };
 
   const {
     register,
@@ -734,8 +739,15 @@ export const SchoolBillingCard = ({ settings }: { settings: SchoolConfig }) => {
     Number.isInteger(dueDay) && dueDay >= 1 && dueDay <= MAX_DUE_DAY;
 
   const onSubmit = (values: BillingFormValues) => {
-    if (values.feeDueDay === defaults.feeDueDay) return;
-    const payload: UpdateSchoolSettingsType = { feeDueDay: values.feeDueDay };
+    const payload: UpdateSchoolSettingsType = {
+      ...(values.feeDueDay !== defaults.feeDueDay && {
+        feeDueDay: values.feeDueDay,
+      }),
+      ...(values.allowPartialPayments !== defaults.allowPartialPayments && {
+        allowPartialPayments: values.allowPartialPayments,
+      }),
+    };
+    if (Object.keys(payload).length === 0) return;
     updateSettings({ data: payload }, { onSuccess: () => reset(values) });
   };
 
@@ -821,6 +833,38 @@ export const SchoolBillingCard = ({ settings }: { settings: SchoolConfig }) => {
                 : "—"}
             </p>
           </div>
+
+          <Controller
+            control={control}
+            name="allowPartialPayments"
+            render={({ field }) => (
+              <div
+                className={`flex items-center justify-between gap-4 rounded-xl border p-4 md:col-span-2 ${
+                  field.value
+                    ? "border-emerald-500/30 bg-emerald-500/5"
+                    : "border-border bg-muted/40"
+                }`}
+              >
+                <div>
+                  <Label
+                    htmlFor="school-partial-payments"
+                    className="font-jakarta text-sm font-semibold text-foreground"
+                  >
+                    {t("fieldPartialPayments")}
+                  </Label>
+                  <p className="mt-0.5 font-manrope text-xs text-muted-foreground">
+                    {field.value ? t("partialOnHint") : t("partialOffHint")}
+                  </p>
+                </div>
+                <Switch
+                  id="school-partial-payments"
+                  checked={field.value}
+                  onCheckedChange={field.onChange}
+                  className="data-[state=checked]:bg-emerald-600 dark:data-[state=checked]:bg-emerald-600"
+                />
+              </div>
+            )}
+          />
         </div>
         <Separator />
         <div className="flex flex-col-reverse gap-2 p-4 sm:flex-row sm:justify-end sm:px-5">
@@ -844,7 +888,7 @@ export const SchoolBillingCard = ({ settings }: { settings: SchoolConfig }) => {
             ) : (
               <Save className="size-4" />
             )}
-            {isPending ? t("saving") : t("saveDueDay")}
+            {isPending ? t("saving") : t("saveBilling")}
           </Button>
         </div>
       </form>

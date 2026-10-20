@@ -39,6 +39,20 @@ export enum EnrollmentStatus {
   WITHDRAWN = "WITHDRAWN",
 }
 
+export enum PaymentMode {
+  CASH = "CASH",
+  UPI = "UPI",
+  CHEQUE = "CHEQUE",
+  BANK_TRANSFER = "BANK_TRANSFER",
+  CARD = "CARD",
+  ONLINE = "ONLINE",
+}
+
+export enum TransactionStatus {
+  SUCCESS = "SUCCESS",
+  REVERSED = "REVERSED",
+}
+
 export enum EmploymentStatus {
   ACTIVE = "ACTIVE",
   INACTIVE = "INACTIVE",
@@ -240,6 +254,7 @@ export interface SchoolConfig {
   affiliationNumber: string | null;
   boardType: string;
   feeDueDay: number;
+  allowPartialPayments: boolean;
   isActive: boolean;
   createdAt: string;
   updatedAt: string;
@@ -716,16 +731,17 @@ export interface FeePayment {
   id: string;
   studentId: string;
   feeStructureId: string;
+  amountDue: number;
   amountPaid: number;
+  waivedAmount: number;
   status: FeeStatus;
   paymentDate: string | null;
   dueDate: string;
   billingPeriod: string | null;
-  transactionId: string | null;
-  paymentMode: string | null;
-  receiptNumber: string | null;
+  waiverReason: string | null;
+  waivedById: string | null;
+  waivedAt: string | null;
   remarks: string | null;
-  collectedBy: string | null;
   createdAt: string;
   updatedAt: string;
   student?: Student;
@@ -1075,14 +1091,13 @@ export interface LeaveRequestListItem {
 export interface FeePaymentListItem {
   id: string;
   studentId: string;
-  amountPaid: number;
   amountDue: number;
+  amountPaid: number;
+  waivedAmount: number;
   status: FeeStatus;
   paymentDate: string | null;
   dueDate: string;
   billingPeriod: string | null;
-  receiptNumber: string | null;
-  paymentMode: string | null;
   createdAt: string;
 }
 
@@ -1614,6 +1629,196 @@ export type UpdateMyProfilePayload =
   | UpdateTeacherProfilePayload
   | UpdateParentProfilePayload
   | UpdateAdminProfilePayload;
+
+export interface FeeTransactionItem {
+  id: string;
+  amount: number;
+  paymentMode: PaymentMode;
+  referenceNumber: string | null;
+  receiptNumber: string;
+  paidAt: string;
+  remarks: string | null;
+  status: TransactionStatus;
+  reversedAt: string | null;
+  reversalReason: string | null;
+  emailedAt: string | null;
+  createdAt: string;
+  collectedBy: string | null;
+  reversedBy: string | null;
+}
+
+export interface FeeBillStructureRef {
+  id: string;
+  name: string;
+  isRecurring: boolean;
+  recurringMonth: number | null;
+}
+
+export interface FeeBillStudentRef {
+  id: string;
+  firstName: string;
+  lastName: string;
+  regNumber: string;
+  className: string | null;
+  rollNumber: string | null;
+}
+
+export interface FeeBillListItem {
+  id: string;
+  amountDue: number;
+  amountPaid: number;
+  waivedAmount: number;
+  balance: number;
+  status: FeeStatus;
+  dueDate: string;
+  billingPeriod: string | null;
+  paymentDate: string | null;
+  createdAt: string;
+  transactionCount: number;
+  feeStructure: FeeBillStructureRef;
+  student: FeeBillStudentRef;
+}
+
+export interface FeeBillTotals {
+  billed: number;
+  collected: number;
+  waived: number;
+  outstanding: number;
+}
+
+export interface PaginatedFeeBills extends PaginatedResponse<FeeBillListItem> {
+  totals: FeeBillTotals;
+}
+
+export interface FeeBillGuardian {
+  relation: ParentType;
+  name: string;
+  email: string | null;
+  phone: string | null;
+}
+
+export interface FeeBillDetail {
+  id: string;
+  amountDue: number;
+  amountPaid: number;
+  waivedAmount: number;
+  balance: number;
+  status: FeeStatus;
+  dueDate: string;
+  billingPeriod: string | null;
+  paymentDate: string | null;
+  createdAt: string;
+  remarks: string | null;
+  waiverReason: string | null;
+  waivedAt: string | null;
+  waivedBy: string | null;
+  feeStructure: FeeBillStructureRef & {
+    academicYear: { id: string; name: string };
+  };
+  student: FeeBillStudentRef & {
+    email: string | null;
+    phone: string | null;
+    guardians: FeeBillGuardian[];
+  };
+  transactions: FeeTransactionItem[];
+}
+
+export interface FeeBillSnapshot {
+  id: string;
+  studentId: string;
+  amountDue: number;
+  amountPaid: number;
+  waivedAmount: number;
+  balance: number;
+  status: FeeStatus;
+}
+
+export interface FeeTransactionResult {
+  bill: FeeBillSnapshot;
+  transaction: FeeTransactionItem;
+}
+
+export interface FeeBillFilters {
+  page?: number;
+  limit?: number;
+  status?: FeeStatus;
+  academicYearId?: string;
+  classId?: string;
+  classGroupId?: string;
+  feeStructureId?: string;
+  billingPeriod?: string;
+  overdueOnly?: boolean;
+  search?: string;
+  sortBy?: "dueDate" | "createdAt" | "paymentDate" | "amountDue";
+  order?: "asc" | "desc";
+}
+
+export interface CollectFeePaymentPayload {
+  amount: number;
+  paymentMode: Exclude<PaymentMode, PaymentMode.ONLINE>;
+  referenceNumber?: string;
+  paidAt?: string;
+  remarks?: string;
+}
+
+export interface WaiveFeePaymentPayload {
+  amount?: number;
+  reason: string;
+}
+
+export interface ReverseFeeTransactionPayload {
+  reason: string;
+}
+
+export interface MyFeeTransaction {
+  id: string;
+  amount: number;
+  paymentMode: PaymentMode;
+  receiptNumber: string;
+  paidAt: string;
+  status: TransactionStatus;
+}
+
+export interface MyFeeBill {
+  id: string;
+  amountDue: number;
+  amountPaid: number;
+  waivedAmount: number;
+  balance: number;
+  isOverdue: boolean;
+  status: FeeStatus;
+  dueDate: string;
+  billingPeriod: string | null;
+  paymentDate: string | null;
+  createdAt: string;
+  feeStructure: {
+    name: string;
+    isRecurring: boolean;
+    academicYear: { name: string };
+  };
+  transactions: MyFeeTransaction[];
+}
+
+export interface MyFeesSummary {
+  billed: number;
+  paid: number;
+  waived: number;
+  outstanding: number;
+  overdueCount: number;
+  openCount: number;
+}
+
+export interface MyFeesChild {
+  studentId: string;
+  name: string;
+  className: string | null;
+  summary: MyFeesSummary;
+  bills: MyFeeBill[];
+}
+
+export interface MyFeesResponse {
+  children: MyFeesChild[];
+}
 
 export type PaginatedTeachers = PaginatedResponse<TeacherListItem>;
 export type PaginatedAdmins = PaginatedResponse<Admin>;
