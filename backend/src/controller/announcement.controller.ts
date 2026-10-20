@@ -18,10 +18,8 @@ export async function createAnnouncement(
   req: AuthenticatedRequest,
   res: Response,
 ): Promise<void> {
-  const schoolId = req.user?.schoolId;
   const createdBy = req.user?.id;
 
-  if (!schoolId) throw new Error("School ID is required");
   if (!createdBy) throw new Error("Creator ID is required");
 
   const { title, content, targetRoles, expiresAt, sendNotification } = req.body;
@@ -46,7 +44,6 @@ export async function createAnnouncement(
   res.status(HTTP_STATUS.CREATED);
 
   const announcement = await createAnnouncementService(
-    schoolId,
     createdBy,
     { title, content, targetRoles, expiresAt, sendNotification },
     auditContext,
@@ -64,10 +61,8 @@ export async function getAnnouncementsForAdmin(
   req: AuthenticatedRequest,
   res: Response,
 ): Promise<void> {
-  const schoolId = req.user?.schoolId;
   const moderatorId = req.user?.id;
 
-  if (!schoolId) throw new Error("School ID is required");
   if (!moderatorId) throw new Error("Moderator ID is required");
 
   const targetRole = req.query.targetRole as Role | undefined;
@@ -91,7 +86,6 @@ export async function getAnnouncementsForAdmin(
   res.status(HTTP_STATUS.OK);
 
   const result = await getAnnouncementsForAdminService(
-    schoolId,
     moderatorId,
     filters,
     auditContext,
@@ -111,11 +105,9 @@ export async function getAnnouncementsForRole(
   req: AuthenticatedRequest,
   res: Response,
 ): Promise<void> {
-  const schoolId = req.user?.schoolId;
   const userId = req.user?.id;
   const role = req.user?.role as Role;
 
-  if (!schoolId) throw new Error("School ID is required");
   if (!userId) throw new Error("User ID is required");
   if (!role) throw new Error("Role is required");
 
@@ -131,7 +123,6 @@ export async function getAnnouncementsForRole(
   res.status(HTTP_STATUS.OK);
 
   const result = await getAnnouncementsForRoleService(
-    schoolId,
     userId,
     role,
     filters,
@@ -152,17 +143,14 @@ export async function getAnnouncementById(
   req: AuthenticatedRequest,
   res: Response,
 ): Promise<void> {
-  const schoolId = req.user?.schoolId;
   const announcementId = req.params.announcementId as string;
 
-  if (!schoolId) throw new Error("School ID is required");
   if (!announcementId) throw new Error("Announcement ID is required");
 
   const auditContext = buildAuditContext(req);
   res.status(HTTP_STATUS.OK);
 
   const announcement = await getAnnouncementByIdService(
-    schoolId,
     announcementId,
     auditContext,
     res.statusCode,
@@ -179,11 +167,9 @@ export async function updateAnnouncement(
   req: AuthenticatedRequest,
   res: Response,
 ): Promise<void> {
-  const schoolId = req.user?.schoolId;
   const performedById = req.user?.id;
   const announcementId = req.params.announcementId as string;
 
-  if (!schoolId) throw new Error("School ID is required");
   if (!performedById) throw new Error("Performer ID is required");
   if (!announcementId) throw new Error("Announcement ID is required");
 
@@ -193,7 +179,6 @@ export async function updateAnnouncement(
   res.status(HTTP_STATUS.OK);
 
   const updated = await updateAnnouncementService(
-    schoolId,
     performedById,
     announcementId,
     { title, content, targetRoles, expiresAt, isActive },
@@ -212,11 +197,9 @@ export async function deleteAnnouncement(
   req: AuthenticatedRequest,
   res: Response,
 ): Promise<void> {
-  const schoolId = req.user?.schoolId;
   const performedById = req.user?.id;
   const announcementId = req.params.announcementId as string;
 
-  if (!schoolId) throw new Error("School ID is required");
   if (!performedById) throw new Error("Performer ID is required");
   if (!announcementId) throw new Error("Announcement ID is required");
 
@@ -224,7 +207,6 @@ export async function deleteAnnouncement(
   res.status(HTTP_STATUS.OK);
 
   const result = await deleteAnnouncementService(
-    schoolId,
     performedById,
     announcementId,
     auditContext,

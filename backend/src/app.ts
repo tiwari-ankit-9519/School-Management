@@ -58,6 +58,7 @@ import profileRoute from "@/src/routes/profile.route.js";
 import feeRoute from "@/src/routes/fees.route.js";
 import settingsRoute from "@/src/routes/schoolsettings.route.js";
 import dashboardRoute from "@/src/routes/dashboard.route.js";
+import feePaymentRoutes from "./routes/fee-payments.routes";
 
 const log = createModuleLogger("Server");
 
@@ -192,6 +193,7 @@ app.use(`${API_PREFIX}/school/profile`, profileRoute);
 app.use(`${API_PREFIX}/school/fee`, feeRoute);
 app.use(`${API_PREFIX}/school`, settingsRoute);
 app.use(`${API_PREFIX}/school`, dashboardRoute);
+app.use("/api/v1/school/fee-payments", feePaymentRoutes);
 
 app.use((req: Request, res: Response, _next: NextFunction) => {
   const knownPaths = [
@@ -211,6 +213,7 @@ app.use((req: Request, res: Response, _next: NextFunction) => {
     `${API_PREFIX}/school/leave`,
     `${API_PREFIX}/school/holiday`,
     `${API_PREFIX}/school/fee`,
+    `${API_PREFIX}/school/fee-payments`,
     "/health",
     "/ping",
   ];

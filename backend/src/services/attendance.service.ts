@@ -310,7 +310,7 @@ export async function markModeratorAttendanceService(
     const isAlreadyMarked = await prisma.adminAttendance.findFirst({
       where: {
         date: new Date(data.date),
-        teacherId: { in: data.attendance.map((entry) => entry.moderatorId) },
+        adminId: { in: data.attendance.map((entry) => entry.moderatorId) },
       },
     });
 

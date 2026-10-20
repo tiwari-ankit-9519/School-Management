@@ -6,26 +6,29 @@ import {
 import { HTTP_STATUS } from "../utils/constants";
 import {
   getSchoolSettingsService,
+  removeSchoolLogoService,
   updateSchoolSettingsService,
+  uploadSchoolLogoService,
 } from "../services/schoolsettings.service";
 import { UpdateSchoolSettingsPayload } from "../validations/input.validations";
+
+const requireAdminId = (req: AuthenticatedRequest): string => {
+  const adminId = req.user?.id;
+  if (!adminId) throw new Error("Admin ID is missing in the request");
+  return adminId;
+};
 
 export async function getSchoolSettings(
   req: AuthenticatedRequest,
   res: Response,
 ): Promise<void> {
-  const adminId = req.user?.id;
-  if (!adminId) {
-    throw new Error("Admin ID is missing in the request");
-  }
-
-  const statusCode = HTTP_STATUS.OK;
-
+  const adminId = requireAdminId(req);
   const auditContext = buildAuditContext(req);
+  res.status(HTTP_STATUS.OK);
 
   const schoolSettings = await getSchoolSettingsService(
     adminId,
-    statusCode,
+    res.statusCode,
     auditContext,
   );
 
@@ -50,25 +53,63 @@ export async function updateSchoolSettings(
     return;
   }
 
-  const adminId = req.user?.id;
-  if (!adminId) {
-    throw new Error("Admin ID is missing in the request");
-  }
-
-  const statusCode = HTTP_STATUS.OK;
-
+  const adminId = requireAdminId(req);
   const auditContext = buildAuditContext(req);
+  res.status(HTTP_STATUS.OK);
 
   const updatedSettings = await updateSchoolSettingsService(
     parsed.data,
     adminId,
-    statusCode,
+    res.statusCode,
     auditContext,
   );
 
   res.json({
     success: true,
     message: "School settings updated successfully",
+    data: updatedSettings,
+  });
+}
+
+export async function uploadSchoolLogo(
+  req: AuthenticatedRequest,
+  res: Response,
+): Promise<void> {
+  const adminId = requireAdminId(req);
+  const auditContext = buildAuditContext(req);
+  res.status(HTTP_STATUS.OK);
+
+  const updatedSettings = await uploadSchoolLogoService(
+    req.file,
+    adminId,
+    res.statusCode,
+    auditContext,
+  );
+
+  res.json({
+    success: true,
+    message: "School logo updated successfully",
+    data: updatedSettings,
+  });
+}
+
+export async function removeSchoolLogo(
+  req: AuthenticatedRequest,
+  res: Response,
+): Promise<void> {
+  const adminId = requireAdminId(req);
+  const auditContext = buildAuditContext(req);
+  res.status(HTTP_STATUS.OK);
+
+  const updatedSettings = await removeSchoolLogoService(
+    adminId,
+    res.statusCode,
+    auditContext,
+  );
+
+  res.json({
+    success: true,
+    message: "School logo removed successfully",
     data: updatedSettings,
   });
 }

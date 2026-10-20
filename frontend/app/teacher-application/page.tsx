@@ -1,4 +1,3 @@
-/* eslint-disable @typescript-eslint/no-unused-vars */
 "use client";
 import { useState } from "react";
 import Image from "next/image";
@@ -190,6 +189,7 @@ const TeacherApplicationPage = () => {
         })),
       },
       files: documentFiles.map((d) => d.file),
+      photo: photoFile ?? undefined,
     });
   };
 

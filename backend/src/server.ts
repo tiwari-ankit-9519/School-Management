@@ -12,6 +12,7 @@ import {
   logSystemShutdown,
 } from "./config/logger.config";
 import { startAdmissionQueue } from "./workers/admission.slot.expire.worker";
+import { startFeeQueue } from "./workers/fee.worker";
 
 const log = createModuleLogger("Server");
 const PORT = parseInt(process.env.PORT ?? "5000");
@@ -33,6 +34,8 @@ async function startServer(): Promise<void> {
     log.info("Email worker started");
     await startAdmissionQueue();
     log.info("Admission queue started successfully");
+    await startFeeQueue();
+    log.info("Fee Worker started");
     await new Promise<void>((resolve, reject) => {
       httpServer.listen(PORT, HOST, () => {
         resolve();

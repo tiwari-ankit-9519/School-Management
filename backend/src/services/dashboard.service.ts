@@ -12,12 +12,25 @@ import {
   FeeStatus,
   LeaveStatus,
   AttendanceStatus,
+  Prisma,
 } from "@prisma/client";
 import { AuditContext } from "../middlewares/request-logger.middleware";
 import { createModuleLogger } from "../config/logger.config";
 import { prisma } from "../config/database.config";
 
 const log = createModuleLogger("DashboardService");
+
+const SCHOOL_TIMEZONE = "Asia/Kolkata";
+
+const SCHOOL_DATE_FORMAT = new Intl.DateTimeFormat("en-CA", {
+  timeZone: SCHOOL_TIMEZONE,
+  year: "numeric",
+  month: "2-digit",
+  day: "2-digit",
+});
+
+const getSchoolToday = (now: Date = new Date()): Date =>
+  new Date(`${SCHOOL_DATE_FORMAT.format(now)}T00:00:00.000Z`);
 
 export interface DashboardCounts {
   academicYear: {
@@ -68,6 +81,12 @@ export interface DashboardCounts {
   };
 }
 
+const emptyCounts = <T extends string>(values: T[]): Record<T, number> =>
+  Object.fromEntries(values.map((value) => [value, 0])) as Record<T, number>;
+
+const sumValues = (record: Record<string, number>) =>
+  Object.values(record).reduce((a, b) => a + b, 0);
+
 export async function getDashboardCountsService(
   adminId: string,
   context: AuditContext,
@@ -89,15 +108,20 @@ export async function getDashboardCountsService(
       return cached;
     }
 
-    const todayStart = new Date();
-    todayStart.setHours(0, 0, 0, 0);
-    const todayEnd = new Date();
-    todayEnd.setHours(23, 59, 59, 999);
+    const today = getSchoolToday();
 
     const currentAcademicYear = await prisma.academicYear.findFirst({
       where: { isCurrent: true },
       select: { id: true, name: true },
     });
+
+    const currentYearBills: Prisma.FeePaymentWhereInput | null =
+      currentAcademicYear
+        ? {
+            feeStructure: { academicYearId: currentAcademicYear.id },
+            status: { not: FeeStatus.WAIVED },
+          }
+        : null;
 
     const [
       classCount,
@@ -108,8 +132,7 @@ export async function getDashboardCountsService(
       admissionGroups,
       teacherApplicationGroups,
       feePaymentGroups,
-      feeCollectedAgg,
-      feeExpectedAgg,
+      feeBillsAgg,
       leaveRequestGroups,
       todayStudentAttendanceGroups,
       todayTeacherAttendanceGroups,
@@ -140,79 +163,62 @@ export async function getDashboardCountsService(
         by: ["status"],
         _count: { _all: true },
       }),
-      prisma.feePayment.aggregate({
-        _sum: { amountPaid: true },
-      }),
-      currentAcademicYear
-        ? prisma.feeStructure.aggregate({
-            where: { academicYearId: currentAcademicYear.id, isActive: true },
-            _sum: { amount: true },
+      currentYearBills
+        ? prisma.feePayment.aggregate({
+            where: currentYearBills,
+            _sum: { amountDue: true, amountPaid: true },
           })
-        : Promise.resolve({ _sum: { amount: 0 } }),
+        : Promise.resolve({ _sum: { amountDue: 0, amountPaid: 0 } }),
       prisma.leaveRequest.groupBy({
         by: ["status", "requesterRole"],
         _count: { _all: true },
       }),
       prisma.studentAttendance.groupBy({
         by: ["status"],
-        where: { date: { gte: todayStart, lte: todayEnd } },
+        where: { date: today },
         _count: { _all: true },
       }),
       prisma.teacherAttendance.groupBy({
         by: ["status"],
-        where: { date: { gte: todayStart, lte: todayEnd } },
+        where: { date: today },
         _count: { _all: true },
       }),
     ]);
 
-    const studentByStatus = Object.fromEntries(
-      Object.values(EnrollmentStatus).map((s) => [s, 0]),
-    ) as Record<EnrollmentStatus, number>;
+    const studentByStatus = emptyCounts(Object.values(EnrollmentStatus));
     studentGroups.forEach((g) => {
       studentByStatus[g.enrollmentStatus] = g._count._all;
     });
 
-    const teacherByStatus = Object.fromEntries(
-      Object.values(EmploymentStatus).map((s) => [s, 0]),
-    ) as Record<EmploymentStatus, number>;
+    const teacherByStatus = emptyCounts(Object.values(EmploymentStatus));
     teacherGroups.forEach((g) => {
       teacherByStatus[g.employmentStatus] = g._count._all;
     });
 
-    const adminByStatus = Object.fromEntries(
-      Object.values(EmploymentStatus).map((s) => [s, 0]),
-    ) as Record<EmploymentStatus, number>;
+    const adminByStatus = emptyCounts(Object.values(EmploymentStatus));
     adminGroups.forEach((g) => {
       adminByStatus[g.employmentStatus] = g._count._all;
     });
 
-    const admissionByStatus = Object.fromEntries(
-      Object.values(AdmissionStatus).map((s) => [s, 0]),
-    ) as Record<AdmissionStatus, number>;
+    const admissionByStatus = emptyCounts(Object.values(AdmissionStatus));
     admissionGroups.forEach((g) => {
       admissionByStatus[g.status] = g._count._all;
     });
 
-    const teacherApplicationByStatus = Object.fromEntries(
-      Object.values(ApplicationStatus).map((s) => [s, 0]),
-    ) as Record<ApplicationStatus, number>;
+    const teacherApplicationByStatus = emptyCounts(
+      Object.values(ApplicationStatus),
+    );
     teacherApplicationGroups.forEach((g) => {
       teacherApplicationByStatus[g.status] = g._count._all;
     });
 
-    const feePaymentByStatus = Object.fromEntries(
-      Object.values(FeeStatus).map((s) => [s, 0]),
-    ) as Record<FeeStatus, number>;
+    const feePaymentByStatus = emptyCounts(Object.values(FeeStatus));
     feePaymentGroups.forEach((g) => {
       feePaymentByStatus[g.status] = g._count._all;
     });
 
-    const studentLeaveByStatus = Object.fromEntries(
-      Object.values(LeaveStatus).map((s) => [s, 0]),
-    ) as Record<LeaveStatus, number>;
-    const teacherLeaveByStatus = Object.fromEntries(
-      Object.values(LeaveStatus).map((s) => [s, 0]),
-    ) as Record<LeaveStatus, number>;
+    const studentLeaveByStatus = emptyCounts(Object.values(LeaveStatus));
+    const teacherLeaveByStatus = emptyCounts(Object.values(LeaveStatus));
     leaveRequestGroups.forEach((g) => {
       if (g.requesterRole === "STUDENT") {
         studentLeaveByStatus[g.status] = g._count._all;
@@ -221,22 +227,15 @@ export async function getDashboardCountsService(
       }
     });
 
-    const todayStudentAttendance = Object.fromEntries(
-      Object.values(AttendanceStatus).map((s) => [s, 0]),
-    ) as Record<AttendanceStatus, number>;
+    const todayStudentAttendance = emptyCounts(Object.values(AttendanceStatus));
     todayStudentAttendanceGroups.forEach((g) => {
       todayStudentAttendance[g.status] = g._count._all;
     });
 
-    const todayTeacherAttendance = Object.fromEntries(
-      Object.values(AttendanceStatus).map((s) => [s, 0]),
-    ) as Record<AttendanceStatus, number>;
+    const todayTeacherAttendance = emptyCounts(Object.values(AttendanceStatus));
     todayTeacherAttendanceGroups.forEach((g) => {
       todayTeacherAttendance[g.status] = g._count._all;
     });
-
-    const sumValues = (record: Record<string, number>) =>
-      Object.values(record).reduce((a, b) => a + b, 0);
 
     const result: DashboardCounts = {
       academicYear: currentAcademicYear,
@@ -267,8 +266,8 @@ export async function getDashboardCountsService(
         byStatus: feePaymentByStatus,
       },
       feeRevenue: {
-        collected: feeCollectedAgg._sum.amountPaid ?? 0,
-        expected: feeExpectedAgg._sum.amount ?? 0,
+        collected: feeBillsAgg._sum.amountPaid ?? 0,
+        expected: feeBillsAgg._sum.amountDue ?? 0,
       },
       studentLeaveRequests: {
         total: sumValues(studentLeaveByStatus),

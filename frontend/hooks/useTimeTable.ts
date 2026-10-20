@@ -27,18 +27,17 @@ const timetableApi = {
     classId: string,
     page: number = 1,
     limit: number = 10,
-    dayOfWeek: DayOfWeek,
+    dayOfWeek?: DayOfWeek,
   ): Promise<PaginatedTimetables> => {
     const params = new URLSearchParams({
       page: String(page),
       limit: String(limit),
     });
-    if (dayOfWeek !== null) params.set("dayOfWeek", dayOfWeek);
-    const response = await api.get<{
-      success: true;
-      message: string;
-      data: PaginatedTimetables;
-    }>(`/school/timetable/${classId}/time-table`, { params });
+    if (dayOfWeek) params.set("dayOfWeek", dayOfWeek);
+    const response = await api.get<ApiResponse<PaginatedTimetables>>(
+      `/school/timetable/${classId}/time-table`,
+      { params },
+    );
     return response.data.data;
   },
   updateTimeTableForClass: async (
@@ -88,10 +87,16 @@ export const useGetTimeTable = (
   classId: string,
   page: number = 1,
   limit: number = 10,
-  dayOfWeek: DayOfWeek,
+  dayOfWeek?: DayOfWeek,
 ) => {
   return useQuery({
-    queryKey: [...QUERY_KEYS.TIME_TABLES, classId],
+    queryKey: [
+      ...QUERY_KEYS.TIME_TABLES,
+      classId,
+      page,
+      limit,
+      dayOfWeek ?? "ALL",
+    ],
     queryFn: () =>
       timetableApi.getTimeTableForClass(classId, page, limit, dayOfWeek),
     enabled: !!classId,

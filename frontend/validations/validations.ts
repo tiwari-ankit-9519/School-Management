@@ -13,10 +13,15 @@ const enumValues = <T extends Record<string, string>>(e: T) =>
   Object.values(e) as [string, ...string[]];
 
 export const UpdateSchoolSettingsPayload = z.object({
-  phone: z.coerce.string().optional(),
+  phone: z.string().optional(),
   email: z.string().optional(),
   website: z.string().optional(),
-  logoUrl: z.string().optional(),
+  address: z.string().optional(),
+  city: z.string().optional(),
+  state: z.string().optional(),
+  country: z.string().optional(),
+  pincode: z.string().optional(),
+  feeDueDay: z.number().optional(),
 });
 
 const classGrade = z.preprocess(
@@ -148,10 +153,17 @@ export const subjectSchema = z.object({
 export const FeesStructureSchema = z.object({
   name: z
     .string({ error: "Name is required" })
-    .min(1, { error: "Name should be of at least one character" }),
-  amount: z.number({ error: "Amount is required" }).min(0),
-  recurringMonth: z.number().nullable().optional(),
-  description: z.string().optional(),
+    .trim()
+    .min(2, { error: "Name must be at least 2 characters" })
+    .max(60, { error: "Name must be at most 60 characters" }),
+  amount: z
+    .number({ error: "Amount is required" })
+    .positive({ error: "Amount must be greater than 0" }),
+  recurringMonth: z.number().int().min(1).max(12).nullable().optional(),
+  description: z
+    .string()
+    .max(300, { error: "Description must be at most 300 characters" })
+    .optional(),
   isRecurring: z.boolean().optional(),
 });
 

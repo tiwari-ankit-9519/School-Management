@@ -6,7 +6,6 @@ import { createModuleLogger } from "@/src/config/logger.config";
 const log = createModuleLogger("AuditService");
 
 interface CreateAuditLogParams {
-  schoolId?: string;
   performedById: string;
   targetUserId?: string;
   action: AuditAction;
@@ -23,7 +22,6 @@ interface CreateAuditLogParams {
 }
 
 interface CreateSystemLogParams {
-  schoolId?: string;
   userId?: string;
   level: LogLevel;
   message: string;
@@ -42,9 +40,6 @@ export async function createAuditLog(
   try {
     await prisma.auditLog.create({
       data: {
-        school: params.schoolId
-          ? { connect: { id: params.schoolId } }
-          : undefined,
         performedBy: { connect: { id: params.performedById } },
         targetUser: params.targetUserId
           ? { connect: { id: params.targetUserId } }
@@ -87,12 +82,7 @@ export async function createSystemLog(
   try {
     await prisma.systemLog.create({
       data: {
-        school: params.schoolId
-          ? { connect: { id: params.schoolId } }
-          : undefined,
-        user: params.userId
-          ? { connect: { id: params.userId } }
-          : undefined,
+        user: params.userId ? { connect: { id: params.userId } } : undefined,
         level: params.level,
         message: params.message,
         module: params.module,

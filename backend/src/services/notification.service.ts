@@ -38,7 +38,6 @@ export interface NotificationWithRecipient extends Notification {
 }
 
 export async function createNotificationService(
-  schoolId: string,
   senderId: string,
   data: CreateNotificationInput,
   context: AuditContext,
@@ -47,7 +46,6 @@ export async function createNotificationService(
   try {
     log.info(`Starting service to create notification`, {
       ipAddress: context.ipAddress,
-      schoolId,
       senderId,
     });
 
@@ -58,7 +56,6 @@ export async function createNotificationService(
     const recipientCount = await prisma.user.count({
       where: {
         id: { in: data.recipientUserIds },
-        schoolId,
         isActive: true,
       },
     });
@@ -71,7 +68,7 @@ export async function createNotificationService(
 
     if (data.announcementId) {
       const announcementExists = await prisma.announcement.findUnique({
-        where: { id: data.announcementId, schoolId },
+        where: { id: data.announcementId },
       });
       if (!announcementExists) {
         throw new Error(
@@ -83,7 +80,6 @@ export async function createNotificationService(
     const notification = await prisma.$transaction(async (tx) => {
       const newNotification = await tx.notification.create({
         data: {
-          schoolId,
           senderId,
           title: data.title,
           message: data.message,
@@ -148,11 +144,10 @@ export async function createNotificationService(
       message: "Notification created and sent successfully",
       context,
       statusCode,
-      metadata: { schoolId, senderId, notificationId: notification.id },
+      metadata: { senderId, notificationId: notification.id },
     });
 
     await createAuditLog({
-      schoolId,
       context,
       module: "NotificationService",
       statusCode,
@@ -174,7 +169,6 @@ export async function createNotificationService(
     log.error(`Failed to create notification`, {
       error: err.message,
       ipAddress: context.ipAddress,
-      schoolId,
       senderId,
     });
     throw err;
@@ -182,7 +176,6 @@ export async function createNotificationService(
 }
 
 export async function getNotificationsForUserService(
-  schoolId: string,
   userId: string,
   filters: {
     isRead?: boolean;
@@ -208,7 +201,6 @@ export async function getNotificationsForUserService(
   try {
     log.info(`Starting service to fetch notifications for user`, {
       ipAddress: context.ipAddress,
-      schoolId,
       userId,
     });
 
@@ -246,7 +238,6 @@ export async function getNotificationsForUserService(
     };
 
     const notificationWhere: Prisma.NotificationWhereInput = {
-      schoolId,
       ...(filters?.type && { type: filters.type }),
       ...(filters?.channel && { channel: filters.channel }),
       ...((filters?.fromDate || filters?.toDate) && {
@@ -271,7 +262,7 @@ export async function getNotificationsForUserService(
       }),
 
       prisma.notificationRecipient.count({
-        where: { userId, isRead: false, notification: { schoolId } },
+        where: { userId, isRead: false },
       }),
     ]);
 
@@ -300,7 +291,7 @@ export async function getNotificationsForUserService(
       message: "Fetched notifications for user",
       context,
       statusCode,
-      metadata: { schoolId, userId, filters },
+      metadata: { userId, filters },
     });
 
     log.info(`Fetched ${data.length} notifications for user ${userId}`);
@@ -310,7 +301,6 @@ export async function getNotificationsForUserService(
     log.error(`Failed to fetch notifications for user`, {
       error: err.message,
       ipAddress: context.ipAddress,
-      schoolId,
       userId,
     });
     throw err;
@@ -318,7 +308,6 @@ export async function getNotificationsForUserService(
 }
 
 export async function markNotificationAsReadService(
-  schoolId: string,
   userId: string,
   notificationId: string,
   context: AuditContext,
@@ -366,7 +355,7 @@ export async function markNotificationAsReadService(
       message: "Notification marked as read",
       context,
       statusCode,
-      metadata: { schoolId, userId, notificationId },
+      metadata: { userId, notificationId },
     });
 
     log.info(`Notification ${notificationId} marked as read`);
@@ -383,7 +372,6 @@ export async function markNotificationAsReadService(
 }
 
 export async function markAllNotificationsAsReadService(
-  schoolId: string,
   userId: string,
   context: AuditContext,
   statusCode: number,
@@ -395,7 +383,6 @@ export async function markAllNotificationsAsReadService(
       where: {
         userId,
         isRead: false,
-        notification: { schoolId },
       },
       data: { isRead: true, readAt: new Date() },
     });
@@ -420,7 +407,7 @@ export async function markAllNotificationsAsReadService(
       message: "All notifications marked as read",
       context,
       statusCode,
-      metadata: { schoolId, userId, updatedCount: result.count },
+      metadata: { userId, updatedCount: result.count },
     });
 
     log.info(`Marked ${result.count} notifications as read for user ${userId}`);
@@ -430,14 +417,12 @@ export async function markAllNotificationsAsReadService(
     log.error(`Failed to mark all notifications as read`, {
       error: err.message,
       userId,
-      schoolId,
     });
     throw err;
   }
 }
 
 export async function deleteNotificationService(
-  schoolId: string,
   performedById: string,
   notificationId: string,
   context: AuditContext,
@@ -451,7 +436,7 @@ export async function deleteNotificationService(
       include: { recipients: { select: { userId: true } } },
     });
 
-    if (!notification || notification.schoolId !== schoolId) {
+    if (!notification) {
       throw new Error(`Notification not found with id ${notificationId}`);
     }
 
@@ -478,7 +463,6 @@ export async function deleteNotificationService(
     );
 
     await createAuditLog({
-      schoolId,
       context,
       module: "NotificationService",
       statusCode,
@@ -497,7 +481,6 @@ export async function deleteNotificationService(
     log.error(`Failed to delete notification`, {
       error: err.message,
       notificationId,
-      schoolId,
     });
     throw err;
   }

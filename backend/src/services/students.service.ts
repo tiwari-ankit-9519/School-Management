@@ -227,7 +227,6 @@ export async function getSingleStudentDetailService(
                 id: true,
                 name: true,
                 amount: true,
-                dueDate: true,
               },
             },
           },

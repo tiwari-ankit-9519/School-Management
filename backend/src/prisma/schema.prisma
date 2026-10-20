@@ -212,39 +212,56 @@ enum Module {
   RATE_LIMIT
 }
 
+enum PaymentMode {
+  CASH
+  UPI
+  CHEQUE
+  BANK_TRANSFER
+  CARD
+  ONLINE
+}
+
+enum TransactionStatus {
+  SUCCESS
+  REVERSED
+}
+
 model SchoolConfig {
-  id                String   @id @default(cuid())
-  name              String
-  code              String   @unique
-  address           String
-  city              String
-  state             String
-  country           String
-  pincode           String
-  phone             String
-  email             String   @unique
-  website           String?
-  logoUrl           String?
-  establishedYear   Int
-  affiliationNumber String?
-  boardType         String
-  isActive          Boolean  @default(true)
-  createdAt         DateTime @default(now())
-  updatedAt         DateTime @updatedAt
+  id                   String   @id @default(cuid())
+  name                 String
+  code                 String   @unique
+  address              String
+  city                 String
+  state                String
+  country              String
+  pincode              String
+  phone                String
+  email                String   @unique
+  website              String?
+  logoUrl              String?
+  establishedYear      Int
+  affiliationNumber    String?
+  boardType            String
+  feeDueDay            Int      @default(10)
+  allowPartialPayments Boolean  @default(true)
+  isActive             Boolean  @default(true)
+  createdAt            DateTime @default(now())
+  updatedAt            DateTime @updatedAt
 }
 
 model AcademicYear {
-  id            String         @id @default(cuid())
-  name          String         @unique
-  startDate     DateTime
-  endDate       DateTime
-  isCurrent     Boolean        @default(false)
-  createdAt     DateTime       @default(now())
-  updatedAt     DateTime       @updatedAt
-  classes       Class[]
-  enrollments   Enrollment[]
-  examSchedules ExamSchedule[]
-  feeStructures FeeStructure[]
+  id             String          @id @default(cuid())
+  name           String          @unique
+  startDate      DateTime
+  endDate        DateTime
+  isCurrent      Boolean         @default(false)
+  createdAt      DateTime        @default(now())
+  updatedAt      DateTime        @updatedAt
+  classes        Class[]
+  enrollments    Enrollment[]
+  examSchedules  ExamSchedule[]
+  feeStructures  FeeStructure[]
+  receiptCounter ReceiptCounter?
 
   @@index([isCurrent])
 }
@@ -306,31 +323,34 @@ model RegistrationCounter {
 }
 
 model User {
-  id                String                  @id @default(cuid())
-  regNumber         String                  @unique
-  role              Role
-  email             String?                 @unique
-  phone             String?
-  passwordHash      String
-  isActive          Boolean                 @default(true)
-  isVerified        Boolean                 @default(false)
-  lastLoginAt       DateTime?
-  lastLoginIp       String?
-  createdAt         DateTime                @default(now())
-  updatedAt         DateTime                @updatedAt
-  admin             Admin?
-  teacher           Teacher?
-  student           Student?
-  parent            Parent?
-  sessions          Session[]
-  notifications     NotificationRecipient[]
-  sseConnections    SSEConnection[]
-  auditLogs         AuditLog[]              @relation("AuditPerformedBy")
-  targetAuditLogs   AuditLog[]              @relation("AuditTargetUser")
-  systemLogs        SystemLog[]
-  passwordResets    PasswordReset[]
-  sentNotifications Notification[]          @relation("NotificationSender")
-  userPermission    UserPermission[]
+  id                       String                  @id @default(cuid())
+  regNumber                String                  @unique
+  role                     Role
+  email                    String?                 @unique
+  phone                    String?
+  passwordHash             String
+  isActive                 Boolean                 @default(true)
+  isVerified               Boolean                 @default(false)
+  lastLoginAt              DateTime?
+  lastLoginIp              String?
+  createdAt                DateTime                @default(now())
+  updatedAt                DateTime                @updatedAt
+  admin                    Admin?
+  teacher                  Teacher?
+  student                  Student?
+  parent                   Parent?
+  sessions                 Session[]
+  notifications            NotificationRecipient[]
+  sseConnections           SSEConnection[]
+  auditLogs                AuditLog[]              @relation("AuditPerformedBy")
+  targetAuditLogs          AuditLog[]              @relation("AuditTargetUser")
+  systemLogs               SystemLog[]
+  passwordResets           PasswordReset[]
+  sentNotifications        Notification[]          @relation("NotificationSender")
+  userPermission           UserPermission[]
+  feeTransactionsCollected FeeTransaction[]        @relation("FeeTransactionCollector")
+  feeTransactionsReversed  FeeTransaction[]        @relation("FeeTransactionReverser")
+  feePaymentsWaived        FeePayment[]            @relation("FeePaymentWaiver")
 
   @@index([regNumber])
   @@index([role])
@@ -473,6 +493,7 @@ model Teacher {
   leaveRequests    LeaveRequest[]
   examSchedules    ExamSchedule[]
   documents        Document[]          @relation("TeacherDocuments")
+  photoUrl         String?
 
   @@index([userId])
   @@index([employmentStatus])
@@ -575,6 +596,7 @@ model Student {
   feePayments       FeePayment[]
   leaveRequests     LeaveRequest[]
   documents         Document[]            @relation("StudentDocuments")
+  photoUrl          String?
 
   @@index([userId])
   @@index([enrollmentStatus])
@@ -592,6 +614,7 @@ model Parent {
   user           User            @relation(fields: [userId], references: [id], onDelete: Cascade)
   children       ParentStudent[]
   documents      Document[]      @relation("ParentDocuments")
+  photoUrl       String?
 
   @@index([userId])
 }
@@ -611,17 +634,19 @@ model ParentStudent {
 }
 
 model Enrollment {
-  id             String           @id @default(cuid())
-  studentId      String
-  classId        String
-  academicYearId String
-  rollNumber     String?
-  status         EnrollmentStatus @default(ACTIVE)
-  enrolledAt     DateTime         @default(now())
-  updatedAt      DateTime         @updatedAt
-  student        Student          @relation(fields: [studentId], references: [id], onDelete: Cascade)
-  class          Class            @relation(fields: [classId], references: [id], onDelete: Cascade)
-  academicYear   AcademicYear     @relation(fields: [academicYearId], references: [id], onDelete: Cascade)
+  id               String           @id @default(cuid())
+  studentId        String
+  classId          String
+  academicYearId   String
+  rollNumber       String?
+  status           EnrollmentStatus @default(ACTIVE)
+  withdrawalReason String?
+  withdrawnAt      DateTime?
+  enrolledAt       DateTime         @default(now())
+  updatedAt        DateTime         @updatedAt
+  student          Student          @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  class            Class            @relation(fields: [classId], references: [id], onDelete: Cascade)
+  academicYear     AcademicYear     @relation(fields: [academicYearId], references: [id], onDelete: Cascade)
 
   @@unique([studentId, academicYearId])
   @@index([studentId])
@@ -792,29 +817,70 @@ model FeeStructure {
 }
 
 model FeePayment {
-  id             String       @id @default(cuid())
+  id             String           @id @default(cuid())
   studentId      String
   feeStructureId String
-  amountPaid     Float
-  status         FeeStatus    @default(PENDING)
+  amountDue      Float
+  amountPaid     Float            @default(0)
+  waivedAmount   Float            @default(0)
+  status         FeeStatus        @default(PENDING)
   paymentDate    DateTime?
   dueDate        DateTime
-  transactionId  String?
-  paymentMode    String?
-  receiptNumber  String?      @unique
+  billingPeriod  String?
+  waiverReason   String?
+  waivedById     String?
+  waivedAt       DateTime?
   remarks        String?
-  collectedBy    String?
-  createdAt      DateTime     @default(now())
-  updatedAt      DateTime     @updatedAt
-  student        Student      @relation(fields: [studentId], references: [id], onDelete: Cascade)
-  feeStructure   FeeStructure @relation(fields: [feeStructureId], references: [id], onDelete: Cascade)
-  documents      Document[]   @relation("FeePaymentDocuments")
+  createdAt      DateTime         @default(now())
+  updatedAt      DateTime         @updatedAt
+  student        Student          @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  feeStructure   FeeStructure     @relation(fields: [feeStructureId], references: [id], onDelete: Cascade)
+  waivedBy       User?            @relation("FeePaymentWaiver", fields: [waivedById], references: [id])
+  transactions   FeeTransaction[]
+  documents      Document[]       @relation("FeePaymentDocuments")
 
+  @@unique([studentId, feeStructureId, billingPeriod])
   @@index([studentId])
   @@index([feeStructureId])
   @@index([status])
   @@index([dueDate])
+  @@index([billingPeriod])
   @@index([studentId, status])
+}
+
+model FeeTransaction {
+  id              String            @id @default(cuid())
+  feePaymentId    String
+  amount          Float
+  paymentMode     PaymentMode
+  referenceNumber String?
+  receiptNumber   String            @unique
+  paidAt          DateTime          @default(now())
+  remarks         String?
+  status          TransactionStatus @default(SUCCESS)
+  collectedById   String
+  reversedById    String?
+  reversedAt      DateTime?
+  reversalReason  String?
+  emailedAt       DateTime?
+  createdAt       DateTime          @default(now())
+  updatedAt       DateTime          @updatedAt
+  feePayment      FeePayment        @relation(fields: [feePaymentId], references: [id], onDelete: Restrict)
+  collectedBy     User              @relation("FeeTransactionCollector", fields: [collectedById], references: [id])
+  reversedBy      User?             @relation("FeeTransactionReverser", fields: [reversedById], references: [id])
+
+  @@index([feePaymentId])
+  @@index([paidAt])
+  @@index([status])
+  @@index([collectedById])
+}
+
+model ReceiptCounter {
+  id             String       @id @default(cuid())
+  academicYearId String       @unique
+  lastNumber     Int          @default(0)
+  updatedAt      DateTime     @updatedAt
+  academicYear   AcademicYear @relation(fields: [academicYearId], references: [id], onDelete: Cascade)
 }
 
 model LeaveRequest {

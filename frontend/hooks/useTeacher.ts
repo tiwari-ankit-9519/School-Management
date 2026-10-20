@@ -20,10 +20,11 @@ const teacherApi = {
   createTeacherApplication: async (
     data: TeacherApplicationFormValues,
     files: File[] = [],
+    photo?: File,
   ): Promise<{ id: string }> => {
     const formData = new FormData();
     Object.entries(data).forEach(([key, value]) => {
-      if (value === undefined || value === null) return;
+      if (value === undefined || value === null || key === "photoUrl") return;
       if (key === "documents" && Array.isArray(value)) {
         formData.append("documents", JSON.stringify(value));
       } else {
@@ -31,6 +32,7 @@ const teacherApi = {
       }
     });
     files.forEach((file) => formData.append("documents", file));
+    if (photo) formData.append("photo", photo);
     const response = await api.post<ApiResponse<{ id: string }>>(
       "/school/users/teacher/apply",
       formData,
@@ -159,10 +161,12 @@ export const useCreateTeacherApplication = () => {
     mutationFn: ({
       formData,
       files,
+      photo,
     }: {
       formData: TeacherApplicationFormValues;
       files: File[];
-    }) => teacherApi.createTeacherApplication(formData, files),
+      photo?: File;
+    }) => teacherApi.createTeacherApplication(formData, files, photo),
     onSuccess: (data) => {
       queryClient.invalidateQueries({
         queryKey: QUERY_KEYS.TEACHER_APPLICATIONS,

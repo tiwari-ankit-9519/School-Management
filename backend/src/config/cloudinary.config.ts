@@ -1,15 +1,16 @@
 import multer from "multer";
 import { v2 as cloudinary } from "cloudinary";
+import type { TransformationOptions } from "cloudinary";
 import { createModuleLogger } from "./logger.config.js";
 import type { Request } from "express";
 
-const log = createModuleLogger('CloudinaryUpload')
+const log = createModuleLogger("CloudinaryUpload");
 
 cloudinary.config({
   cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
   api_key: process.env.CLOUDINARY_API_KEY,
   api_secret: process.env.CLOUDINARY_API_SECRET,
-}); 
+});
 
 const ALLOWED_MIME_TYPES: string[] = [
   "image/jpeg",
@@ -17,6 +18,12 @@ const ALLOWED_MIME_TYPES: string[] = [
   "image/png",
   "image/webp",
   "image/gif",
+];
+
+const DEFAULT_TRANSFORMATION: TransformationOptions = [
+  { width: 1200, height: 630, crop: "limit" },
+  { quality: "auto:good" },
+  { fetch_format: "auto" },
 ];
 
 const fileFilter = (
@@ -59,6 +66,7 @@ export interface CloudinaryUploadResult {
 export async function uploadToCloudinary(
   file: Express.Multer.File,
   folder: string = "general",
+  transformation: TransformationOptions = DEFAULT_TRANSFORMATION,
 ): Promise<CloudinaryUploadResult> {
   log.info("Uploading file to Cloudinary", {
     folder: `school-management/${folder}`,
@@ -72,11 +80,7 @@ export async function uploadToCloudinary(
       {
         folder: `school-management/${folder}`,
         resource_type: "auto",
-        transformation: [
-          { width: 1200, height: 630, crop: "limit" },
-          { quality: "auto:good" },
-          { fetch_format: "auto" },
-        ],
+        transformation,
       },
       (error, result) => {
         if (error ?? !result) {

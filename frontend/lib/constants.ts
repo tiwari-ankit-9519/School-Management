@@ -42,4 +42,5 @@ export const QUERY_KEYS = {
   HOLIDAY: ["holiday"],
   MY_PROFILE: ["my_profile"],
   MARKS: ["marks"] as const,
+  MY_TODAY: ["my-today"] as const,
 };

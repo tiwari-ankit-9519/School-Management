@@ -20,6 +20,11 @@ import { controllerContext } from "../config/logger.config";
 
 const router: Router = Router();
 
+const teacherApplicationUpload = upload.fields([
+  { name: "documents", maxCount: 5 },
+  { name: "photo", maxCount: 1 },
+]);
+
 router.use(controllerContext("UserManagementController"));
 
 router.post(
@@ -39,7 +44,7 @@ router.patch(
 
 router.post(
   "/teacher/apply",
-  upload.array("documents", 5),
+  teacherApplicationUpload,
   createTeacherApplication,
 );
 

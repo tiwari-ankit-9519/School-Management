@@ -12,6 +12,11 @@ import {
   updateParentProfileService,
   updateAdminProfileService,
 } from "../services/profile.service";
+import { getMyTodayService } from "../services/profile.today.service";
+import {
+  removeMyPhotoService,
+  updateMyPhotoService,
+} from "../services/profile-photo.service";
 
 export async function getMyProfile(
   req: AuthenticatedRequest,
@@ -37,6 +42,26 @@ export async function getMyProfile(
     success: true,
     message: "Profile fetched successfully",
     data: profile,
+  });
+}
+
+export async function getMyToday(
+  req: AuthenticatedRequest,
+  res: Response,
+): Promise<void> {
+  const userId = req.user?.id;
+  const role = req.user?.role as Role;
+
+  if (!userId) throw new Error("User ID is required");
+  if (!role) throw new Error("Role is required");
+
+  const auditContext = buildAuditContext(req);
+  const summary = await getMyTodayService(userId, role, auditContext);
+
+  res.status(HTTP_STATUS.OK).json({
+    success: true,
+    message: "Today summary fetched successfully",
+    data: summary,
   });
 }
 
@@ -176,4 +201,59 @@ export async function updateMyProfile(
       });
     }
   }
+}
+
+export async function updateMyPhoto(
+  req: AuthenticatedRequest,
+  res: Response,
+): Promise<void> {
+  const userId = req.user?.id;
+  const role = req.user?.role as Role;
+
+  if (!userId) throw new Error("User ID is required");
+  if (!role) throw new Error("Role is required");
+
+  const auditContext = buildAuditContext(req);
+  res.status(HTTP_STATUS.OK);
+
+  const result = await updateMyPhotoService(
+    userId,
+    role,
+    req.file,
+    auditContext,
+    res.statusCode,
+  );
+
+  res.json({
+    success: true,
+    message: "Profile photo updated successfully",
+    data: result,
+  });
+}
+
+export async function removeMyPhoto(
+  req: AuthenticatedRequest,
+  res: Response,
+): Promise<void> {
+  const userId = req.user?.id;
+  const role = req.user?.role as Role;
+
+  if (!userId) throw new Error("User ID is required");
+  if (!role) throw new Error("Role is required");
+
+  const auditContext = buildAuditContext(req);
+  res.status(HTTP_STATUS.OK);
+
+  const result = await removeMyPhotoService(
+    userId,
+    role,
+    auditContext,
+    res.statusCode,
+  );
+
+  res.json({
+    success: true,
+    message: "Profile photo removed successfully",
+    data: result,
+  });
 }

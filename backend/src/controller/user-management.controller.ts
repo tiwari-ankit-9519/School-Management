@@ -145,13 +145,18 @@ export async function createTeacherApplication(
     return;
   }
 
-  const files = (req.files as Express.Multer.File[]) ?? [];
+  const uploaded = req.files as
+    | { [fieldName: string]: Express.Multer.File[] }
+    | undefined;
+  const documents = uploaded?.documents ?? [];
+  const photo = uploaded?.photo?.[0];
   const auditContext = buildAuditContext(req);
 
   res.status(HTTP_STATUS.CREATED);
   const teacherApplication = await teacherApplicationService(
     parsed.data,
-    files,
+    documents,
+    photo,
     auditContext,
     res.statusCode,
   );

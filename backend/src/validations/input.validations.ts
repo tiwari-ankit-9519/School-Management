@@ -857,7 +857,7 @@ export const studentWithDetails = Prisma.validator<Prisma.StudentDefaultArgs>()(
       feePayments: {
         include: {
           feeStructure: {
-            select: { id: true, name: true, amount: true, dueDate: true },
+            select: { id: true, name: true, amount: true },
           },
         },
       },
@@ -910,30 +910,129 @@ export const userPermissionWithDetails =
     },
   });
 
-export const FeesStructurePayload = z.object({
-  name: z
-    .string({ error: "Name is required" })
-    .min(1, { error: "Name should be of atleast one character" }),
-  amount: z.coerce.number({ error: "Amount is required" }),
-  recurringMonth: z.coerce.number().nullable().optional(),
-  description: z.string().optional(),
-  isRecurring: z.boolean().optional(),
-});
+const recurringMonthField = z
+  .number({ error: "Billing month must be a number" })
+  .int({ error: "Billing month must be a whole number" })
+  .min(1, {
+    error: "Billing month must be between 1 (January) and 12 (December)",
+  })
+  .max(12, {
+    error: "Billing month must be between 1 (January) and 12 (December)",
+  })
+  .nullable()
+  .optional();
 
-export const FeesStructureUpdatePayload = z.object({
-  name: z.string().optional(),
-  amount: z.coerce.number().optional(),
-  recurringMonth: z.coerce.number().nullable().optional(),
-  description: z.string().optional(),
-  isRecurring: z.coerce.boolean().optional(),
-});
+const feeNameField = z
+  .string({ error: "Name is required" })
+  .trim()
+  .min(2, { error: "Name must be at least 2 characters" })
+  .max(60, { error: "Name must be at most 60 characters" });
 
-export const UpdateSchoolSettingsPayload = z.object({
-  phone: z.coerce.string().optional(),
-  email: z.string().optional(),
-  website: z.string().optional(),
-  logoUrl: z.string().optional(),
-});
+const feeAmountField = z
+  .number({ error: "Amount is required" })
+  .positive({ error: "Amount must be greater than 0" })
+  .max(10_000_000, { error: "Amount looks too large" });
+
+const feeDescriptionField = z
+  .string()
+  .trim()
+  .max(300, { error: "Description must be at most 300 characters" })
+  .optional();
+
+export const FeesStructurePayload = z
+  .object({
+    name: feeNameField,
+    amount: feeAmountField,
+    description: feeDescriptionField,
+    isRecurring: z.boolean().optional().default(false),
+    recurringMonth: recurringMonthField,
+  })
+  .refine((data) => data.isRecurring || data.recurringMonth == null, {
+    error: "A billing month can only be set on a recurring fee",
+    path: ["recurringMonth"],
+  });
+
+export const FeesStructureUpdatePayload = z
+  .object({
+    name: feeNameField.optional(),
+    amount: feeAmountField.optional(),
+    description: feeDescriptionField,
+    isRecurring: z.boolean().optional(),
+    recurringMonth: recurringMonthField,
+  })
+  .refine((data) => Object.values(data).some((value) => value !== undefined), {
+    error: "Provide at least one field to update",
+  })
+  .refine((data) => data.isRecurring !== false || data.recurringMonth == null, {
+    error: "A billing month can only be set on a recurring fee",
+    path: ["recurringMonth"],
+  });
+
+export const UpdateSchoolSettingsPayload = z
+  .object({
+    phone: z
+      .string()
+      .trim()
+      .regex(/^\+?[0-9][0-9\s-]{6,14}$/, {
+        error: "Enter a valid phone number",
+      })
+      .optional(),
+    email: z
+      .string()
+      .trim()
+      .email({ error: "Enter a valid email address" })
+      .optional(),
+    website: z
+      .union([
+        z.literal(""),
+        z
+          .string()
+          .trim()
+          .url({ error: "Website must be a full URL starting with https://" }),
+      ])
+      .optional(),
+    address: z
+      .string()
+      .trim()
+      .min(10, { error: "Address must be at least 10 characters" })
+      .max(200, { error: "Address must be at most 200 characters" })
+      .optional(),
+    city: z
+      .string()
+      .trim()
+      .min(2, { error: "City must be at least 2 characters" })
+      .max(50, { error: "City must be at most 50 characters" })
+      .optional(),
+    state: z
+      .string()
+      .trim()
+      .min(2, { error: "State must be at least 2 characters" })
+      .max(50, { error: "State must be at most 50 characters" })
+      .optional(),
+    country: z
+      .string()
+      .trim()
+      .min(2, { error: "Country must be at least 2 characters" })
+      .max(56, { error: "Country must be at most 56 characters" })
+      .optional(),
+    pincode: z
+      .string()
+      .trim()
+      .regex(/^\d{4,10}$/, { error: "Pincode must be 4 to 10 digits" })
+      .optional(),
+    feeDueDay: z
+      .number({ error: "Due day must be a number" })
+      .int({ error: "Due day must be a whole number" })
+      .min(1, { error: "Due day must be between 1 and 28" })
+      .max(28, { error: "Due day must be between 1 and 28" })
+      .optional(),
+    allowPartialPayments: z
+      .boolean({ error: "allowPartialPayments must be true or false" })
+      .optional(),
+  })
+  .refine((data) => Object.values(data).some((value) => value !== undefined), {
+    error: "Provide at least one field to update",
+  });
 
 export type AdmissionApplicationStatusResponse = {
   id: string;
@@ -946,6 +1045,123 @@ export type AdmissionApplicationStatusResponse = {
   slotExpiresAt?: string | null;
   slotOfferedClass?: string | null;
 };
+
+const COLLECTABLE_MODES = [
+  "CASH",
+  "UPI",
+  "CHEQUE",
+  "BANK_TRANSFER",
+  "CARD",
+] as const;
+const MODES_NEEDING_REFERENCE = ["UPI", "CHEQUE", "BANK_TRANSFER", "CARD"];
+
+const queryBoolean = z.preprocess(
+  (value) => (value === "true" ? true : value === "false" ? false : value),
+  z.boolean().optional(),
+);
+
+const queryInt = (fallback: number, max: number) =>
+  z.preprocess(
+    (value) => (value === undefined || value === "" ? fallback : Number(value)),
+    z.number().int().min(1).max(max),
+  );
+
+export const CollectFeePaymentPayload = z
+  .object({
+    amount: z
+      .number({ error: "Amount is required" })
+      .positive({ error: "Amount must be greater than 0" })
+      .max(10_000_000, { error: "Amount looks too large" }),
+    paymentMode: z.enum(COLLECTABLE_MODES, {
+      error: "Payment mode must be cash, UPI, cheque, bank transfer or card",
+    }),
+    referenceNumber: z
+      .string()
+      .trim()
+      .max(64, { error: "Reference number must be at most 64 characters" })
+      .optional(),
+    paidAt: z
+      .string()
+      .date("Payment date must be in YYYY-MM-DD format")
+      .refine((value) => new Date(value) <= new Date(), {
+        error: "Payment date cannot be in the future",
+      })
+      .optional(),
+    remarks: z
+      .string()
+      .trim()
+      .max(300, { error: "Remarks must be at most 300 characters" })
+      .optional(),
+  })
+  .refine(
+    (data) =>
+      !MODES_NEEDING_REFERENCE.includes(data.paymentMode) ||
+      !!data.referenceNumber,
+    {
+      error:
+        "Reference number is required for UPI, cheque, bank transfer and card payments",
+      path: ["referenceNumber"],
+    },
+  );
+
+export const WaiveFeePaymentPayload = z.object({
+  amount: z
+    .number({ error: "Amount must be a number" })
+    .positive({ error: "Amount must be greater than 0" })
+    .optional(),
+  reason: z
+    .string({ error: "A reason is required to waive fees" })
+    .trim()
+    .min(5, { error: "Reason must be at least 5 characters" })
+    .max(300, { error: "Reason must be at most 300 characters" }),
+});
+
+export const ReverseFeeTransactionPayload = z.object({
+  reason: z
+    .string({ error: "A reason is required to reverse a payment" })
+    .trim()
+    .min(10, { error: "Reason must be at least 10 characters" })
+    .max(300, { error: "Reason must be at most 300 characters" }),
+});
+
+export const FeePaymentListQuery = z.object({
+  page: queryInt(1, 10_000),
+  limit: queryInt(10, 100),
+  status: z
+    .enum(["PENDING", "PARTIAL", "PAID", "OVERDUE", "WAIVED"])
+    .optional(),
+  academicYearId: z.string().trim().min(1).optional(),
+  classId: z.string().trim().min(1).optional(),
+  classGroupId: z.string().trim().min(1).optional(),
+  feeStructureId: z.string().trim().min(1).optional(),
+  billingPeriod: z
+    .string()
+    .regex(/^\d{4}-(0[1-9]|1[0-2])$/, {
+      error: "Billing period must be YYYY-MM",
+    })
+    .optional(),
+  overdueOnly: queryBoolean,
+  search: z.string().trim().max(60).optional(),
+  sortBy: z
+    .enum(["dueDate", "createdAt", "paymentDate", "amountDue"])
+    .optional()
+    .default("dueDate"),
+  order: z.enum(["asc", "desc"]).optional().default("asc"),
+});
+
+export const UpdateFeeStructureStatusPayload = z.object({
+  isActive: z.boolean({ error: "isActive must be true or false" }),
+});
+
+export type CollectFeePaymentType = z.infer<typeof CollectFeePaymentPayload>;
+export type WaiveFeePaymentType = z.infer<typeof WaiveFeePaymentPayload>;
+export type ReverseFeeTransactionType = z.infer<
+  typeof ReverseFeeTransactionPayload
+>;
+export type FeePaymentListQueryType = z.infer<typeof FeePaymentListQuery>;
+export type UpdateFeeStructureStatusType = z.infer<
+  typeof UpdateFeeStructureStatusPayload
+>;
 
 export type UpdateSchoolSettingsType = z.infer<
   typeof UpdateSchoolSettingsPayload

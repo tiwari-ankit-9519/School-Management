@@ -32,8 +32,10 @@ import {
 import {
   CloudinaryUploadResult,
   deleteFromCloudinary,
+  extractPublicId,
   uploadToCloudinary,
 } from "../config/cloudinary.config";
+import type { TransformationOptions } from "cloudinary";
 import {
   CACHE_KEYS,
   CACHE_TTL,
@@ -54,6 +56,12 @@ import {
 } from "../types/response-type";
 
 const log = createModuleLogger("UserManagement");
+
+const APPLICANT_PHOTO_TRANSFORMATION: TransformationOptions = [
+  { width: 400, height: 400, crop: "fill", gravity: "face" },
+  { quality: "auto:good" },
+  { fetch_format: "auto" },
+];
 
 export async function createModeratorService(
   data: CreateModeratorInput,
@@ -414,14 +422,65 @@ export async function getSingleAdminService(
 export async function teacherApplicationService(
   data: TeacherApplicationInput,
   files: Express.Multer.File[],
+  photo: Express.Multer.File | undefined,
   context: AuditContext,
   statusCode: number,
 ): Promise<{ id: string }> {
+  const uploadedPublicIds: string[] = [];
+
+  const uploadDocuments = async (folder: string) => {
+    const uploadedFiles: Array<{
+      uploadResult: CloudinaryUploadResult;
+      documentType: DocumentType;
+      title: string;
+    }> = [];
+
+    if (files.length > 0) {
+      log.info("Uploading documents to Cloudinary", {
+        fileCount: files.length,
+      });
+
+      for (let i = 0; i < files.length; i++) {
+        const file = files[i];
+        const documentMeta = data.documents?.[i];
+        const uploadResult = await uploadToCloudinary(file, folder);
+        uploadedPublicIds.push(uploadResult.publicId);
+        uploadedFiles.push({
+          uploadResult,
+          documentType: documentMeta?.documentType ?? "OTHER",
+          title: documentMeta?.title ?? file.originalname,
+        });
+        log.info("Documents uploaded successfully", {
+          publicId: uploadResult.publicId,
+          documentType: documentMeta?.documentType,
+          title: documentMeta?.title,
+        });
+      }
+    }
+
+    return uploadedFiles;
+  };
+
+  const uploadPhoto = async (folder: string): Promise<string | null> => {
+    if (!photo) return null;
+    const photoResult = await uploadToCloudinary(
+      photo,
+      folder,
+      APPLICANT_PHOTO_TRANSFORMATION,
+    );
+    uploadedPublicIds.push(photoResult.publicId);
+    log.info("Applicant photo uploaded successfully", {
+      publicId: photoResult.publicId,
+    });
+    return photoResult.secureUrl;
+  };
+
   try {
     log.info("Teacher Application service starting", {
       teacherEmail: data.email,
       firstName: data.firstName,
       lastName: data.lastName,
+      hasPhoto: !!photo,
     });
 
     const [applicationExists, school] = await Promise.all([
@@ -441,36 +500,8 @@ export async function teacherApplicationService(
           phone: data.phone,
         });
 
-        const uploadedFiles: Array<{
-          uploadResult: CloudinaryUploadResult;
-          documentType: DocumentType;
-          title: string;
-        }> = [];
-
-        if (files.length > 0) {
-          log.info("Uploading documents to cloudinary", {
-            fileCount: files.length,
-          });
-
-          for (let i = 0; i < files.length; i++) {
-            const file = files[i];
-            const documentMeta = data.documents?.[i];
-            const uploadResult = await uploadToCloudinary(
-              file,
-              "teacher-applications",
-            );
-            uploadedFiles.push({
-              uploadResult,
-              documentType: documentMeta?.documentType ?? "OTHER",
-              title: documentMeta?.title ?? file.originalname,
-            });
-            log.info("Documents uploaded successfully", {
-              publicId: uploadResult.publicId,
-              documentType: documentMeta?.documentType,
-              title: documentMeta?.title,
-            });
-          }
-        }
+        const uploadedFiles = await uploadDocuments("teacher-applications");
+        const newPhotoUrl = await uploadPhoto("teacher-applications");
 
         const resubmittedApplication = await prisma.$transaction(async (tx) => {
           const updated = await tx.teacherApplication.update({
@@ -489,6 +520,7 @@ export async function teacherApplicationService(
               qualification: data.qualification,
               experience: data.experience,
               specialization: data.specialization,
+              ...(newPhotoUrl && { photoUrl: newPhotoUrl }),
             },
           });
 
@@ -544,6 +576,18 @@ export async function teacherApplicationService(
           return { id: updated.id };
         });
 
+        if (newPhotoUrl && applicationExists.photoUrl) {
+          const oldPublicId = extractPublicId(applicationExists.photoUrl);
+          if (oldPublicId) {
+            deleteFromCloudinary(oldPublicId).catch((err) => {
+              log.warn("Failed to delete old applicant photo from Cloudinary", {
+                publicId: oldPublicId,
+                error: (err as Error).message,
+              });
+            });
+          }
+        }
+
         await createSystemLog({
           level: "INFO",
           message: "Teacher Application resubmitted",
@@ -554,6 +598,7 @@ export async function teacherApplicationService(
             lastName: data.lastName,
             email: data.email,
             documentCount: uploadedFiles.length,
+            photoUpdated: !!newPhotoUrl,
           },
           context,
           statusCode,
@@ -584,7 +629,6 @@ export async function teacherApplicationService(
         existingApplicationId: applicationExists.id,
         existingStatus: applicationExists.status,
         email: data.email,
-        adminEmail: data.email,
       });
 
       throw new Error(
@@ -592,36 +636,8 @@ export async function teacherApplicationService(
       );
     }
 
-    const uploadedFiles: Array<{
-      uploadResult: CloudinaryUploadResult;
-      documentType: DocumentType;
-      title: string;
-    }> = [];
-
-    if (files.length > 0) {
-      log.info("Uploading documents to Cloudinary", {
-        fileCount: files.length,
-      });
-
-      for (let i = 0; i < files.length; i++) {
-        const file = files[i];
-        const documentMeta = data.documents?.[i];
-        const uploadResult = await uploadToCloudinary(
-          file,
-          "teacher-application",
-        );
-        uploadedFiles.push({
-          uploadResult,
-          documentType: documentMeta?.documentType ?? "OTHER",
-          title: documentMeta?.title ?? file.originalname,
-        });
-        log.info("Documents uploaded successfully", {
-          publicId: uploadResult.publicId,
-          documentType: documentMeta?.documentType,
-          title: documentMeta?.title,
-        });
-      }
-    }
+    const uploadedFiles = await uploadDocuments("teacher-application");
+    const photoUrl = await uploadPhoto("teacher-application");
 
     const newApplication = await prisma.$transaction(async (tx) => {
       const application = await tx.teacherApplication.create({
@@ -639,29 +655,11 @@ export async function teacherApplicationService(
           qualification: data.qualification,
           experience: data.experience,
           specialization: data.specialization,
+          photoUrl,
         },
       });
 
       if (uploadedFiles.length > 0) {
-        const existingDocs = await tx.document.findMany({
-          where: {
-            ownerId: application.id,
-            ownerType: "TEACHER_APPLICATION",
-          },
-          select: {
-            cloudinaryId: true,
-          },
-        });
-
-        existingDocs.forEach(({ cloudinaryId }) => {
-          deleteFromCloudinary(cloudinaryId).catch((err) => {
-            log.warn("Failed to delete old document from Cloudinary", {
-              cloudinaryId,
-              error: (err as Error).message,
-            });
-          });
-        });
-
         await tx.document.createMany({
           data: uploadedFiles.map(({ uploadResult, documentType, title }) => ({
             ownerId: application.id,
@@ -700,6 +698,7 @@ export async function teacherApplicationService(
         firstName: newApplication.firstName,
         lastName: newApplication.lastName,
         email: newApplication.email,
+        hasPhoto: !!photoUrl,
       },
       context,
       statusCode,
@@ -726,6 +725,15 @@ export async function teacherApplicationService(
 
     return { id: newApplication.id };
   } catch (error) {
+    if (uploadedPublicIds.length > 0) {
+      log.warn("Cleaning up orphaned Cloudinary uploads", {
+        fileCount: uploadedPublicIds.length,
+      });
+      await Promise.allSettled(
+        uploadedPublicIds.map((publicId) => deleteFromCloudinary(publicId)),
+      );
+    }
+
     const err = error as Error;
     log.error("Failed to create teacher application", {
       error: err.message,
@@ -1053,6 +1061,17 @@ export async function approveTeacherApplicationService(
         },
         data: {
           status: "SELECTED",
+          reviewedBy: adminId,
+          reviewedAt: new Date(),
+        },
+      });
+
+      await tx.teacherApplicationHistory.create({
+        data: {
+          applicationId,
+          status: "SELECTED",
+          previousStatus: application.status,
+          changedBy: adminId,
         },
       });
 
@@ -1087,6 +1106,7 @@ export async function approveTeacherApplicationService(
           qualification: application.qualification,
           experience: application.experience,
           specialization: application.specialization,
+          photoUrl: application.photoUrl,
           joiningDate: new Date(),
         },
       });
@@ -1101,6 +1121,7 @@ export async function approveTeacherApplicationService(
       log.info("Teacher created successfully", {
         userName: `${application.firstName} ${application.lastName}`,
         userRegNumber: regNumber,
+        photoCopied: !!application.photoUrl,
       });
 
       return {
@@ -1160,6 +1181,7 @@ export async function approveTeacherApplicationService(
         userLastName: response.teacher.lastName,
         userDOB: response.teacher.dateOfBirth,
         email: response.teacher.user.email,
+        photoCopied: !!application.photoUrl,
       },
       context,
       isSuccessful: true,

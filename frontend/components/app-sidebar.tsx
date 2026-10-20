@@ -3,11 +3,10 @@ import { ReactNode, useSyncExternalStore } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import Image from "next/image";
 import Link from "next/link";
-import { ArrowUpRight, ChevronDown, LogOut } from "lucide-react";
+import { ChevronDown, LogOut, UserRound } from "lucide-react";
 import {
   Sidebar,
   SidebarContent,
-  SidebarFooter,
   SidebarGroup,
   SidebarGroupContent,
   SidebarGroupLabel,
@@ -28,18 +27,27 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
 import { NAV_CONFIG, UserRole, NavItem } from "@/config/sidebar-config";
 import { useAuthStore } from "@/stores/useAuthStore";
 import { useLogout } from "@/hooks/useAuth";
+import {
+  getProfilePhotoUrl,
+  isParentProfile,
+  isStudentProfile,
+  isTeacherProfile,
+  useGetMyProfile,
+} from "@/hooks/useProfile";
 import { useTranslations } from "@/hooks/useTranslations";
 import { LanguageToggle } from "@/components/LanguageToggle";
 import { ThemeToggle } from "@/components/ThemeToggle";
+import { MyProfile } from "@/types";
 
 const SCHOOL_NAME = "Nageshwari Devi Shree Krishna Girls Inter College";
 const SCHOOL_CODE = "N.D.S.K.G.I.C.";
+const PROFILE_PATH = "/profile";
 
 const ROLE_LABEL_KEYS = {
   ADMIN: "roleAdmin",
@@ -68,7 +76,7 @@ const getGreetingKey = (): GreetingKey => {
 
 const getServerGreetingKey = (): GreetingKey | null => null;
 
-const getDisplayName = (email?: string | null): string => {
+const getEmailName = (email?: string | null): string => {
   if (!email) return "";
   const local = email
     .split("@")[0]
@@ -77,8 +85,45 @@ const getDisplayName = (email?: string | null): string => {
   return local.charAt(0).toUpperCase() + local.slice(1);
 };
 
-const getInitials = (email?: string | null): string =>
-  email ? email.slice(0, 2).toUpperCase() : "—";
+const getProfileRecord = (profile?: MyProfile) => {
+  if (!profile) return null;
+  if (isStudentProfile(profile)) return profile.student;
+  if (isTeacherProfile(profile)) return profile.teacher;
+  if (isParentProfile(profile)) return profile.parent;
+  return profile.admin;
+};
+
+const getProfilePhoto = (profile?: MyProfile): string | null => {
+  if (!profile) return null;
+  if (isTeacherProfile(profile)) return profile.teacher?.photoUrl ?? null;
+  if (isStudentProfile(profile) || isParentProfile(profile)) return null;
+  return profile.admin?.photoUrl ?? null;
+};
+
+function useCurrentUserIdentity() {
+  const { user } = useAuthStore();
+  const { data: profile } = useGetMyProfile();
+  const record = getProfileRecord(profile);
+  const firstName = record?.firstName?.trim() ?? "";
+  const lastName = record?.lastName?.trim() ?? "";
+  const fullName = [firstName, lastName].filter(Boolean).join(" ");
+  const email = profile?.email ?? user?.email ?? null;
+  const fallbackName = getEmailName(email);
+  const initials = fullName
+    ? `${firstName.charAt(0)}${lastName.charAt(0)}`.toUpperCase()
+    : email
+      ? email.slice(0, 2).toUpperCase()
+      : "—";
+
+  return {
+    role: user?.role as UserRole | undefined,
+    email,
+    fullName: fullName || fallbackName,
+    firstName: firstName || fallbackName,
+    initials,
+    photoUrl: getProfilePhotoUrl(profile),
+  };
+}
 
 const findActiveHref = (
   pathname: string,
@@ -92,18 +137,20 @@ const findActiveHref = (
     )
     .sort((a, b) => b.length - a.length)[0];
 
+const ActiveBar = () => (
+  <span
+    aria-hidden="true"
+    className="absolute top-1.5 bottom-1.5 -left-2 w-1 rounded-r-full bg-indigo-600 dark:bg-indigo-400"
+  />
+);
+
 function NavItemRow({ item, isActive }: { item: NavItem; isActive: boolean }) {
   const t = useTranslations("sidebar");
   const { setOpenMobile } = useSidebar();
 
   return (
     <SidebarMenuItem>
-      {isActive && (
-        <span
-          aria-hidden="true"
-          className="absolute top-1.5 bottom-1.5 -left-2 w-1 rounded-r-full bg-indigo-600 dark:bg-indigo-400"
-        />
-      )}
+      {isActive && <ActiveBar />}
       <SidebarMenuButton
         asChild
         isActive={isActive}
@@ -131,13 +178,15 @@ function useLogoutAction() {
 
 function AppSidebarInner() {
   const pathname = usePathname();
-  const { user } = useAuthStore();
+  const { role } = useCurrentUserIdentity();
   const handleLogout = useLogoutAction();
+  const { setOpenMobile } = useSidebar();
   const t = useTranslations("sidebar");
   const tCommon = useTranslations("common");
-  const role = user?.role as UserRole | undefined;
   const navItems = role && NAV_CONFIG[role] ? NAV_CONFIG[role] : [];
   const activeHref = findActiveHref(pathname, navItems);
+  const isProfileActive =
+    pathname === PROFILE_PATH || pathname.startsWith(`${PROFILE_PATH}/`);
 
   return (
     <Sidebar
@@ -180,7 +229,7 @@ function AppSidebarInner() {
                 <NavItemRow
                   key={item.labelKey}
                   item={item}
-                  isActive={item.href === activeHref}
+                  isActive={!isProfileActive && item.href === activeHref}
                 />
               ))}
             </SidebarMenu>
@@ -194,6 +243,28 @@ function AppSidebarInner() {
           <SidebarGroupContent>
             <SidebarMenu className="gap-0.5">
               <SidebarMenuItem>
+                {isProfileActive && <ActiveBar />}
+                <SidebarMenuButton
+                  asChild
+                  isActive={isProfileActive}
+                  className={NAV_BUTTON_CLASS}
+                >
+                  <Link
+                    href={PROFILE_PATH}
+                    onClick={() => setOpenMobile(false)}
+                  >
+                    <UserRound
+                      className={
+                        isProfileActive
+                          ? "text-indigo-600 dark:text-indigo-400"
+                          : ""
+                      }
+                    />
+                    <span>{t("myProfile")}</span>
+                  </Link>
+                </SidebarMenuButton>
+              </SidebarMenuItem>
+              <SidebarMenuItem>
                 <SidebarMenuButton
                   onClick={handleLogout}
                   className={`${NAV_BUTTON_CLASS} hover:bg-red-500/10 hover:text-red-600 dark:hover:text-red-400`}
@@ -206,60 +277,13 @@ function AppSidebarInner() {
           </SidebarGroupContent>
         </SidebarGroup>
       </SidebarContent>
-
-      <SidebarFooter className="p-3">
-        <div className="relative overflow-hidden rounded-2xl bg-linear-to-br from-indigo-600 via-indigo-700 to-indigo-950 p-4 text-white">
-          <svg
-            className="pointer-events-none absolute -right-12 -bottom-12 h-40 w-40"
-            viewBox="0 0 160 160"
-            fill="none"
-            aria-hidden="true"
-          >
-            {[30, 46, 62, 78].map((r) => (
-              <circle
-                key={r}
-                cx="80"
-                cy="80"
-                r={r}
-                stroke="white"
-                strokeOpacity="0.12"
-              />
-            ))}
-          </svg>
-          <span className="relative flex h-8 w-8 items-center justify-center rounded-full bg-white/15 ring-1 ring-white/20">
-            <Image
-              src="/logo.png"
-              alt=""
-              width={18}
-              height={18}
-              className="object-contain"
-              aria-hidden="true"
-            />
-          </span>
-          <p className="relative mt-3 font-jakarta text-sm leading-snug font-semibold">
-            {t("promoTitle")}
-          </p>
-          <p className="relative mt-1 font-manrope text-[11px] leading-relaxed text-white/70">
-            {t("promoText")}
-          </p>
-          <Button
-            asChild
-            size="sm"
-            className="relative mt-3 h-9 w-full gap-1.5 rounded-full bg-white/15 font-manrope text-xs font-medium text-white shadow-none backdrop-blur hover:bg-white/25"
-          >
-            <Link href="/">
-              {t("promoAction")}
-              <ArrowUpRight className="size-3.5" />
-            </Link>
-          </Button>
-        </div>
-      </SidebarFooter>
     </Sidebar>
   );
 }
 
 function TopBar() {
-  const { user } = useAuthStore();
+  const { role, email, fullName, firstName, initials, photoUrl } =
+    useCurrentUserIdentity();
   const handleLogout = useLogoutAction();
   const t = useTranslations("sidebar");
   const tCommon = useTranslations("common");
@@ -268,9 +292,7 @@ function TopBar() {
     getGreetingKey,
     getServerGreetingKey,
   );
-  const role = user?.role as UserRole | undefined;
   const roleLabel = role ? t(ROLE_LABEL_KEYS[role]) : "";
-  const displayName = getDisplayName(user?.email);
   const greeting = greetingKey ? t(greetingKey) : t("welcomeBack");
 
   return (
@@ -280,7 +302,7 @@ function TopBar() {
         <Separator orientation="vertical" className="h-5" />
         <div className="min-w-0">
           <p className="truncate font-jakarta text-sm font-semibold text-foreground">
-            {displayName ? `${greeting}, ${displayName}` : greeting}
+            {firstName ? `${greeting}, ${firstName}` : greeting}
           </p>
           <p className="hidden truncate font-manrope text-xs text-muted-foreground sm:block">
             {SCHOOL_NAME}
@@ -299,16 +321,23 @@ function TopBar() {
                 className="h-11 gap-2.5 rounded-full py-1 pr-2 pl-1 hover:bg-accent data-[state=open]:bg-accent"
               >
                 <Avatar className="h-9 w-9">
+                  {photoUrl && (
+                    <AvatarImage
+                      src={photoUrl}
+                      alt={fullName}
+                      className="object-cover"
+                    />
+                  )}
                   <AvatarFallback className="bg-indigo-500/15 font-jakarta text-xs font-bold text-indigo-700 dark:text-indigo-300">
-                    {getInitials(user?.email)}
+                    {initials}
                   </AvatarFallback>
                 </Avatar>
                 <span className="hidden max-w-44 min-w-0 text-left md:block">
                   <span className="block truncate font-jakarta text-sm font-semibold text-foreground">
-                    {displayName || "—"}
+                    {fullName || "—"}
                   </span>
                   <span className="block truncate font-manrope text-[11px] font-normal text-muted-foreground">
-                    {user?.email ?? "—"}
+                    {roleLabel || email || "—"}
                   </span>
                 </span>
                 <ChevronDown className="hidden size-3.5 text-muted-foreground md:block" />
@@ -317,16 +346,45 @@ function TopBar() {
             <DropdownMenuContent
               align="end"
               sideOffset={8}
-              className="w-60 rounded-xl p-1.5"
+              className="w-64 rounded-xl p-1.5"
             >
-              <DropdownMenuLabel className="px-2.5 py-2 font-normal">
-                <p className="truncate font-jakarta text-xs font-semibold text-foreground">
-                  {user?.email ?? "—"}
-                </p>
-                <p className="mt-0.5 font-manrope text-[10px] text-muted-foreground">
-                  {roleLabel}
-                </p>
+              <DropdownMenuLabel className="flex items-center gap-2.5 px-2.5 py-2 font-normal">
+                <Avatar className="h-9 w-9">
+                  {photoUrl && (
+                    <AvatarImage
+                      src={photoUrl}
+                      alt={fullName}
+                      className="object-cover"
+                    />
+                  )}
+                  <AvatarFallback className="bg-indigo-500/15 font-jakarta text-[11px] font-bold text-indigo-700 dark:text-indigo-300">
+                    {initials}
+                  </AvatarFallback>
+                </Avatar>
+                <span className="min-w-0">
+                  <span className="block truncate font-jakarta text-sm font-semibold text-foreground">
+                    {fullName || "—"}
+                  </span>
+                  <span className="block truncate font-manrope text-[11px] text-muted-foreground">
+                    {email ?? "—"}
+                  </span>
+                  {roleLabel && (
+                    <span className="mt-0.5 block font-manrope text-[10px] font-medium text-indigo-600 dark:text-indigo-400">
+                      {roleLabel}
+                    </span>
+                  )}
+                </span>
               </DropdownMenuLabel>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem
+                asChild
+                className="cursor-pointer gap-2.5 rounded-lg px-2.5 py-2 font-manrope text-xs font-medium"
+              >
+                <Link href={PROFILE_PATH}>
+                  <UserRound className="size-3.5" />
+                  {t("myProfile")}
+                </Link>
+              </DropdownMenuItem>
               <DropdownMenuSeparator />
               <DropdownMenuItem
                 onSelect={handleLogout}

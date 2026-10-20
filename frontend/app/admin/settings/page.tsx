@@ -1,399 +1,313 @@
 "use client";
-import { useEffect } from "react";
-import { useForm, useWatch } from "react-hook-form";
-import { zodResolver } from "@hookform/resolvers/zod";
-import { z } from "zod";
+import { useState } from "react";
 import { motion } from "motion/react";
-import Image from "next/image";
 import {
-  Building2,
-  Hash,
-  GraduationCap,
+  AlertCircle,
   Award,
+  Building2,
+  CalendarClock,
   CalendarDays,
-  Phone,
+  ExternalLink,
+  GraduationCap,
+  Hash,
+  Info,
   Mail,
-  Globe,
-  ImageIcon,
-  MapPin,
-  Landmark,
-  Flag,
-  Locate,
+  Phone,
   Power,
-  Loader2,
-  Save,
+  Sparkles,
 } from "lucide-react";
+import { Card } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import AnimatedInput from "@/components/smoothui/animated-input";
+import { Separator } from "@/components/ui/separator";
 import {
-  useGetSchoolSettings,
-  useUpdateSchoolSettings,
-} from "@/hooks/useSchoolSettings";
+  CARD_CLASS,
+  TONE_CLASSES,
+  fadeUp,
+} from "@/components/dashboard/DashboardWidgets";
+import { OUTLINE_PILL_CLASS } from "@/components/forms/FormParts";
+import {
+  InfoTile,
+  SectionCard,
+  formatDate,
+} from "@/components/admissions/AdmissionDetailParts";
+import {
+  SchoolAddressCard,
+  SchoolBillingCard,
+  SchoolContactForm,
+  SchoolLogo,
+  SchoolLogoCard,
+  SettingsSkeleton,
+} from "@/components/settings/SettingsParts";
+import { useGetSchoolSettings } from "@/hooks/useSchoolSettings";
 import { useTranslations } from "@/hooks/useTranslations";
-import { UpdateSchoolSettingsType } from "@/validations/validations";
-
-const schoolSettingsSchema = z.object({
-  phone: z.string().trim().optional(),
-  email: z
-    .string()
-    .trim()
-    .optional()
-    .refine((v) => !v || z.string().email().safeParse(v).success, {
-      error: "Enter a valid email address",
-    }),
-  website: z.string().trim().optional(),
-  logoUrl: z.string().trim().optional(),
-});
-
-type SchoolSettingsFormValues = z.infer<typeof schoolSettingsSchema>;
-
-const inputClass =
-  "h-12 rounded-xl border-white/10 bg-white/5 text-white placeholder:text-white/20 focus-visible:ring-indigo-500/50 focus-visible:border-indigo-500/50";
-const labelClass = "text-white/40";
 
 const SettingsPage = () => {
   const t = useTranslations("settings");
-
-  const { data: settings, isLoading } = useGetSchoolSettings();
-  const { mutate: updateSettings, isPending: isSaving } =
-    useUpdateSchoolSettings();
-
   const {
-    handleSubmit,
-    control,
-    setValue,
-    reset,
-    formState: { errors, isDirty },
-  } = useForm<SchoolSettingsFormValues>({
-    resolver: zodResolver(schoolSettingsSchema),
-    defaultValues: {
-      phone: "",
-      email: "",
-      website: "",
-      logoUrl: "",
-    },
-  });
+    data: settings,
+    isLoading,
+    isError,
+    refetch,
+  } = useGetSchoolSettings();
+  const [currentYear] = useState(() => new Date().getFullYear());
 
-  useEffect(() => {
-    if (!settings) return;
-    if (isDirty) return;
-    reset({
-      phone: settings.phone ?? "",
-      email: settings.email ?? "",
-      website: settings.website ?? "",
-      logoUrl: settings.logoUrl ?? "",
-    });
-  }, [settings, reset, isDirty]);
+  if (isLoading) return <SettingsSkeleton />;
 
-  const phoneValue = useWatch({ control, name: "phone" });
-  const emailValue = useWatch({ control, name: "email" });
-  const websiteValue = useWatch({ control, name: "website" });
-  const logoUrlValue = useWatch({ control, name: "logoUrl" });
-
-  const onSubmit = (formData: SchoolSettingsFormValues) => {
-    const payload: UpdateSchoolSettingsType = {
-      phone: formData.phone || undefined,
-      email: formData.email || undefined,
-      website: formData.website || undefined,
-      logoUrl: formData.logoUrl || undefined,
-    };
-    updateSettings(
-      { data: payload },
-      {
-        onSuccess: () => {
-          reset(formData);
-        },
-      },
-    );
-  };
-  if (isLoading) {
+  if (isError || !settings) {
     return (
-      <div className="relative flex min-h-screen w-full items-center justify-center bg-[#050810]">
-        <div className="flex flex-col items-center gap-3">
-          <Loader2 className="h-7 w-7 animate-spin text-indigo-400" />
-          <span className="font-manrope text-sm text-white/30">
-            {t("loading")}
+      <div className="flex min-h-[60vh] items-center justify-center">
+        <Card
+          className={`${CARD_CLASS} w-full max-w-sm items-center gap-4 px-6 py-8 text-center`}
+        >
+          <span className="flex h-11 w-11 items-center justify-center rounded-full bg-red-500/10 text-red-600 dark:text-red-400">
+            <AlertCircle className="size-5" />
           </span>
-        </div>
+          <div>
+            <p className="font-jakarta text-base font-semibold text-foreground">
+              {t("notFoundTitle")}
+            </p>
+            <p className="mt-1 font-manrope text-sm text-muted-foreground">
+              {t("notFoundSub")}
+            </p>
+          </div>
+          <Button
+            type="button"
+            variant="outline"
+            onClick={() => refetch()}
+            className={`h-9 px-4 text-xs ${OUTLINE_PILL_CLASS}`}
+          >
+            {t("retry")}
+          </Button>
+        </Card>
       </div>
     );
   }
 
-  const infoRows = [
+  const yearsServing = settings.establishedYear
+    ? Math.max(0, currentYear - settings.establishedYear)
+    : null;
+
+  const quickFacts = [
     {
-      icon: <Building2 className="h-3.5 w-3.5" />,
-      label: t("fieldName"),
-      value: settings?.name,
-    },
-    {
-      icon: <Hash className="h-3.5 w-3.5" />,
-      label: t("fieldCode"),
-      value: settings?.code,
-    },
-    {
-      icon: <GraduationCap className="h-3.5 w-3.5" />,
-      label: t("fieldBoardType"),
-      value: settings?.boardType,
-    },
-    {
-      icon: <Award className="h-3.5 w-3.5" />,
-      label: t("fieldAffiliationNumber"),
-      value: settings?.affiliationNumber ?? "—",
-    },
-    {
-      icon: <CalendarDays className="h-3.5 w-3.5" />,
+      icon: CalendarDays,
       label: t("fieldEstablishedYear"),
-      value: settings?.establishedYear ? String(settings.establishedYear) : "—",
+      value: settings.establishedYear ? String(settings.establishedYear) : null,
+    },
+    {
+      icon: Sparkles,
+      label: t("yearsServing"),
+      value: yearsServing !== null ? `${yearsServing} ${t("years")}` : null,
+    },
+    {
+      icon: Award,
+      label: t("fieldAffiliationNumber"),
+      value: settings.affiliationNumber,
+    },
+    {
+      icon: CalendarClock,
+      label: t("lastUpdated"),
+      value: formatDate(settings.updatedAt),
     },
   ];
 
-  const addressRows = [
+  const contactActions = [
     {
-      icon: <MapPin className="h-3.5 w-3.5" />,
-      label: t("fieldAddress"),
-      value: settings?.address,
+      key: "call",
+      icon: Phone,
+      label: t("callSchool"),
+      href: settings.phone ? `tel:${settings.phone}` : null,
+      external: false,
     },
     {
-      icon: <Landmark className="h-3.5 w-3.5" />,
-      label: t("fieldCity"),
-      value: settings?.city,
+      key: "email",
+      icon: Mail,
+      label: t("emailSchool"),
+      href: settings.email ? `mailto:${settings.email}` : null,
+      external: false,
     },
     {
-      icon: <Landmark className="h-3.5 w-3.5" />,
-      label: t("fieldState"),
-      value: settings?.state,
+      key: "web",
+      icon: ExternalLink,
+      label: t("visitWebsite"),
+      href: settings.website,
+      external: true,
     },
-    {
-      icon: <Flag className="h-3.5 w-3.5" />,
-      label: t("fieldCountry"),
-      value: settings?.country,
-    },
-    {
-      icon: <Locate className="h-3.5 w-3.5" />,
-      label: t("fieldPincode"),
-      value: settings?.pincode,
-    },
-  ];
+  ].filter(
+    (action): action is typeof action & { href: string } => !!action.href,
+  );
 
   return (
-    <div className="relative min-h-screen w-full bg-[#050810] px-3 py-6 sm:px-8 sm:py-10">
-      <div
-        className="pointer-events-none fixed inset-0 select-none"
-        style={{
-          background:
-            "radial-gradient(ellipse at 20% 20%, #1e3a5f18 0%, transparent 55%), radial-gradient(ellipse at 80% 70%, #6366f10a 0%, transparent 50%)",
-        }}
-      />
+    <div className="space-y-5">
+      <motion.header {...fadeUp(0)} className="px-1">
+        <h1 className="font-jakarta text-3xl font-bold tracking-tight text-foreground sm:text-4xl">
+          {t("pageTitle")}
+        </h1>
+        <p className="mt-1.5 font-manrope text-sm text-muted-foreground">
+          {t("pageSubtitle")}
+        </p>
+      </motion.header>
 
-      <div className="relative z-10 mx-auto max-w-6xl">
-        <motion.div
-          initial={{ opacity: 0, y: 24 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.6, ease: [0.16, 1, 0.3, 1] }}
-          className="mb-6 sm:mb-10 flex items-center justify-between gap-3"
-        >
-          <div className="flex items-center gap-3">
-            <div className="flex h-9 w-9 sm:h-11 sm:w-11 items-center justify-center rounded-xl border border-indigo-400/30 bg-indigo-500/20 shrink-0">
-              <Image
-                src="/logo.png"
-                alt="EduSphere Logo"
-                width={22}
-                height={22}
-                className="object-contain"
-              />
-            </div>
-            <div>
-              <h1 className="font-jakarta text-xl sm:text-2xl font-extrabold leading-tight text-white">
-                {t("pageTitle")}
-              </h1>
-              <p className="font-manrope text-xs sm:text-sm text-white/40 mt-0.5">
-                {t("pageSubtitle")}
-              </p>
-            </div>
-          </div>
-          {settings && (
-            <span
-              className={`flex items-center gap-1.5 rounded-full border px-3 py-1.5 font-manrope text-xs font-medium ${
-                settings.isActive
-                  ? "border-emerald-500/20 bg-emerald-500/10 text-emerald-400"
-                  : "border-white/10 bg-white/5 text-white/30"
-              }`}
-            >
-              <Power className="h-3 w-3" />
-              {settings.isActive ? t("activeLabel") : t("inactiveLabel")}
-            </span>
-          )}
-        </motion.div>
-
-        <motion.div
-          initial={{ opacity: 0, y: 12 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.4, delay: 0.05 }}
-          className="relative mb-5 sm:mb-6 overflow-hidden rounded-2xl border border-white/10 bg-white/4 p-5 sm:p-6 backdrop-blur-xl"
-        >
-          <div className="absolute inset-x-0 top-0 h-px bg-linear-to-r from-transparent via-white/15 to-transparent" />
-          <h2 className="mb-4 font-jakarta text-sm font-bold uppercase tracking-widest text-white/30">
-            {t("sectionIdentity")}
-          </h2>
-          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-            {infoRows.map((row) => (
-              <div
-                key={row.label}
-                className="flex items-center gap-3 rounded-xl border border-white/8 bg-white/3 px-4 py-3"
-              >
-                <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-indigo-500/20 bg-indigo-500/10 text-indigo-400">
-                  {row.icon}
-                </div>
-                <div className="min-w-0">
-                  <p className="font-manrope text-[11px] uppercase tracking-wide text-white/30">
-                    {row.label}
-                  </p>
-                  <p className="font-manrope text-sm text-white/70 truncate">
-                    {row.value || "—"}
-                  </p>
-                </div>
-              </div>
-            ))}
-          </div>
-        </motion.div>
-
-        <motion.div
-          initial={{ opacity: 0, y: 12 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.4, delay: 0.1 }}
-          className="relative mb-5 sm:mb-6 overflow-hidden rounded-2xl border border-white/10 bg-white/4 p-5 sm:p-6 backdrop-blur-xl"
-        >
-          <div className="absolute inset-x-0 top-0 h-px bg-linear-to-r from-transparent via-white/15 to-transparent" />
-          <h2 className="mb-4 font-jakarta text-sm font-bold uppercase tracking-widest text-white/30">
-            {t("sectionAddress")}
-          </h2>
-          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-            {addressRows.map((row) => (
-              <div
-                key={row.label}
-                className="flex items-center gap-3 rounded-xl border border-white/8 bg-white/3 px-4 py-3"
-              >
-                <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-indigo-500/20 bg-indigo-500/10 text-indigo-400">
-                  {row.icon}
-                </div>
-                <div className="min-w-0">
-                  <p className="font-manrope text-[11px] uppercase tracking-wide text-white/30">
-                    {row.label}
-                  </p>
-                  <p className="font-manrope text-sm text-white/70 truncate">
-                    {row.value || "—"}
-                  </p>
-                </div>
-              </div>
-            ))}
-          </div>
-        </motion.div>
-
-        <form onSubmit={handleSubmit(onSubmit)}>
-          <motion.div
-            initial={{ opacity: 0, y: 12 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.4, delay: 0.15 }}
-            className="relative overflow-hidden rounded-2xl border border-white/10 bg-white/4 p-5 sm:p-6 backdrop-blur-xl"
-          >
-            <div className="absolute inset-x-0 top-0 h-px bg-linear-to-r from-transparent via-white/15 to-transparent" />
-            <h2 className="mb-4 font-jakarta text-sm font-bold uppercase tracking-widest text-white/30">
-              {t("sectionContact")}
+      <div className="grid grid-cols-1 items-start gap-4 lg:grid-cols-[320px_1fr]">
+        <motion.div {...fadeUp(0.05)} className="lg:sticky lg:top-24">
+          <Card className={`${CARD_CLASS} items-center gap-0 p-6 text-center`}>
+            <SchoolLogo url={settings.logoUrl} name={settings.name} />
+            <h2 className="mt-4 font-jakarta text-lg leading-snug font-bold text-foreground">
+              {settings.name}
             </h2>
-            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-              <div className="space-y-1">
-                <AnimatedInput
-                  label={t("fieldPhone")}
-                  icon={<Phone className="h-4 w-4 text-indigo-400" />}
-                  value={phoneValue ?? ""}
-                  onChange={(v) =>
-                    setValue("phone", v, {
-                      shouldValidate: true,
-                      shouldDirty: true,
-                    })
-                  }
-                  inputClassName={inputClass}
-                  labelClassName={labelClass}
-                />
-                {errors.phone && (
-                  <p className="ml-1 font-manrope text-xs text-red-400">
-                    {errors.phone.message}
-                  </p>
-                )}
-              </div>
-              <div className="space-y-1">
-                <AnimatedInput
-                  label={t("fieldEmail")}
-                  icon={<Mail className="h-4 w-4 text-indigo-400" />}
-                  value={emailValue ?? ""}
-                  onChange={(v) =>
-                    setValue("email", v, {
-                      shouldValidate: true,
-                      shouldDirty: true,
-                    })
-                  }
-                  inputClassName={inputClass}
-                  labelClassName={labelClass}
-                />
-                {errors.email && (
-                  <p className="ml-1 font-manrope text-xs text-red-400">
-                    {errors.email.message}
-                  </p>
-                )}
-              </div>
-              <div className="space-y-1">
-                <AnimatedInput
-                  label={t("fieldWebsite")}
-                  icon={<Globe className="h-4 w-4 text-indigo-400" />}
-                  value={websiteValue ?? ""}
-                  onChange={(v) =>
-                    setValue("website", v, {
-                      shouldValidate: true,
-                      shouldDirty: true,
-                    })
-                  }
-                  inputClassName={inputClass}
-                  labelClassName={labelClass}
-                />
-              </div>
-              <div className="space-y-1">
-                <AnimatedInput
-                  label={t("fieldLogoUrl")}
-                  icon={<ImageIcon className="h-4 w-4 text-indigo-400" />}
-                  value={logoUrlValue ?? ""}
-                  onChange={(v) =>
-                    setValue("logoUrl", v, {
-                      shouldValidate: true,
-                      shouldDirty: true,
-                    })
-                  }
-                  inputClassName={inputClass}
-                  labelClassName={labelClass}
-                />
-              </div>
+            <Badge
+              variant="outline"
+              className="mt-2 gap-1 rounded-md border-border bg-muted font-mono text-[11px] text-foreground/80"
+            >
+              <Hash className="size-3" />
+              {settings.code}
+            </Badge>
+            <div className="mt-3 flex flex-wrap justify-center gap-1.5">
+              <Badge
+                variant="outline"
+                className={`gap-1 rounded-full font-manrope text-[11px] font-medium ${TONE_CLASSES.indigo}`}
+              >
+                <GraduationCap className="size-3" />
+                {settings.boardType}
+              </Badge>
+              <Badge
+                variant="outline"
+                className={`gap-1 rounded-full font-manrope text-[11px] font-medium ${
+                  settings.isActive ? TONE_CLASSES.emerald : TONE_CLASSES.red
+                }`}
+              >
+                <Power className="size-3" />
+                {settings.isActive ? t("activeLabel") : t("inactiveLabel")}
+              </Badge>
             </div>
 
-            <div className="mt-5 flex justify-end">
-              <Button
-                type="submit"
-                disabled={isSaving || !isDirty}
-                className="h-12 rounded-xl border-0 bg-indigo-600 px-6 font-jakarta text-sm font-bold text-white shadow-lg shadow-indigo-500/20 transition-all duration-200 hover:bg-indigo-500 hover:shadow-indigo-500/30 disabled:opacity-50"
-              >
-                {isSaving ? (
-                  <span className="flex items-center gap-2">
-                    <Loader2 className="h-4 w-4 animate-spin" />
-                    {t("saving")}
-                  </span>
-                ) : (
-                  <span className="flex items-center gap-2">
-                    <Save className="h-4 w-4" />
-                    {t("saveBtn")}
-                  </span>
-                )}
-              </Button>
+            {contactActions.length > 0 && (
+              <div className="mt-5 grid w-full grid-cols-3 gap-2">
+                {contactActions.map((action) => (
+                  <Button
+                    key={action.key}
+                    asChild
+                    variant="outline"
+                    className={`h-auto flex-col gap-1 rounded-xl py-2.5 text-[11px] ${OUTLINE_PILL_CLASS}`}
+                  >
+                    <a
+                      href={action.href}
+                      target={action.external ? "_blank" : undefined}
+                      rel={action.external ? "noopener noreferrer" : undefined}
+                    >
+                      <action.icon className="size-4" />
+                      {action.label}
+                    </a>
+                  </Button>
+                ))}
+              </div>
+            )}
+
+            <Separator className="my-5" />
+
+            <div className="w-full space-y-2.5 text-left">
+              <p className="px-1 font-manrope text-[11px] font-medium tracking-wider text-muted-foreground uppercase">
+                {t("quickFacts")}
+              </p>
+              {quickFacts.map((fact) => (
+                <div
+                  key={fact.label}
+                  className="rounded-xl border border-border bg-muted/40 px-3.5 py-2.5"
+                >
+                  <p className="flex items-center gap-1.5 font-manrope text-[11px] text-muted-foreground">
+                    <fact.icon className="size-3" />
+                    {fact.label}
+                  </p>
+                  <p
+                    className={`truncate font-jakarta text-sm font-semibold ${
+                      fact.value
+                        ? "text-foreground"
+                        : "text-muted-foreground italic"
+                    }`}
+                  >
+                    {fact.value ?? "—"}
+                  </p>
+                </div>
+              ))}
             </div>
+          </Card>
+        </motion.div>
+
+        <div className="min-w-0 space-y-4">
+          <SectionCard
+            title={t("sectionIdentity")}
+            description={t("identitySub")}
+            icon={<Building2 className="size-4" />}
+            delay={0.1}
+          >
+            <InfoTile
+              icon={<Building2 className="size-3.5" />}
+              label={t("fieldName")}
+              value={settings.name}
+            />
+            <InfoTile
+              icon={<Hash className="size-3.5" />}
+              label={t("fieldCode")}
+              value={settings.code}
+            />
+            <InfoTile
+              icon={<GraduationCap className="size-3.5" />}
+              label={t("fieldBoardType")}
+              value={settings.boardType}
+            />
+            <InfoTile
+              icon={<Award className="size-3.5" />}
+              label={t("fieldAffiliationNumber")}
+              value={settings.affiliationNumber}
+            />
+            <InfoTile
+              icon={<CalendarDays className="size-3.5" />}
+              label={t("fieldEstablishedYear")}
+              value={
+                settings.establishedYear
+                  ? String(settings.establishedYear)
+                  : null
+              }
+            />
+          </SectionCard>
+
+          <motion.div {...fadeUp(0.12)}>
+            <p
+              className={`flex items-start gap-2 rounded-xl border px-4 py-3 font-manrope text-xs ${TONE_CLASSES.indigo}`}
+            >
+              <Info className="mt-0.5 size-3.5 shrink-0" />
+              {t("managedNote")}
+            </p>
           </motion.div>
-        </form>
+
+          <motion.div {...fadeUp(0.15)}>
+            <SchoolAddressCard
+              key={`address-${settings.updatedAt}`}
+              settings={settings}
+            />
+          </motion.div>
+
+          <motion.div {...fadeUp(0.18)}>
+            <SchoolLogoCard
+              key={`logo-${settings.updatedAt}`}
+              settings={settings}
+            />
+          </motion.div>
+
+          <motion.div {...fadeUp(0.19)}>
+            <SchoolBillingCard
+              key={`billing-${settings.updatedAt}`}
+              settings={settings}
+            />
+          </motion.div>
+
+          <motion.div {...fadeUp(0.2)}>
+            <SchoolContactForm
+              key={`contact-${settings.updatedAt}`}
+              settings={settings}
+            />
+          </motion.div>
+        </div>
       </div>
     </div>
   );

@@ -37,7 +37,6 @@ export interface UpdateAnnouncementInput {
 }
 
 export async function createAnnouncementService(
-  schoolId: string,
   createdBy: string,
   data: CreateAnnouncementInput,
   context: AuditContext,
@@ -46,7 +45,6 @@ export async function createAnnouncementService(
   try {
     log.info(`Starting service to create announcement`, {
       ipAddress: context.ipAddress,
-      schoolId,
       createdBy,
     });
 
@@ -76,7 +74,6 @@ export async function createAnnouncementService(
     const announcement = await prisma.$transaction(async (tx) => {
       const newAnnouncement = await tx.announcement.create({
         data: {
-          schoolId,
           createdBy,
           title: data.title,
           content: data.content,
@@ -88,14 +85,13 @@ export async function createAnnouncementService(
 
       if (data.sendNotification !== false) {
         const targetUsers = await tx.user.findMany({
-          where: { schoolId, role: { in: data.targetRoles }, isActive: true },
+          where: { role: { in: data.targetRoles }, isActive: true },
           select: { id: true },
         });
 
         if (targetUsers.length > 0) {
           const notification = await tx.notification.create({
             data: {
-              schoolId,
               senderId: createdBy,
               announcementId: newAnnouncement.id,
               title: data.title,
@@ -137,19 +133,16 @@ export async function createAnnouncementService(
       return newAnnouncement;
     });
 
-    await deleteCache(CACHE_KEYS.schoolAnnouncements(schoolId));
-
     await createSystemLog({
       level: "INFO",
       module: "AnnouncementService",
       message: "Announcement created successfully",
       context,
       statusCode,
-      metadata: { schoolId, createdBy, announcementId: announcement.id },
+      metadata: { createdBy, announcementId: announcement.id },
     });
 
     await createAuditLog({
-      schoolId,
       context,
       module: "AnnouncementService",
       statusCode,
@@ -168,7 +161,6 @@ export async function createAnnouncementService(
     log.error(`Failed to create announcement`, {
       error: err.message,
       ipAddress: context.ipAddress,
-      schoolId,
       createdBy,
     });
     throw err;
@@ -176,7 +168,6 @@ export async function createAnnouncementService(
 }
 
 export async function getAnnouncementsForAdminService(
-  schoolId: string,
   moderatorId: string,
   filters: {
     targetRole?: Role;
@@ -200,7 +191,6 @@ export async function getAnnouncementsForAdminService(
   try {
     log.info(`Starting service to fetch announcements for admin`, {
       ipAddress: context.ipAddress,
-      schoolId,
       moderatorId,
     });
 
@@ -208,7 +198,6 @@ export async function getAnnouncementsForAdminService(
     const sortOrder = filters?.sortOrder ?? "desc";
 
     const cacheKey = CACHE_KEYS.adminAnnouncements(
-      schoolId,
       moderatorId,
       filters?.targetRole || "ALL",
       filters?.isActive?.toString() || "ALL",
@@ -233,7 +222,7 @@ export async function getAnnouncementsForAdminService(
       return cached;
     }
 
-    const where: Prisma.AnnouncementWhereInput = { schoolId };
+    const where: Prisma.AnnouncementWhereInput = {};
 
     if (filters?.isActive !== undefined) where.isActive = filters.isActive;
     if (filters?.targetRole) {
@@ -272,7 +261,7 @@ export async function getAnnouncementsForAdminService(
       message: "Fetched announcements for admin",
       context,
       statusCode,
-      metadata: { schoolId, moderatorId, filters },
+      metadata: { moderatorId, filters },
     });
 
     log.info(`Fetched ${announcements.length} announcements`);
@@ -282,7 +271,6 @@ export async function getAnnouncementsForAdminService(
     log.error(`Failed to fetch announcements for admin`, {
       error: err.message,
       ipAddress: context.ipAddress,
-      schoolId,
       moderatorId,
     });
     throw err;
@@ -290,7 +278,6 @@ export async function getAnnouncementsForAdminService(
 }
 
 export async function getAnnouncementsForRoleService(
-  schoolId: string,
   userId: string,
   role: Role,
   filters: {
@@ -312,7 +299,6 @@ export async function getAnnouncementsForRoleService(
   try {
     log.info(`Starting service to fetch announcements for role ${role}`, {
       ipAddress: context.ipAddress,
-      schoolId,
       userId,
       role,
     });
@@ -320,7 +306,6 @@ export async function getAnnouncementsForRoleService(
     const sortOrder = filters?.sortOrder ?? "desc";
 
     const cacheKey = CACHE_KEYS.roleAnnouncements(
-      schoolId,
       role,
       filters?.fromDate || "ALL",
       filters?.toDate || "ALL",
@@ -344,7 +329,6 @@ export async function getAnnouncementsForRoleService(
 
     const now = new Date();
     const where: Prisma.AnnouncementWhereInput = {
-      schoolId,
       isActive: true,
       targetRoles: { has: role },
       publishedAt: { lte: now },
@@ -384,7 +368,7 @@ export async function getAnnouncementsForRoleService(
       message: `Fetched announcements for role ${role}`,
       context,
       statusCode,
-      metadata: { schoolId, userId, role, filters },
+      metadata: { userId, role, filters },
     });
 
     log.info(`Fetched ${announcements.length} announcements for role ${role}`);
@@ -394,7 +378,6 @@ export async function getAnnouncementsForRoleService(
     log.error(`Failed to fetch announcements for role ${role}`, {
       error: err.message,
       ipAddress: context.ipAddress,
-      schoolId,
       userId,
     });
     throw err;
@@ -402,7 +385,6 @@ export async function getAnnouncementsForRoleService(
 }
 
 export async function getAnnouncementByIdService(
-  schoolId: string,
   announcementId: string,
   context: AuditContext,
   statusCode: number,
@@ -418,7 +400,7 @@ export async function getAnnouncementByIdService(
       where: { id: announcementId },
     });
 
-    if (!announcement || announcement.schoolId !== schoolId) {
+    if (!announcement) {
       throw new Error(`Announcement not found with id ${announcementId}`);
     }
 
@@ -430,7 +412,7 @@ export async function getAnnouncementByIdService(
       message: "Fetched announcement by id",
       context,
       statusCode,
-      metadata: { schoolId, announcementId },
+      metadata: { announcementId },
     });
 
     return announcement;
@@ -439,14 +421,12 @@ export async function getAnnouncementByIdService(
     log.error(`Failed to fetch announcement by id`, {
       error: err.message,
       announcementId,
-      schoolId,
     });
     throw err;
   }
 }
 
 export async function updateAnnouncementService(
-  schoolId: string,
   performedById: string,
   announcementId: string,
   data: UpdateAnnouncementInput,
@@ -460,7 +440,7 @@ export async function updateAnnouncementService(
       where: { id: announcementId },
     });
 
-    if (!existing || existing.schoolId !== schoolId) {
+    if (!existing) {
       throw new Error(`Announcement not found with id ${announcementId}`);
     }
 
@@ -487,11 +467,9 @@ export async function updateAnnouncementService(
       },
     });
 
-    await deleteCache(CACHE_KEYS.schoolAnnouncements(schoolId));
     await deleteCache(CACHE_KEYS.announcementById(announcementId));
 
     await createAuditLog({
-      schoolId,
       context,
       module: "AnnouncementService",
       statusCode,
@@ -511,14 +489,12 @@ export async function updateAnnouncementService(
     log.error(`Failed to update announcement`, {
       error: err.message,
       announcementId,
-      schoolId,
     });
     throw err;
   }
 }
 
 export async function deleteAnnouncementService(
-  schoolId: string,
   performedById: string,
   announcementId: string,
   context: AuditContext,
@@ -531,17 +507,15 @@ export async function deleteAnnouncementService(
       where: { id: announcementId },
     });
 
-    if (!announcement || announcement.schoolId !== schoolId) {
+    if (!announcement) {
       throw new Error(`Announcement not found with id ${announcementId}`);
     }
 
     await prisma.announcement.delete({ where: { id: announcementId } });
 
-    await deleteCache(CACHE_KEYS.schoolAnnouncements(schoolId));
     await deleteCache(CACHE_KEYS.announcementById(announcementId));
 
     await createAuditLog({
-      schoolId,
       context,
       module: "AnnouncementService",
       statusCode,
@@ -560,7 +534,6 @@ export async function deleteAnnouncementService(
     log.error(`Failed to delete announcement`, {
       error: err.message,
       announcementId,
-      schoolId,
     });
     throw err;
   }

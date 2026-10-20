@@ -239,6 +239,7 @@ export interface SchoolConfig {
   establishedYear: number;
   affiliationNumber: string | null;
   boardType: string;
+  feeDueDay: number;
   isActive: boolean;
   createdAt: string;
   updatedAt: string;
@@ -398,6 +399,7 @@ export interface Teacher {
   joiningDate: string;
   employmentStatus: EmploymentStatus;
   salary: number | null;
+  photoUrl: string | null;
   createdAt: string;
   updatedAt: string;
   user?: SafeUser;
@@ -508,6 +510,7 @@ export interface Student {
   emergencyContact: string | null;
   enrollmentStatus: EnrollmentStatus;
   admissionDate: string;
+  photoUrl: string | null;
   createdAt: string;
   updatedAt: string;
   user?: SafeUser;
@@ -548,6 +551,8 @@ export interface Enrollment {
   academicYearId: string;
   rollNumber: string | null;
   status: EnrollmentStatus;
+  withdrawalReason: string | null;
+  withdrawnAt: string | null;
   enrolledAt: string;
   updatedAt: string;
   student?: Student;
@@ -565,6 +570,7 @@ export interface Parent {
   firstName: string;
   lastName: string;
   alternatePhone: string | null;
+  photoUrl: string | null;
   createdAt: string;
   updatedAt: string;
   user?: SafeUser;
@@ -695,7 +701,6 @@ export interface FeeStructure {
   classId: string | null;
   name: string;
   amount: number;
-  dueDate: string;
   isRecurring: boolean;
   recurringMonth: number | null;
   description: string | null;
@@ -715,6 +720,7 @@ export interface FeePayment {
   status: FeeStatus;
   paymentDate: string | null;
   dueDate: string;
+  billingPeriod: string | null;
   transactionId: string | null;
   paymentMode: string | null;
   receiptNumber: string | null;
@@ -1044,7 +1050,6 @@ export interface FeeStructureListItem {
   classId: string | null;
   name: string;
   amount: number;
-  dueDate: string;
   isRecurring: boolean;
   recurringMonth: number | null;
   description: string | null;
@@ -1071,9 +1076,11 @@ export interface FeePaymentListItem {
   id: string;
   studentId: string;
   amountPaid: number;
+  amountDue: number;
   status: FeeStatus;
   paymentDate: string | null;
   dueDate: string;
+  billingPeriod: string | null;
   receiptNumber: string | null;
   paymentMode: string | null;
   createdAt: string;
@@ -1151,6 +1158,113 @@ export interface TeacherAttendanceListItem {
   remarks: string | null;
   markedBy: string | null;
 }
+
+export interface TodayPeriod {
+  periodNumber: number;
+  startTime: string;
+  endTime: string;
+  room: string | null;
+  subjectName: string;
+  teacherName: string;
+  className: string;
+}
+
+export interface TodayExam {
+  id: string;
+  title: string;
+  examType: ExamType;
+  date: string;
+  startTime: string;
+  subjectName: string;
+  className: string;
+  childName: string | null;
+}
+
+export interface TodayExamOutlook {
+  count: number;
+  byDay: number[];
+  next: TodayExam | null;
+}
+
+export interface TodayFeeOutlook {
+  pendingCount: number;
+  overdueCount: number;
+  dueAmount: number;
+}
+
+interface TodayBase {
+  date: string;
+  dayOfWeek: DayOfWeek;
+  time: string;
+  holiday: string | null;
+}
+
+export interface StudentToday extends TodayBase {
+  role: "STUDENT";
+  className: string | null;
+  periodsToday: number;
+  nextPeriod: TodayPeriod | null;
+  weekLoad: number[];
+  exams: TodayExamOutlook;
+  attendanceToday: AttendanceStatus | null;
+  recentAttendance: AttendanceStatus[];
+  fees: TodayFeeOutlook;
+}
+
+export interface TeacherToday extends TodayBase {
+  role: "TEACHER";
+  periodsToday: number;
+  nextPeriod: TodayPeriod | null;
+  weekLoad: number[];
+  exams: TodayExamOutlook;
+  classTeacherOf: {
+    classId: string;
+    className: string;
+    students: number;
+    attendanceMarked: boolean;
+  }[];
+}
+
+export interface ParentToday extends TodayBase {
+  role: "PARENT";
+  children: {
+    studentId: string;
+    name: string;
+    className: string | null;
+    periodsToday: number;
+    attendanceToday: AttendanceStatus | null;
+  }[];
+  periodsToday: number;
+  exams: TodayExamOutlook;
+  fees: TodayFeeOutlook;
+}
+
+export interface AdminToday extends TodayBase {
+  role: "ADMIN" | "MODERATOR";
+  attendance: {
+    present: number;
+    absent: number;
+    late: number;
+    excused: number;
+    marked: number;
+    enrolled: number;
+    rate: number | null;
+  };
+  attendanceTrend: (number | null)[];
+  pending: {
+    admissions: number;
+    teacherApplications: number;
+    leaveRequests: number;
+    total: number;
+  };
+  exams: TodayExamOutlook;
+}
+
+export type MyTodaySummary =
+  | StudentToday
+  | TeacherToday
+  | ParentToday
+  | AdminToday;
 
 export interface ParentStudent {
   id: string;

@@ -1,821 +1,263 @@
 "use client";
-import { useState, useMemo } from "react";
-import { motion, AnimatePresence } from "motion/react";
-import { useForm, useWatch, Controller } from "react-hook-form";
-import { zodResolver } from "@hookform/resolvers/zod";
+import { useMemo, useState } from "react";
+import { motion } from "motion/react";
 import {
-  Wallet,
-  ChevronDown,
   CheckCircle2,
-  XCircle,
-  CalendarIcon,
-  Repeat,
-  Loader2,
-  ChevronLeft,
-  ChevronRight,
   Layers,
-  X,
-  Pencil,
-  AlertCircle,
   Plus,
+  Receipt,
+  Repeat,
+  Wallet,
 } from "lucide-react";
-import Image from "next/image";
-import { Checkbox } from "@/components/ui/checkbox";
+import { Card } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Separator } from "@/components/ui/separator";
+import { Skeleton } from "@/components/ui/skeleton";
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { CARD_CLASS, fadeUp } from "@/components/dashboard/DashboardWidgets";
+import {
+  PRIMARY_PILL_CLASS,
+  TAB_TRIGGER_CLASS,
+} from "@/components/forms/FormParts";
+import {
+  ApplicationsPagination,
+  StatFilterCard,
+} from "@/components/admissions/AdmissionsListParts";
+import {
+  FeeFormDialog,
+  FeesTable,
+  FeesTableSkeleton,
+  formatAmount,
+} from "@/components/fees/FeeStructureParts";
 import { useGetAllClassGroup } from "@/hooks/useClass";
-import {
-  useGetFeeStructureForClass,
-  useUpdateFeeStructure,
-  useCreateFeeStructure,
-} from "@/hooks/useFees";
-import {
-  FeeStructureUpdateType,
-  FeesStructureType,
-  FeesStructureUpdatePayload,
-  FeesStructureSchema,
-} from "@/validations/validations";
+import { useGetFeeStructureForClass } from "@/hooks/useFees";
+import { useTranslations } from "@/hooks/useTranslations";
 import { FeeStructure } from "@/types";
 
-const MONTH_NAMES = [
-  "January",
-  "February",
-  "March",
-  "April",
-  "May",
-  "June",
-  "July",
-  "August",
-  "September",
-  "October",
-  "November",
-  "December",
-];
-
-const formatDate = (dateStr: string) =>
-  new Date(dateStr).toLocaleDateString("en-IN", {
-    day: "numeric",
-    month: "short",
-    year: "numeric",
-  });
-
-const formatAmount = (amount: number) =>
-  new Intl.NumberFormat("en-IN", {
-    style: "currency",
-    currency: "INR",
-    maximumFractionDigits: 0,
-  }).format(amount);
-
-const inputClass =
-  "h-10 w-full rounded-xl border border-white/10 bg-white/5 px-3 font-manrope text-sm text-white placeholder:text-white/20 focus:border-indigo-500/50 focus:outline-none focus:ring-1 focus:ring-indigo-500/30 transition-colors";
-const labelClass = "mb-1 block font-manrope text-xs text-white/40";
-
-const ErrorMsg = ({ message }: { message?: string }) => {
-  if (!message) return null;
-  return (
-    <p className="mt-1 flex items-center gap-1 font-manrope text-xs text-red-400">
-      <AlertCircle className="h-3 w-3 shrink-0" />
-      {message}
-    </p>
-  );
-};
-
-const CreateFeeModal = ({
-  classGroupId,
-  onClose,
-}: {
-  classGroupId: string;
-  onClose: () => void;
-}) => {
-  const { mutate: createFee, isPending } = useCreateFeeStructure(classGroupId);
-
-  const {
-    register,
-    handleSubmit,
-    control,
-    setValue,
-    formState: { errors },
-  } = useForm<FeesStructureType>({
-    resolver: zodResolver(FeesStructureSchema),
-    defaultValues: {
-      name: "",
-      amount: 0,
-      description: undefined,
-      isRecurring: false,
-      recurringMonth: undefined,
-    },
-  });
-
-  const isRecurringValue = useWatch({ control, name: "isRecurring" });
-
-  const onSubmit = (data: FeesStructureType) => {
-    createFee(data, {
-      onSuccess: () => onClose(),
-    });
-  };
-
-  return (
-    <motion.div
-      initial={{ opacity: 0 }}
-      animate={{ opacity: 1 }}
-      exit={{ opacity: 0 }}
-      className="fixed inset-0 z-50 flex items-center justify-center px-4"
-      onClick={onClose}
-    >
-      <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" />
-      <motion.div
-        initial={{ opacity: 0, scale: 0.96, y: 16 }}
-        animate={{ opacity: 1, scale: 1, y: 0 }}
-        exit={{ opacity: 0, scale: 0.96, y: 16 }}
-        transition={{ duration: 0.2, ease: [0.16, 1, 0.3, 1] }}
-        onClick={(e) => e.stopPropagation()}
-        className="relative z-10 w-full max-w-md overflow-hidden rounded-2xl border border-white/10 bg-[#0d1525] shadow-[0_24px_60px_rgba(0,0,0,0.7)]"
-      >
-        <div className="absolute inset-x-0 top-0 h-px bg-linear-to-r from-transparent via-white/20 to-transparent" />
-        <div className="flex items-center justify-between border-b border-white/8 px-5 py-4">
-          <div>
-            <h2 className="font-jakarta text-base font-bold text-white">
-              Create Fee Structure
-            </h2>
-            <p className="mt-0.5 font-manrope text-xs text-white/40">
-              Add a new fee structure for this class group
-            </p>
-          </div>
-          <button
-            onClick={onClose}
-            className="flex h-7 w-7 items-center justify-center rounded-lg border border-white/10 bg-white/5 text-white/40 transition-colors hover:text-white"
-          >
-            <X className="h-3.5 w-3.5" />
-          </button>
-        </div>
-
-        <form onSubmit={handleSubmit(onSubmit)} className="space-y-4 p-5">
-          <div>
-            <label className={labelClass}>Fee Name</label>
-            <input
-              {...register("name")}
-              placeholder="e.g. Admission Fee"
-              className={inputClass}
-            />
-            <ErrorMsg message={errors.name?.message} />
-          </div>
-
-          <div>
-            <label className={labelClass}>Amount (₹)</label>
-            <input
-              {...register("amount", { valueAsNumber: true })}
-              type="number"
-              placeholder="0"
-              className={inputClass}
-            />
-            <ErrorMsg message={errors.amount?.message} />
-          </div>
-
-          <div>
-            <label className={labelClass}>Description (optional)</label>
-            <input
-              {...register("description")}
-              placeholder="e.g. One-time admission fee"
-              className={inputClass}
-            />
-            <ErrorMsg message={errors.description?.message} />
-          </div>
-
-          <div className="flex items-center justify-between rounded-xl border border-white/8 bg-white/3 px-4 py-3">
-            <div>
-              <p className="font-jakarta text-sm font-semibold text-white">
-                Recurring
-              </p>
-              <p className="mt-0.5 font-manrope text-xs text-white/40">
-                Charge this fee every month
-              </p>
-            </div>
-            <Controller
-              control={control}
-              name="isRecurring"
-              render={({ field }) => (
-                <Checkbox
-                  checked={field.value ?? false}
-                  onCheckedChange={(checked) => {
-                    field.onChange(checked);
-                    if (!checked) setValue("recurringMonth", undefined);
-                  }}
-                  className="border-white/20 bg-white/5 data-checked:border-indigo-500 data-checked:bg-indigo-500"
-                />
-              )}
-            />
-          </div>
-
-          <AnimatePresence>
-            {isRecurringValue && (
-              <motion.div
-                initial={{ opacity: 0, height: 0 }}
-                animate={{ opacity: 1, height: "auto" }}
-                exit={{ opacity: 0, height: 0 }}
-                transition={{ duration: 0.2, ease: [0.16, 1, 0.3, 1] }}
-                style={{ overflow: "hidden" }}
-              >
-                <div className="pt-1">
-                  <label className={labelClass}>
-                    Recurring Month (1–12, optional)
-                  </label>
-                  <input
-                    {...register("recurringMonth", {
-                      setValueAs: (v) =>
-                        v === "" || isNaN(Number(v)) ? undefined : Number(v),
-                    })}
-                    type="number"
-                    min={1}
-                    max={12}
-                    placeholder="e.g. 6 for June"
-                    className={inputClass}
-                  />
-                  <ErrorMsg message={errors.recurringMonth?.message} />
-                </div>
-              </motion.div>
-            )}
-          </AnimatePresence>
-
-          <div className="flex items-center gap-3 border-t border-white/8 pt-4">
-            <button
-              type="button"
-              onClick={onClose}
-              className="flex h-10 flex-1 items-center justify-center rounded-xl border border-white/10 bg-white/5 font-jakarta text-sm font-bold text-white/50 transition-colors hover:text-white"
-            >
-              Cancel
-            </button>
-            <button
-              type="submit"
-              disabled={isPending}
-              className="flex h-10 flex-1 items-center justify-center gap-2 rounded-xl bg-indigo-600 font-jakarta text-sm font-bold text-white shadow-lg shadow-indigo-500/20 transition-colors hover:bg-indigo-500 disabled:opacity-70"
-            >
-              {isPending ? (
-                <>
-                  <Loader2 className="h-4 w-4 animate-spin" />
-                  Creating...
-                </>
-              ) : (
-                <>
-                  <Plus className="h-4 w-4" />
-                  Create
-                </>
-              )}
-            </button>
-          </div>
-        </form>
-      </motion.div>
-    </motion.div>
-  );
-};
-
-const UpdateFeeModal = ({
-  fee,
-  onClose,
-}: {
-  fee: FeeStructure;
-  onClose: () => void;
-}) => {
-  const { mutate: updateFee, isPending } = useUpdateFeeStructure(fee.id);
-
-  const {
-    register,
-    handleSubmit,
-    control,
-    setValue,
-    formState: { errors },
-  } = useForm<FeeStructureUpdateType>({
-    resolver: zodResolver(FeesStructureUpdatePayload),
-    defaultValues: {
-      name: fee.name,
-      amount: fee.amount,
-      description: fee.description ?? undefined,
-      isRecurring: fee.isRecurring,
-      recurringMonth: fee.recurringMonth ?? undefined,
-    },
-  });
-
-  const isRecurringValue = useWatch({ control, name: "isRecurring" });
-
-  const onSubmit = (data: FeeStructureUpdateType) => {
-    updateFee(data, {
-      onSuccess: () => onClose(),
-    });
-  };
-
-  return (
-    <motion.div
-      initial={{ opacity: 0 }}
-      animate={{ opacity: 1 }}
-      exit={{ opacity: 0 }}
-      className="fixed inset-0 z-50 flex items-center justify-center px-4"
-      onClick={onClose}
-    >
-      <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" />
-      <motion.div
-        initial={{ opacity: 0, scale: 0.96, y: 16 }}
-        animate={{ opacity: 1, scale: 1, y: 0 }}
-        exit={{ opacity: 0, scale: 0.96, y: 16 }}
-        transition={{ duration: 0.2, ease: [0.16, 1, 0.3, 1] }}
-        onClick={(e) => e.stopPropagation()}
-        className="relative z-10 w-full max-w-md overflow-hidden rounded-2xl border border-white/10 bg-[#0d1525] shadow-[0_24px_60px_rgba(0,0,0,0.7)]"
-      >
-        <div className="absolute inset-x-0 top-0 h-px bg-linear-to-r from-transparent via-white/20 to-transparent" />
-        <div className="flex items-center justify-between border-b border-white/8 px-5 py-4">
-          <div>
-            <h2 className="font-jakarta text-base font-bold text-white">
-              Update Fee Structure
-            </h2>
-            <p className="mt-0.5 font-manrope text-xs text-white/40">
-              Editing: {fee.name}
-            </p>
-          </div>
-          <button
-            onClick={onClose}
-            className="flex h-7 w-7 items-center justify-center rounded-lg border border-white/10 bg-white/5 text-white/40 transition-colors hover:text-white"
-          >
-            <X className="h-3.5 w-3.5" />
-          </button>
-        </div>
-
-        <form onSubmit={handleSubmit(onSubmit)} className="space-y-4 p-5">
-          <div>
-            <label className={labelClass}>Fee Name</label>
-            <input
-              {...register("name")}
-              placeholder="e.g. Admission Fee"
-              className={inputClass}
-            />
-            <ErrorMsg message={errors.name?.message} />
-          </div>
-
-          <div>
-            <label className={labelClass}>Amount (₹)</label>
-            <input
-              {...register("amount", { valueAsNumber: true })}
-              type="number"
-              placeholder="0"
-              className={inputClass}
-            />
-            <ErrorMsg message={errors.amount?.message} />
-          </div>
-
-          <div>
-            <label className={labelClass}>Description (optional)</label>
-            <input
-              {...register("description")}
-              placeholder="Optional description"
-              className={inputClass}
-            />
-            <ErrorMsg message={errors.description?.message} />
-          </div>
-
-          <div className="flex items-center justify-between rounded-xl border border-white/8 bg-white/3 px-4 py-3">
-            <div>
-              <p className="font-jakarta text-sm font-semibold text-white">
-                Recurring
-              </p>
-              <p className="mt-0.5 font-manrope text-xs text-white/40">
-                Charge this fee every month
-              </p>
-            </div>
-            <Controller
-              control={control}
-              name="isRecurring"
-              render={({ field }) => (
-                <Checkbox
-                  checked={field.value ?? false}
-                  onCheckedChange={(checked) => {
-                    field.onChange(checked);
-                    if (!checked) setValue("recurringMonth", undefined);
-                  }}
-                  className="border-white/20 bg-white/5 data-checked:border-indigo-500 data-checked:bg-indigo-500"
-                />
-              )}
-            />
-          </div>
-
-          <AnimatePresence>
-            {isRecurringValue && (
-              <motion.div
-                initial={{ opacity: 0, height: 0 }}
-                animate={{ opacity: 1, height: "auto" }}
-                exit={{ opacity: 0, height: 0 }}
-                transition={{ duration: 0.2, ease: [0.16, 1, 0.3, 1] }}
-                style={{ overflow: "hidden" }}
-              >
-                <div className="pt-1">
-                  <label className={labelClass}>
-                    Recurring Month (1–12, optional)
-                  </label>
-                  <input
-                    {...register("recurringMonth", {
-                      setValueAs: (v) =>
-                        v === "" || isNaN(Number(v)) ? undefined : Number(v),
-                    })}
-                    type="number"
-                    min={1}
-                    max={12}
-                    placeholder="e.g. 6 for June"
-                    className={inputClass}
-                  />
-                  <ErrorMsg message={errors.recurringMonth?.message} />
-                </div>
-              </motion.div>
-            )}
-          </AnimatePresence>
-
-          <div className="flex items-center gap-3 border-t border-white/8 pt-4">
-            <button
-              type="button"
-              onClick={onClose}
-              className="flex h-10 flex-1 items-center justify-center rounded-xl border border-white/10 bg-white/5 font-jakarta text-sm font-bold text-white/50 transition-colors hover:text-white"
-            >
-              Cancel
-            </button>
-            <button
-              type="submit"
-              disabled={isPending}
-              className="flex h-10 flex-1 items-center justify-center gap-2 rounded-xl bg-indigo-600 font-jakarta text-sm font-bold text-white shadow-lg shadow-indigo-500/20 transition-colors hover:bg-indigo-500 disabled:opacity-70"
-            >
-              {isPending ? (
-                <>
-                  <Loader2 className="h-4 w-4 animate-spin" />
-                  Saving...
-                </>
-              ) : (
-                "Save Changes"
-              )}
-            </button>
-          </div>
-        </form>
-      </motion.div>
-    </motion.div>
-  );
-};
+const PAGE_SIZE = 10;
 
 const FeeStructurePage = () => {
-  const [selectedGroupId, setSelectedGroupId] = useState<string>("");
-  const [groupDropdownOpen, setGroupDropdownOpen] = useState(false);
+  const t = useTranslations("feeStructure");
+  const [selectedGroupId, setSelectedGroupId] = useState<string | null>(null);
   const [page, setPage] = useState(1);
-  const [editingFee, setEditingFee] = useState<FeeStructure | null>(null);
-  const [isCreating, setIsCreating] = useState(false);
+  const [dialogFee, setDialogFee] = useState<FeeStructure | null>(null);
+  const [isDialogOpen, setIsDialogOpen] = useState(false);
 
-  const { data: classGroupData, isLoading: isGroupsLoading } =
-    useGetAllClassGroup();
+  const { data: groupData, isLoading: isGroupsLoading } = useGetAllClassGroup();
+  const groups = useMemo(() => groupData?.data ?? [], [groupData]);
+  const activeGroupId = selectedGroupId ?? groups[0]?.classGroupId ?? "";
+  const activeGroupName =
+    groups.find((g) => g.classGroupId === activeGroupId)?.classGroup ?? "";
 
-  const classGroups = useMemo(
-    () => classGroupData?.data ?? [],
-    [classGroupData],
-  );
-
-  const selectedGroupName = useMemo(
-    () =>
-      classGroups.find((g) => g.classGroupId === selectedGroupId)?.classGroup,
-    [classGroups, selectedGroupId],
-  );
-
+  const { data: allFeesData, isLoading: isStatsLoading } =
+    useGetFeeStructureForClass(activeGroupId, 1, 100);
   const { data: feeData, isLoading: isFeesLoading } =
-    useGetFeeStructureForClass(selectedGroupId, page, 10);
+    useGetFeeStructureForClass(activeGroupId, page, PAGE_SIZE);
 
-  const handleSelectGroup = (classGroupId: string) => {
-    setSelectedGroupId(classGroupId);
-    setPage(1);
-    setGroupDropdownOpen(false);
+  const allFees = useMemo(() => allFeesData?.data ?? [], [allFeesData]);
+  const fees = feeData?.data ?? [];
+  const oneTimeTotal = allFees
+    .filter((f) => !f.isRecurring)
+    .reduce((sum, f) => sum + f.amount, 0);
+  const recurringTotal = allFees
+    .filter((f) => f.isRecurring)
+    .reduce((sum, f) => sum + f.amount, 0);
+  const activeCount = allFees.filter((f) => f.isActive).length;
+  const totalPages = feeData?.totalPages ?? 1;
+  const groupLabel = activeGroupName
+    ? `${t("classLabel")} ${activeGroupName}`
+    : "";
+
+  const openCreate = () => {
+    setDialogFee(null);
+    setIsDialogOpen(true);
   };
 
-  const handleClearGroup = () => {
-    setSelectedGroupId("");
-    setPage(1);
+  const openEdit = (fee: FeeStructure) => {
+    setDialogFee(fee);
+    setIsDialogOpen(true);
   };
 
-  const handlePageChange = (newPage: number) => {
-    setPage(newPage);
+  const selectGroup = (value: string) => {
+    setSelectedGroupId(value);
+    setPage(1);
   };
 
   return (
-    <div className="relative min-h-screen w-full bg-[#050810] px-4 py-10 sm:px-8">
-      <div
-        className="pointer-events-none fixed inset-0 select-none"
-        style={{
-          background:
-            "radial-gradient(ellipse at 20% 20%, #1e3a5f18 0%, transparent 55%), radial-gradient(ellipse at 80% 70%, #6366f10a 0%, transparent 50%)",
-        }}
-      />
-
-      <div className="relative z-10 mx-auto max-w-6xl">
-        <motion.div
-          initial={{ opacity: 0, y: 24 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.6, ease: [0.16, 1, 0.3, 1] }}
-          className="mb-10 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between"
+    <div className="space-y-5">
+      <motion.header
+        {...fadeUp(0)}
+        className="flex flex-col gap-4 px-1 sm:flex-row sm:items-end sm:justify-between"
+      >
+        <div>
+          <h1 className="font-jakarta text-3xl font-bold tracking-tight text-foreground sm:text-4xl">
+            {t("pageTitle")}
+          </h1>
+          <p className="mt-1.5 font-manrope text-sm text-muted-foreground">
+            {t("pageSubtitle")}
+          </p>
+        </div>
+        <Button
+          type="button"
+          onClick={openCreate}
+          disabled={!activeGroupId}
+          className="h-11 gap-2 self-start rounded-full bg-linear-to-r from-indigo-600 to-indigo-800 px-5 font-manrope text-sm font-semibold text-white shadow-none hover:opacity-90 sm:self-auto"
         >
-          <div className="flex items-center gap-4">
-            <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border border-indigo-400/30 bg-indigo-500/20">
-              <Image
-                src="/logo.png"
-                alt="EduSphere Logo"
-                width={24}
-                height={24}
-                className="object-contain"
-              />
-            </div>
-            <div>
-              <h1 className="font-jakarta text-2xl font-extrabold leading-tight text-white">
-                Fee Structure
-              </h1>
-              <p className="font-manrope text-sm text-white/40">
-                Pick a class group to view or manage its fee structure
-              </p>
-            </div>
+          <Plus className="size-4" />
+          {t("addFee")}
+        </Button>
+      </motion.header>
+
+      <motion.div {...fadeUp(0.05)}>
+        <Card className={`${CARD_CLASS} gap-3 p-4 sm:p-5`}>
+          <div className="flex items-center gap-2">
+            <Layers className="size-4 text-muted-foreground" />
+            <p className="font-jakarta text-sm font-semibold text-foreground">
+              {t("classGroupsTitle")}
+            </p>
           </div>
-          {selectedGroupId && (
-            <button
-              onClick={() => setIsCreating(true)}
-              className="flex h-9 sm:h-10 shrink-0 items-center gap-2 rounded-xl border-0 bg-indigo-600 px-3 sm:px-4 font-jakarta text-xs sm:text-sm font-bold text-white shadow-lg shadow-indigo-500/20 transition-all hover:bg-indigo-500"
-            >
-              <Plus className="h-3.5 w-3.5" />
-              Add Fee Structure
-            </button>
-          )}
-        </motion.div>
-
-        <motion.div
-          initial={{ opacity: 0, y: 16 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.5, delay: 0.1, ease: [0.16, 1, 0.3, 1] }}
-          className="mb-6 flex flex-wrap items-center gap-3"
-        >
-          <div className="relative">
-            <button
-              onClick={() => setGroupDropdownOpen((v) => !v)}
-              className={`flex h-9 items-center gap-2 rounded-xl border px-3.5 font-manrope text-xs font-medium transition-all duration-200 backdrop-blur-sm ${
-                selectedGroupId
-                  ? "border-indigo-500/30 bg-indigo-500/10 text-indigo-300"
-                  : "border-white/8 bg-white/4 text-white/40 hover:text-white/70"
-              }`}
-            >
-              <Layers className="h-3.5 w-3.5" />
-              {selectedGroupName ?? "Select class group"}
-              {selectedGroupId && (
-                <span
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    handleClearGroup();
-                  }}
-                  className="ml-1 flex h-3.5 w-3.5 items-center justify-center rounded-full bg-indigo-500/30 text-indigo-300 hover:bg-indigo-500/50"
-                >
-                  <X className="h-2.5 w-2.5" />
-                </span>
-              )}
-              <ChevronDown
-                className={`h-3 w-3 transition-transform duration-200 ${groupDropdownOpen ? "rotate-180" : ""}`}
-              />
-            </button>
-
-            <AnimatePresence>
-              {groupDropdownOpen && (
-                <motion.div
-                  initial={{ opacity: 0, y: 6, scale: 0.97 }}
-                  animate={{ opacity: 1, y: 0, scale: 1 }}
-                  exit={{ opacity: 0, y: 6, scale: 0.97 }}
-                  transition={{ duration: 0.15 }}
-                  className="absolute left-0 top-10 z-30 min-w-52 overflow-hidden rounded-xl border border-white/10 bg-[#0d1525] shadow-[0_16px_40px_rgba(0,0,0,0.6)] backdrop-blur-xl"
-                >
-                  {isGroupsLoading ? (
-                    <div className="flex items-center gap-2 px-4 py-3 font-manrope text-xs text-white/30">
-                      <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                      Loading class groups...
-                    </div>
-                  ) : classGroups.length === 0 ? (
-                    <div className="px-4 py-3 font-manrope text-xs text-white/30">
-                      No class groups available
-                    </div>
-                  ) : (
-                    <div className="py-1">
-                      {classGroups.map((group) => (
-                        <button
-                          key={group.classGroupId}
-                          onClick={() => handleSelectGroup(group.classGroupId)}
-                          className={`flex w-full items-center gap-2 px-4 py-2.5 font-manrope text-xs transition-colors duration-150 ${
-                            selectedGroupId === group.classGroupId
-                              ? "bg-indigo-500/15 text-indigo-300"
-                              : "text-white/60 hover:bg-white/5 hover:text-white"
-                          }`}
-                        >
-                          {selectedGroupId === group.classGroupId && (
-                            <CheckCircle2 className="h-3 w-3 text-indigo-400" />
-                          )}
-                          Class {group.classGroup}
-                        </button>
-                      ))}
-                    </div>
-                  )}
-                </motion.div>
-              )}
-            </AnimatePresence>
-          </div>
-
-          {selectedGroupId && (
-            <button
-              onClick={handleClearGroup}
-              className="font-manrope text-xs text-white/30 underline-offset-2 hover:text-white/60 hover:underline transition-colors"
-            >
-              Clear selection
-            </button>
-          )}
-        </motion.div>
-
-        <motion.div
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          transition={{ duration: 0.5, delay: 0.15 }}
-          className="relative overflow-hidden rounded-2xl border border-white/10 bg-white/4 backdrop-blur-xl shadow-[0_0_0_1px_rgba(255,255,255,0.04),0_24px_60px_rgba(0,0,0,0.5)]"
-        >
-          <div className="absolute inset-x-0 top-0 h-px bg-linear-to-r from-transparent via-white/15 to-transparent" />
-
-          {!selectedGroupId ? (
-            <div className="flex flex-col items-center justify-center gap-4 py-20">
-              <div className="flex h-14 w-14 items-center justify-center rounded-2xl border border-white/10 bg-white/5">
-                <Layers className="h-6 w-6 text-white/20" />
-              </div>
-              <div className="text-center">
-                <p className="font-jakarta text-sm font-semibold text-white/40">
-                  No class group selected
-                </p>
-                <p className="mt-0.5 font-manrope text-xs text-white/20">
-                  Choose a class group above to view its fee structure
-                </p>
-              </div>
+          {isGroupsLoading ? (
+            <div className="flex gap-2">
+              {Array.from({ length: 6 }).map((_, i) => (
+                <Skeleton key={i} className="h-9 w-20 rounded-full" />
+              ))}
             </div>
+          ) : groups.length === 0 ? (
+            <p className="font-manrope text-sm text-muted-foreground">
+              {t("noGroups")}
+            </p>
           ) : (
-            <>
-              <div className="grid grid-cols-[2fr_1.3fr_1.3fr_1.4fr_1fr_0.5fr] gap-4 border-b border-white/8 px-6 py-3.5">
-                {[
-                  "Fee Name",
-                  "Amount",
-                  "Due Date",
-                  "Recurring",
-                  "Status",
-                  "Modify",
-                ].map((h) => (
-                  <span
-                    key={h}
-                    className="font-manrope text-xs font-medium uppercase tracking-widest text-white/30"
+            <Tabs
+              value={activeGroupId}
+              onValueChange={(value: string) => selectGroup(value)}
+            >
+              <TabsList className="flex h-auto w-full flex-wrap justify-start gap-1.5 bg-transparent p-0">
+                {groups.map((group) => (
+                  <TabsTrigger
+                    key={group.classGroupId}
+                    value={group.classGroupId}
+                    className={`${TAB_TRIGGER_CLASS} px-4`}
                   >
-                    {h}
-                  </span>
+                    {t("classLabel")} {group.classGroup}
+                  </TabsTrigger>
                 ))}
-              </div>
+              </TabsList>
+            </Tabs>
+          )}
+        </Card>
+      </motion.div>
 
-              {isFeesLoading ? (
-                <div className="flex items-center justify-center py-20">
-                  <div className="flex flex-col items-center gap-3">
-                    <Loader2 className="h-7 w-7 animate-spin text-indigo-400" />
-                    <span className="font-manrope text-sm text-white/30">
-                      Loading fee structure...
-                    </span>
-                  </div>
+      {activeGroupId && (
+        <>
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
+            <StatFilterCard
+              highlighted
+              label={t("kpiItems")}
+              value={String(allFeesData?.total ?? 0)}
+              footnote={`${t("kpiItemsNote")} ${groupLabel}`}
+              icon={<Receipt className="size-4" />}
+              tone="indigo"
+              loading={isStatsLoading}
+              delay={0.1}
+            />
+            <StatFilterCard
+              label={t("kpiOneTime")}
+              value={formatAmount(oneTimeTotal)}
+              footnote={t("kpiOneTimeNote")}
+              icon={<Wallet className="size-4" />}
+              tone="violet"
+              loading={isStatsLoading}
+              delay={0.15}
+            />
+            <StatFilterCard
+              label={t("kpiRecurring")}
+              value={formatAmount(recurringTotal)}
+              footnote={t("kpiRecurringNote")}
+              icon={<Repeat className="size-4" />}
+              tone="indigo"
+              loading={isStatsLoading}
+              delay={0.2}
+            />
+            <StatFilterCard
+              label={t("kpiActive")}
+              value={`${activeCount}/${allFees.length}`}
+              footnote={t("kpiActiveNote")}
+              icon={<CheckCircle2 className="size-4" />}
+              tone="emerald"
+              loading={isStatsLoading}
+              delay={0.25}
+            />
+          </div>
+
+          <motion.div {...fadeUp(0.3)}>
+            <Card className={CARD_CLASS}>
+              <div className="flex items-center justify-between gap-3 px-4 pt-4 pb-3 sm:px-5">
+                <div>
+                  <h2 className="font-jakarta text-base font-semibold text-foreground">
+                    {t("feesFor")} {groupLabel}
+                  </h2>
+                  <p className="font-manrope text-xs text-muted-foreground">
+                    {t("feesForSub")}
+                  </p>
                 </div>
-              ) : !feeData?.data?.length ? (
-                <div className="flex flex-col items-center justify-center gap-4 py-20">
-                  <div className="flex h-14 w-14 items-center justify-center rounded-2xl border border-white/10 bg-white/5">
-                    <Wallet className="h-6 w-6 text-white/20" />
-                  </div>
-                  <div className="text-center">
-                    <p className="font-jakarta text-sm font-semibold text-white/40">
-                      No fee structure found
+                <span className="font-manrope text-xs text-muted-foreground">
+                  {feeData?.total ?? 0} {t("results")}
+                </span>
+              </div>
+              <Separator />
+              {isFeesLoading ? (
+                <FeesTableSkeleton />
+              ) : fees.length === 0 ? (
+                <div className="flex flex-col items-center justify-center gap-4 px-4 py-20 text-center">
+                  <span className="flex h-14 w-14 items-center justify-center rounded-2xl border border-border bg-muted">
+                    <Wallet className="size-6 text-muted-foreground" />
+                  </span>
+                  <div>
+                    <p className="font-jakarta text-sm font-semibold text-foreground">
+                      {t("emptyTitle")}
                     </p>
-                    <p className="mt-0.5 font-manrope text-xs text-white/20">
-                      This class group does not have any fee structure yet
+                    <p className="mt-1 font-manrope text-xs text-muted-foreground">
+                      {t("emptySub")}
                     </p>
                   </div>
-                  <button
-                    onClick={() => setIsCreating(true)}
-                    className="flex h-9 items-center gap-2 rounded-xl bg-indigo-600 px-4 font-jakarta text-xs font-bold text-white shadow-lg shadow-indigo-500/20 transition-all hover:bg-indigo-500"
+                  <Button
+                    type="button"
+                    onClick={openCreate}
+                    className={`h-9 gap-2 px-4 text-xs ${PRIMARY_PILL_CLASS}`}
                   >
-                    <Plus className="h-3.5 w-3.5" />
-                    Add Fee Structure
-                  </button>
+                    <Plus className="size-3.5" />
+                    {t("addFee")}
+                  </Button>
                 </div>
               ) : (
-                <div className="divide-y divide-white/6">
-                  {feeData.data.map((fee, i) => (
-                    <motion.div
-                      key={fee.id}
-                      initial={{ opacity: 0, x: -8 }}
-                      animate={{ opacity: 1, x: 0 }}
-                      transition={{ duration: 0.35, delay: i * 0.04 }}
-                      className="grid grid-cols-[2fr_1.3fr_1.3fr_1.4fr_1fr_0.5fr] gap-4 px-6 py-4 transition-colors duration-150 hover:bg-white/3 items-center"
-                    >
-                      <div className="flex items-center gap-3">
-                        <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-indigo-500/20 bg-indigo-500/10">
-                          <Wallet className="h-3.5 w-3.5 text-indigo-400" />
-                        </div>
-                        <div>
-                          <span className="font-jakarta text-sm font-bold text-white">
-                            {fee.name}
-                          </span>
-                          <p className="font-manrope text-xs text-white/30">
-                            {fee.description ?? "No description"}
-                          </p>
-                        </div>
-                      </div>
-                      <div className="flex items-center">
-                        <span className="font-manrope text-sm font-semibold text-white/70">
-                          {formatAmount(fee.amount)}
-                        </span>
-                      </div>
-                      <div className="flex items-center gap-1.5">
-                        <CalendarIcon className="h-3.5 w-3.5 text-white/20" />
-                        <span className="font-manrope text-sm text-white/50">
-                          {formatDate(fee.dueDate)}
-                        </span>
-                      </div>
-                      <div className="flex items-center">
-                        {fee.isRecurring ? (
-                          <span className="flex items-center gap-1.5 rounded-full border border-sky-500/20 bg-sky-500/10 px-2.5 py-1 font-manrope text-xs font-medium text-sky-400">
-                            <Repeat className="h-3 w-3" />
-                            Monthly
-                            {fee.recurringMonth
-                              ? ` · ${MONTH_NAMES[fee.recurringMonth - 1]}`
-                              : ""}
-                          </span>
-                        ) : (
-                          <span className="font-manrope text-xs text-white/30">
-                            One-time
-                          </span>
-                        )}
-                      </div>
-                      <div className="flex items-center">
-                        {fee.isActive ? (
-                          <span className="flex items-center gap-1.5 rounded-full border border-emerald-500/20 bg-emerald-500/10 px-2.5 py-1 font-manrope text-xs font-medium text-emerald-400">
-                            <CheckCircle2 className="h-3 w-3" />
-                            Active
-                          </span>
-                        ) : (
-                          <span className="flex items-center gap-1.5 rounded-full border border-white/10 bg-white/5 px-2.5 py-1 font-manrope text-xs font-medium text-white/30">
-                            <XCircle className="h-3 w-3" />
-                            Inactive
-                          </span>
-                        )}
-                      </div>
-                      <div className="flex items-center justify-end">
-                        <button
-                          onClick={() => setEditingFee(fee)}
-                          className="flex h-7 w-7 items-center justify-center rounded-lg border border-white/10 bg-white/5 text-white/30 transition-colors hover:border-indigo-500/30 hover:bg-indigo-500/10 hover:text-indigo-400"
-                        >
-                          <Pencil className="h-3 w-3" />
-                        </button>
-                      </div>
-                    </motion.div>
-                  ))}
-                </div>
+                <FeesTable fees={fees} onEdit={openEdit} />
               )}
-
-              {feeData && feeData.totalPages > 1 && (
-                <div className="flex items-center justify-between border-t border-white/8 px-6 py-4">
-                  <span className="font-manrope text-xs text-white/30">
-                    Page {feeData.page} / {feeData.totalPages} · {feeData.total}{" "}
-                    total
-                  </span>
-                  <div className="flex items-center gap-2">
-                    <button
-                      onClick={() => handlePageChange(page - 1)}
-                      disabled={page === 1}
-                      className="flex h-8 w-8 items-center justify-center rounded-lg border border-white/10 bg-white/5 text-white/40 transition-colors hover:border-white/20 hover:text-white/70 disabled:opacity-30"
-                    >
-                      <ChevronLeft className="h-4 w-4" />
-                    </button>
-                    <button
-                      onClick={() => handlePageChange(page + 1)}
-                      disabled={page === feeData.totalPages}
-                      className="flex h-8 w-8 items-center justify-center rounded-lg border border-white/10 bg-white/5 text-white/40 transition-colors hover:border-white/20 hover:text-white/70 disabled:opacity-30"
-                    >
-                      <ChevronRight className="h-4 w-4" />
-                    </button>
-                  </div>
-                </div>
+              {feeData && totalPages > 1 && (
+                <>
+                  <Separator />
+                  <ApplicationsPagination
+                    page={feeData.page}
+                    totalPages={totalPages}
+                    total={feeData.total}
+                    onChange={setPage}
+                  />
+                </>
               )}
-            </>
-          )}
-        </motion.div>
-      </div>
+            </Card>
+          </motion.div>
+        </>
+      )}
 
-      <AnimatePresence>
-        {isCreating && (
-          <CreateFeeModal
-            classGroupId={selectedGroupId}
-            onClose={() => setIsCreating(false)}
-          />
-        )}
-      </AnimatePresence>
-
-      <AnimatePresence>
-        {editingFee && (
-          <UpdateFeeModal
-            fee={editingFee}
-            onClose={() => setEditingFee(null)}
-          />
-        )}
-      </AnimatePresence>
+      {activeGroupId && (
+        <FeeFormDialog
+          key={isDialogOpen ? (dialogFee?.id ?? "new") : "closed"}
+          open={isDialogOpen}
+          onOpenChange={setIsDialogOpen}
+          classGroupId={activeGroupId}
+          groupName={groupLabel}
+          fee={dialogFee}
+        />
+      )}
     </div>
   );
 };

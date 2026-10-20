@@ -116,6 +116,7 @@ export async function createStudentFromApprovedApplication(
         city: admissionApplication.city,
         state: admissionApplication.state,
         pincode: admissionApplication.pincode,
+        photoUrl: admissionApplication.photoUrl,
       },
     });
     let existingParent = admissionApplication.guardianEmail
@@ -132,6 +133,7 @@ export async function createStudentFromApprovedApplication(
     }
     let parentRegNumber: string;
     let parentTempPassword: string | null = null;
+    let existingParentPhotoUserId: string | null = null;
     if (existingParent) {
       parentRegNumber = existingParent.user.regNumber;
       await tx.parentStudent.create({
@@ -141,6 +143,13 @@ export async function createStudentFromApprovedApplication(
           parentType: admissionApplication.guardianRelation,
         },
       });
+      if (!existingParent.photoUrl && admissionApplication.guardianPhotoUrl) {
+        await tx.parent.update({
+          where: { id: existingParent.id },
+          data: { photoUrl: admissionApplication.guardianPhotoUrl },
+        });
+        existingParentPhotoUserId = existingParent.userId;
+      }
     } else {
       parentRegNumber = await generateRegistrationNumber(Role.PARENT);
       parentTempPassword = `PARENT@${Math.random().toString(36).slice(-8)}`;
@@ -162,6 +171,7 @@ export async function createStudentFromApprovedApplication(
           firstName: admissionApplication.guardianFirstName,
           lastName: admissionApplication.guardianLastName,
           alternatePhone: null,
+          photoUrl: admissionApplication.guardianPhotoUrl,
         },
       });
       await tx.parentStudent.create({
@@ -224,21 +234,16 @@ export async function createStudentFromApprovedApplication(
       const ADMISSION_FEE_GRACE_PERIOD_DAYS = 7;
       const dueDate = new Date();
       dueDate.setDate(dueDate.getDate() + ADMISSION_FEE_GRACE_PERIOD_DAYS);
-      await Promise.all([
-        tx.feeStructure.update({
-          where: { id: admissionFeeStructure.id },
-          data: { dueDate },
-        }),
-        tx.feePayment.create({
-          data: {
-            studentId: student.id,
-            feeStructureId: admissionFeeStructure.id,
-            amountPaid: 0,
-            status: "PENDING",
-            dueDate,
-          },
-        }),
-      ]);
+      await tx.feePayment.create({
+        data: {
+          studentId: student.id,
+          feeStructureId: admissionFeeStructure.id,
+          amountDue: admissionFeeStructure.amount,
+          amountPaid: 0,
+          status: "PENDING",
+          dueDate,
+        },
+      });
     }
     const [aggregateCapacity, aggregateEnrollments, aggregatePending] =
       await Promise.all([
@@ -301,12 +306,20 @@ export async function createStudentFromApprovedApplication(
       parentTempPassword,
       parentRegNumber,
       isExistingParent: !!existingParent,
+      existingParentPhotoUserId,
     };
   });
   await Promise.all([
     deleteCacheByPattern(`students:*`),
     deleteCache(CACHE_KEYS.admissionApplication(applicationId)),
     deleteCacheByPattern(`admission-applications:*`),
+    ...(response.existingParentPhotoUserId
+      ? [
+          deleteCache(
+            CACHE_KEYS.userProfile(response.existingParentPhotoUserId),
+          ),
+        ]
+      : []),
   ]);
   await createAuditLog({
     performedById: reviewerId,
@@ -322,6 +335,10 @@ export async function createStudentFromApprovedApplication(
       assignedClass: classExists.name,
       assignedSection: classExists.section,
       linkedExistingParent: response.isExistingParent,
+      studentPhotoCopied: !!admissionApplication.photoUrl,
+      guardianPhotoCopied: !response.isExistingParent
+        ? !!admissionApplication.guardianPhotoUrl
+        : !!response.existingParentPhotoUserId,
     },
     context,
     isSuccessful: true,
@@ -392,7 +409,6 @@ export async function withdrawStudentService(
           status: "WITHDRAWN",
           withdrawalReason,
           withdrawnAt: new Date(),
-          withdrawnBy: moderatorId,
         },
       });
     });

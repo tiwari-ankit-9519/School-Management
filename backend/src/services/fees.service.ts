@@ -1,3 +1,4 @@
+import { FeeStructure, Prisma } from "@prisma/client";
 import { prisma } from "../config/database.config";
 import { createModuleLogger } from "../config/logger.config";
 import { AuditContext } from "../middlewares/request-logger.middleware";
@@ -5,10 +6,46 @@ import { createAuditLog, createSystemLog } from "../utils/audit.util";
 import {
   FeesStructureType,
   FeesStructureUpdateType,
+  UpdateFeeStructureStatusType,
 } from "../validations/input.validations";
-import { FeeStructure } from "@prisma/client";
 
 const log = createModuleLogger("FeeModule");
+
+const MAX_PAGE_SIZE = 100;
+
+const resolveRecurringMonth = (
+  isRecurring: boolean | undefined,
+  recurringMonth: number | null | undefined,
+): number | null | undefined => {
+  if (isRecurring === false) return null;
+  if (isRecurring === true) return recurringMonth ?? null;
+  return recurringMonth;
+};
+
+async function assertUniqueFeeName(
+  name: string,
+  classGroupId: string,
+  academicYearId: string,
+  excludeId?: string,
+): Promise<void> {
+  const duplicate = await prisma.feeStructure.findFirst({
+    where: {
+      classGroupId,
+      academicYearId,
+      name: { equals: name.trim(), mode: "insensitive" },
+      ...(excludeId ? { NOT: { id: excludeId } } : {}),
+    },
+    select: { id: true },
+  });
+  if (duplicate) {
+    log.warn("Fee Structure with this name already exists", {
+      name,
+      classGroupId,
+      academicYearId,
+    });
+    throw new Error("A fee with this name already exists for this class group");
+  }
+}
 
 export async function createFeeStructureService(
   adminId: string,
@@ -24,49 +61,51 @@ export async function createFeeStructureService(
       classGroupId,
     });
 
-    const academicYear = await prisma.academicYear.findFirst({
-      where: { isCurrent: true },
-    });
+    const [academicYear, classGroupExists] = await Promise.all([
+      prisma.academicYear.findFirst({ where: { isCurrent: true } }),
+      prisma.classGroup.findUnique({ where: { id: classGroupId } }),
+    ]);
+
     if (!academicYear) {
       log.warn("Academic Year not found");
       throw new Error("Academic Year not found");
     }
 
-    const classGroupExists = await prisma.classGroup.findUnique({
-      where: { id: classGroupId },
-    });
     if (!classGroupExists) {
       log.warn("Class Group does not exist");
       throw new Error("Class Group does not exist");
     }
 
-    const feeStructureExists = await prisma.feeStructure.findFirst({
-      where: { classGroupId, academicYearId: academicYear.id, name: data.name },
-    });
-    if (feeStructureExists) {
-      log.warn("Fee Structure already exists");
-      throw new Error("Fee Structure already exists");
-    }
+    await assertUniqueFeeName(data.name, classGroupId, academicYear.id);
+
+    const isRecurring = data.isRecurring ?? false;
 
     const newFeeStructure = await prisma.feeStructure.create({
       data: {
         academicYearId: academicYear.id,
         classGroupId,
-        name: data.name,
+        name: data.name.trim(),
         amount: data.amount,
-        description: data.description,
-        recurringMonth: data.recurringMonth,
-        isRecurring: data.isRecurring,
+        description: data.description?.trim() || null,
+        isRecurring,
+        recurringMonth:
+          resolveRecurringMonth(isRecurring, data.recurringMonth) ?? null,
       },
+    });
+
+    log.info("Fee structure created", {
+      feeId: newFeeStructure.id,
+      classGroupId,
     });
 
     await createSystemLog({
       level: "INFO",
       message: "Fee Structure created successfully",
-      module: "Fee Structure",
+      module: "FeeStructure",
       context,
       statusCode,
       metadata: {
+        feeId: newFeeStructure.id,
         name: newFeeStructure.name,
         amount: newFeeStructure.amount,
         classGroupId: newFeeStructure.classGroupId,
@@ -79,12 +118,13 @@ export async function createFeeStructureService(
       action: "CREATE",
       module: "Fees",
       resourceId: newFeeStructure.id,
-      resourceType: "FeeStructureCreation",
+      resourceType: "FeeStructure",
       newValues: {
         name: newFeeStructure.name,
         amount: newFeeStructure.amount,
         classGroupId: newFeeStructure.classGroupId,
         isRecurring: newFeeStructure.isRecurring,
+        recurringMonth: newFeeStructure.recurringMonth,
       },
       context,
       isSuccessful: true,
@@ -94,7 +134,7 @@ export async function createFeeStructureService(
     return newFeeStructure;
   } catch (error) {
     const err = error as Error;
-    log.error("Internal Server Error.", {
+    log.error("Failed to create fee structure", {
       error: err.message,
       ipAddress: context.ipAddress,
       classGroupId,
@@ -123,55 +163,83 @@ export async function updateFeeStructureService(
     });
 
     if (!feeStructure) {
-      log.warn("Fee Structure not found");
+      log.warn("Fee Structure not found", { feeId });
       throw new Error("Fee Structure not found");
+    }
+
+    if (
+      data.name &&
+      data.name.trim().toLowerCase() !== feeStructure.name.toLowerCase()
+    ) {
+      await assertUniqueFeeName(
+        data.name,
+        feeStructure.classGroupId,
+        feeStructure.academicYearId,
+        feeId,
+      );
+    }
+
+    const updateData: Prisma.FeeStructureUpdateInput = {
+      ...(data.name !== undefined && { name: data.name.trim() }),
+      ...(data.amount !== undefined && { amount: data.amount }),
+      ...(data.description !== undefined && {
+        description: data.description.trim() || null,
+      }),
+      ...(data.isRecurring !== undefined && { isRecurring: data.isRecurring }),
+    };
+
+    const recurringMonth = resolveRecurringMonth(
+      data.isRecurring,
+      data.recurringMonth,
+    );
+    if (recurringMonth !== undefined) {
+      updateData.recurringMonth = recurringMonth;
     }
 
     const updatedFeeStructure = await prisma.feeStructure.update({
       where: { id: feeId },
-      data: {
-        name: data.name,
-        amount: data.amount,
-        description: data.description,
-        recurringMonth: data.recurringMonth,
-        isRecurring: data.isRecurring,
-      },
+      data: updateData,
     });
 
     log.info("Fee structure updated", {
-      updateFeeStructureService,
+      feeId,
+      changedFields: Object.keys(updateData),
     });
 
     await createSystemLog({
       level: "INFO",
       message: "Fee Structure updated successfully",
-      module: "Fee Structure",
+      module: "FeeStructure",
       context,
       statusCode,
       metadata: {
+        feeId,
         name: updatedFeeStructure.name,
         amount: updatedFeeStructure.amount,
-        classId: updatedFeeStructure.classId,
+        classGroupId: updatedFeeStructure.classGroupId,
         isRecurring: updatedFeeStructure.isRecurring,
       },
     });
 
     await createAuditLog({
       performedById: adminId,
-      action: "CREATE",
+      action: "UPDATE",
       module: "Fees",
       resourceId: updatedFeeStructure.id,
-      resourceType: "FeeStructureCreation",
+      resourceType: "FeeStructure",
       oldValues: {
+        name: feeStructure.name,
         amount: feeStructure.amount,
-        isRecurring: feeStructure.isRecurring,
         description: feeStructure.description,
+        isRecurring: feeStructure.isRecurring,
+        recurringMonth: feeStructure.recurringMonth,
       },
       newValues: {
         name: updatedFeeStructure.name,
         amount: updatedFeeStructure.amount,
-        classId: updatedFeeStructure.classId,
+        description: updatedFeeStructure.description,
         isRecurring: updatedFeeStructure.isRecurring,
+        recurringMonth: updatedFeeStructure.recurringMonth,
       },
       context,
       isSuccessful: true,
@@ -181,7 +249,7 @@ export async function updateFeeStructureService(
     return updatedFeeStructure;
   } catch (error) {
     const err = error as Error;
-    log.error("Internal Server Error", {
+    log.error("Failed to update fee structure", {
       feeId,
       adminId,
       ipAddress: context.ipAddress,
@@ -206,9 +274,14 @@ export async function getFeeStructureForClassService(
   totalPages: number;
 }> {
   try {
-    log.info(`Starting service to fetch fee structure of the class`, {
+    const safePage = Math.max(1, page);
+    const safeLimit = Math.min(MAX_PAGE_SIZE, Math.max(1, limit));
+
+    log.info("Starting service to fetch fee structure of the class group", {
       classGroupId,
       adminId,
+      page: safePage,
+      limit: safeLimit,
       ipAddress: context.ipAddress,
     });
 
@@ -217,15 +290,20 @@ export async function getFeeStructureForClassService(
     });
 
     if (!academicYear) {
-      log.warn(`Current academic year not found`);
-      throw new Error(`Current academic year not found`);
+      log.warn("Current academic year not found");
+      throw new Error("Current academic year not found");
     }
+
+    const where: Prisma.FeeStructureWhereInput = {
+      classGroupId,
+      academicYearId: academicYear.id,
+    };
 
     const [feeStructureOfClass, total] = await prisma.$transaction([
       prisma.feeStructure.findMany({
-        where: { classGroupId, academicYearId: academicYear.id },
-        skip: (page - 1) * limit,
-        take: limit,
+        where,
+        skip: (safePage - 1) * safeLimit,
+        take: safeLimit,
         orderBy: { createdAt: "desc" },
         include: {
           classGroup: {
@@ -233,55 +311,109 @@ export async function getFeeStructureForClassService(
           },
         },
       }),
-      prisma.feeStructure.count({
-        where: { classGroupId, academicYearId: academicYear.id },
-      }),
+      prisma.feeStructure.count({ where }),
     ]);
-
-    if (!feeStructureOfClass.length) {
-      log.warn(`Fee Structure not found`);
-      throw new Error(`Fee Structure not found`);
-    }
-
-    const response = {
-      data: feeStructureOfClass,
-      page,
-      limit,
-      total,
-      totalPages: Math.ceil(total / limit),
-    };
 
     await createSystemLog({
       level: "INFO",
-      module: "FeeStructureModule",
+      module: "FeeStructure",
       message: "Fetched Fee Structure",
       context,
       statusCode,
       metadata: {
         adminId,
         classGroupId,
+        total,
       },
     });
 
-    log.info(`Fetched fee structure for classs with id ${classGroupId}`, {
+    log.info(`Fetched fee structure for class group ${classGroupId}`, {
       total,
-      page,
-      limit,
-      totalPages: Math.ceil(total / limit),
+      page: safePage,
+      limit: safeLimit,
     });
 
-    return response;
+    return {
+      data: feeStructureOfClass,
+      page: safePage,
+      limit: safeLimit,
+      total,
+      totalPages: Math.ceil(total / safeLimit),
+    };
   } catch (error) {
     const err = error as Error;
-    log.error(
-      `Internal Server Error. Failed to fetch fee structure of class ${classGroupId}`,
-      {
-        error: err.message,
-        ipAddress: context.ipAddress,
-        classGroupId,
-        adminId,
-      },
-    );
+    log.error(`Failed to fetch fee structure of class group ${classGroupId}`, {
+      error: err.message,
+      ipAddress: context.ipAddress,
+      classGroupId,
+      adminId,
+    });
+    throw err;
+  }
+}
+
+export async function updateFeeStructureStatusService(
+  adminId: string,
+  feeId: string,
+  data: UpdateFeeStructureStatusType,
+  context: AuditContext,
+  statusCode: number,
+): Promise<FeeStructure> {
+  try {
+    log.info("Updating fee structure status", {
+      adminId,
+      feeId,
+      isActive: data.isActive,
+      ipAddress: context.ipAddress,
+    });
+
+    const feeStructure = await prisma.feeStructure.findUnique({
+      where: { id: feeId },
+    });
+
+    if (!feeStructure) {
+      log.warn("Fee Structure not found", { feeId });
+      throw new Error("Fee Structure not found");
+    }
+
+    if (feeStructure.isActive === data.isActive) return feeStructure;
+
+    const updated = await prisma.feeStructure.update({
+      where: { id: feeId },
+      data: { isActive: data.isActive },
+    });
+
+    await createSystemLog({
+      level: "INFO",
+      message: `Fee Structure ${data.isActive ? "activated" : "deactivated"}`,
+      module: "FeeStructure",
+      context,
+      statusCode,
+      metadata: { feeId, name: updated.name, isActive: updated.isActive },
+    });
+
+    await createAuditLog({
+      performedById: adminId,
+      action: "STATUS_CHANGE",
+      module: "Fees",
+      resourceId: updated.id,
+      resourceType: "FeeStructure",
+      oldValues: { isActive: feeStructure.isActive },
+      newValues: { isActive: updated.isActive },
+      context,
+      isSuccessful: true,
+      statusCode,
+    });
+
+    return updated;
+  } catch (error) {
+    const err = error as Error;
+    log.error("Failed to update fee structure status", {
+      feeId,
+      adminId,
+      error: err.message,
+      ipAddress: context.ipAddress,
+    });
     throw err;
   }
 }

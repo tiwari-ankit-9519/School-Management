@@ -17,10 +17,8 @@ export async function createNotification(
   req: AuthenticatedRequest,
   res: Response,
 ): Promise<void> {
-  const schoolId = req.user?.schoolId;
   const senderId = req.user?.id;
 
-  if (!schoolId) throw new Error("School ID is required");
   if (!senderId) throw new Error("Sender ID is required");
 
   const {
@@ -57,7 +55,6 @@ export async function createNotification(
   res.status(HTTP_STATUS.CREATED);
 
   const notification = await createNotificationService(
-    schoolId,
     senderId,
     {
       title,
@@ -83,10 +80,8 @@ export async function getNotificationsForUser(
   req: AuthenticatedRequest,
   res: Response,
 ): Promise<void> {
-  const schoolId = req.user?.schoolId;
   const userId = req.user?.id;
 
-  if (!schoolId) throw new Error("School ID is required");
   if (!userId) throw new Error("User ID is required");
 
   const isReadRaw = req.query.isRead as string | undefined;
@@ -107,7 +102,6 @@ export async function getNotificationsForUser(
   res.status(HTTP_STATUS.OK);
 
   const result = await getNotificationsForUserService(
-    schoolId,
     userId,
     filters,
     auditContext,
@@ -127,11 +121,9 @@ export async function markNotificationAsRead(
   req: AuthenticatedRequest,
   res: Response,
 ): Promise<void> {
-  const schoolId = req.user?.schoolId;
   const userId = req.user?.id;
   const notificationId = req.params.notificationId as string;
 
-  if (!schoolId) throw new Error("School ID is required");
   if (!userId) throw new Error("User ID is required");
   if (!notificationId) throw new Error("Notification ID is required");
 
@@ -139,7 +131,6 @@ export async function markNotificationAsRead(
   res.status(HTTP_STATUS.OK);
 
   const result = await markNotificationAsReadService(
-    schoolId,
     userId,
     notificationId,
     auditContext,
@@ -157,17 +148,14 @@ export async function markAllNotificationsAsRead(
   req: AuthenticatedRequest,
   res: Response,
 ): Promise<void> {
-  const schoolId = req.user?.schoolId;
   const userId = req.user?.id;
 
-  if (!schoolId) throw new Error("School ID is required");
   if (!userId) throw new Error("User ID is required");
 
   const auditContext = buildAuditContext(req);
   res.status(HTTP_STATUS.OK);
 
   const result = await markAllNotificationsAsReadService(
-    schoolId,
     userId,
     auditContext,
     res.statusCode,
@@ -184,11 +172,9 @@ export async function deleteNotification(
   req: AuthenticatedRequest,
   res: Response,
 ): Promise<void> {
-  const schoolId = req.user?.schoolId;
   const performedById = req.user?.id;
   const notificationId = req.params.notificationId as string;
 
-  if (!schoolId) throw new Error("School ID is required");
   if (!performedById) throw new Error("Performer ID is required");
   if (!notificationId) throw new Error("Notification ID is required");
 
@@ -196,7 +182,6 @@ export async function deleteNotification(
   res.status(HTTP_STATUS.OK);
 
   const result = await deleteNotificationService(
-    schoolId,
     performedById,
     notificationId,
     auditContext,

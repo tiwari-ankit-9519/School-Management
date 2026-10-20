@@ -25,7 +25,6 @@ interface PoolStats {
 
 interface DatabaseStats {
   totalUsers: number;
-  totalSchools: number;
   totalAuditLogs: number;
   totalStudents: number;
   totalTeachers: number;
@@ -318,10 +317,9 @@ export function getPoolStats(): PoolStats {
 
 export async function getDatabaseStats(): Promise<DatabaseStats> {
   try {
-    const [users, schools, auditLogs, students, teachers, admissions] =
+    const [users, auditLogs, students, teachers, admissions] =
       await Promise.all([
         prisma.user.count(),
-        prisma.school.count(),
         prisma.auditLog.count(),
         prisma.student.count(),
         prisma.teacher.count(),
@@ -329,7 +327,6 @@ export async function getDatabaseStats(): Promise<DatabaseStats> {
       ]);
     return {
       totalUsers: users,
-      totalSchools: schools,
       totalAuditLogs: auditLogs,
       totalStudents: students,
       totalTeachers: teachers,
@@ -341,7 +338,6 @@ export async function getDatabaseStats(): Promise<DatabaseStats> {
     log.error("Failed to get database stats", { error: err.message });
     return {
       totalUsers: 0,
-      totalSchools: 0,
       totalAuditLogs: 0,
       totalStudents: 0,
       totalTeachers: 0,

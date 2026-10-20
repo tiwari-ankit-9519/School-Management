@@ -150,6 +150,13 @@ export async function getSingleTeacherService(
         attendances: true,
         leaveRequests: true,
         examSchedules: true,
+        user: {
+          select: {
+            regNumber: true,
+            email: true,
+            phone: true,
+          },
+        },
       },
     });
 

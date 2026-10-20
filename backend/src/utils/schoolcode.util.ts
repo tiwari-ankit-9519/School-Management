@@ -22,31 +22,31 @@ export function buildSchoolPrefix(schoolName: string): string {
   return prefix;
 }
 
-export async function generateSchoolCode(schoolName: string): Promise<string> {
-  const prefix = buildSchoolPrefix(schoolName);
+// export async function generateSchoolCode(schoolName: string): Promise<string> {
+//   const prefix = buildSchoolPrefix(schoolName);
 
-  const lastSchool = await prisma.school.findFirst({
-    where: {
-      code: {
-        startsWith: prefix,
-      },
-    },
-    orderBy: {
-      code: "desc",
-    },
-    select: {
-      code: true,
-    },
-  });
+//   const lastSchool = await prisma.school.findFirst({
+//     where: {
+//       code: {
+//         startsWith: prefix,
+//       },
+//     },
+//     orderBy: {
+//       code: "desc",
+//     },
+//     select: {
+//       code: true,
+//     },
+//   });
 
-  let nextCounter = 1;
+//   let nextCounter = 1;
 
-  if (lastSchool) {
-    const existingNumber = parseInt(lastSchool.code.replace(prefix, ""), 10);
-    if (!isNaN(existingNumber)) {
-      nextCounter = existingNumber + 1;
-    }
-  }
+//   if (lastSchool) {
+//     const existingNumber = parseInt(lastSchool.code.replace(prefix, ""), 10);
+//     if (!isNaN(existingNumber)) {
+//       nextCounter = existingNumber + 1;
+//     }
+//   }
 
-  return `${prefix}${String(nextCounter).padStart(3, "0")}`;
-}
+//   return `${prefix}${String(nextCounter).padStart(3, "0")}`;
+// }
