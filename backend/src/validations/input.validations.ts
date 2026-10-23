@@ -10,7 +10,13 @@ import {
   ParentType,
   Prisma,
 } from "@prisma/client";
-import { error } from "console";
+
+// HELPER FUNCTIONS
+const queryInt = (fallback: number, max: number) =>
+  z.preprocess(
+    (value) => (value === undefined || value === "" ? fallback : Number(value)),
+    z.number().int().min(1).max(max),
+  );
 
 export const LoginInputSchema = z
   .object({
@@ -717,8 +723,61 @@ export const reviewLeaveRequestSchema = z
 // ─────────────────────────────────────────────
 
 export const CreateHolidaySchema = z.object({
-  name: z.string({ error: "Name is required" }),
-  date: z.iso.date({ error: "Date is required" }),
+  name: z
+    .string({ error: "Holiday name is required" })
+    .trim()
+    .min(2, { error: "Holiday name must be at least 2 characters" })
+    .max(100, { error: "Holiday name must be at most 100 characters" }),
+  date: z.string().date("Date must be in YYYY-MM-DD format"),
+  description: z
+    .string()
+    .trim()
+    .max(300, { error: "Description must be at most 300 characters" })
+    .optional(),
+  overrideAttendance: z.boolean().optional().default(false),
+});
+
+export const UpdateHolidaySchema = z
+  .object({
+    name: z
+      .string()
+      .trim()
+      .min(2, { error: "Holiday name must be at least 2 characters" })
+      .max(100, { error: "Holiday name must be at most 100 characters" })
+      .optional(),
+    date: z.string().date("Date must be in YYYY-MM-DD format").optional(),
+    description: z
+      .union([
+        z.literal(""),
+        z
+          .string()
+          .trim()
+          .max(300, { error: "Description must be at most 300 characters" }),
+      ])
+      .optional(),
+    overrideAttendance: z.boolean().optional().default(false),
+  })
+  .refine(
+    (data) =>
+      data.name !== undefined ||
+      data.date !== undefined ||
+      data.description !== undefined,
+    { error: "Provide at least one field to update" },
+  );
+
+export const HolidayListQuery = z.object({
+  page: queryInt(1, 10_000),
+  limit: queryInt(10, 100),
+  month: z.preprocess(
+    (value) =>
+      value === undefined || value === "" ? undefined : Number(value),
+    z.number().int().min(1).max(12).optional(),
+  ),
+  year: z.preprocess(
+    (value) =>
+      value === undefined || value === "" ? undefined : Number(value),
+    z.number().int().min(2000).max(2100).optional(),
+  ),
 });
 
 // ─────────────────────────────────────────────
@@ -1060,12 +1119,6 @@ const queryBoolean = z.preprocess(
   z.boolean().optional(),
 );
 
-const queryInt = (fallback: number, max: number) =>
-  z.preprocess(
-    (value) => (value === undefined || value === "" ? fallback : Number(value)),
-    z.number().int().min(1).max(max),
-  );
-
 export const WaiveFeePaymentPayload = z.object({
   amount: z
     .number({ error: "Amount must be a number" })
@@ -1272,6 +1325,8 @@ export type UpdateMarkInput = z.infer<typeof updateMarkSchema>;
 export type CreateLeaveRequestInput = z.infer<typeof createLeaveRequestSchema>;
 export type ReviewLeaveRequestInput = z.infer<typeof reviewLeaveRequestSchema>;
 export type CreateHolidayInput = z.infer<typeof CreateHolidaySchema>;
+export type UpdateHolidayInput = z.infer<typeof UpdateHolidaySchema>;
+export type HolidayListQueryType = z.infer<typeof HolidayListQuery>;
 export type AssignTeacherToSubjectInput = z.infer<
   typeof AssignTeacherToSubjectSchema
 >;

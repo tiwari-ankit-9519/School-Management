@@ -218,6 +218,52 @@ export enum Module {
   RATE_LIMIT = "RATE_LIMIT",
 }
 
+export type ModuleKey =
+  | "ACADEMIC_YEAR"
+  | "CLASS"
+  | "SUBJECT"
+  | "ADMIN"
+  | "TEACHER"
+  | "STUDENT"
+  | "PARENT"
+  | "ADMISSION_APPLICATION"
+  | "TEACHER_APPLICATION"
+  | "TEACHER_SUBJECT"
+  | "CLASS_TEACHER"
+  | "ENROLLMENT"
+  | "TIMETABLE"
+  | "HOLIDAY"
+  | "STUDENT_ATTENDANCE"
+  | "TEACHER_ATTENDANCE"
+  | "EXAM_SCHEDULE"
+  | "MARK"
+  | "FEE_STRUCTURE"
+  | "FEE_PAYMENT"
+  | "LEAVE_REQUEST"
+  | "ANNOUNCEMENT"
+  | "NOTIFICATION"
+  | "DOCUMENT"
+  | "AUDIT_LOG"
+  | "SYSTEM_LOG"
+  | "IP_BLACKLIST"
+  | "RATE_LIMIT";
+
+export type PermissionAction =
+  | "canCreate"
+  | "canRead"
+  | "canUpdate"
+  | "canDelete"
+  | "canApprove"
+  | "canExport";
+
+export type PermissionFlags = Record<PermissionAction, boolean>;
+
+export interface MyPermissions {
+  role: Role;
+  isAdmin: boolean;
+  permissions: Record<ModuleKey, PermissionFlags>;
+}
+
 export type AdmissionClass = {
   id: string;
   name: string;
@@ -786,6 +832,40 @@ export interface Holiday {
   description: string | null;
   createdAt: string;
   updatedAt: string;
+}
+
+export interface HolidayFilters {
+  page?: number;
+  limit?: number;
+  month?: number;
+  year?: number;
+}
+
+export interface CreateHolidayPayload {
+  name: string;
+  date: string;
+  description?: string;
+  overrideAttendance?: boolean;
+}
+
+export interface UpdateHolidayPayload {
+  name?: string;
+  date?: string;
+  description?: string;
+  overrideAttendance?: boolean;
+}
+
+export interface HolidayMutationResult {
+  holiday: Holiday;
+  convertedAttendance: number;
+}
+
+export interface HolidayAttendanceConflict {
+  date: string;
+  students: number;
+  teachers: number;
+  admins: number;
+  total: number;
 }
 
 // ─────────────────────────────────────────────

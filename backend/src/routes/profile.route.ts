@@ -1,6 +1,7 @@
 import { Router } from "express";
 import { authenticate, authorize } from "../middlewares/auth.middleware";
 import {
+  getMyPermissions,
   getMyProfile,
   getMyToday,
   removeMyPhoto,
@@ -26,6 +27,13 @@ router.get(
   authenticate,
   authorize("ADMIN", "MODERATOR", "TEACHER", "STUDENT", "PARENT"),
   getMyToday,
+);
+
+router.get(
+  "/me/permissions",
+  authenticate,
+  authorize("ADMIN", "MODERATOR", "TEACHER", "STUDENT", "PARENT"),
+  getMyPermissions,
 );
 
 router.patch(

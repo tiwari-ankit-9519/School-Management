@@ -1,6 +1,7 @@
 import {
   AdminAttendance,
   AttendanceStatus,
+  EnrollmentStatus,
   Prisma,
   StudentAttendance,
   TeacherAttendance,
@@ -14,9 +15,79 @@ import {
   StudentAttendanceInput,
   TeacherAttendanceInput,
 } from "../validations/input.validations";
-import { CACHE_KEYS, CACHE_TTL, getCache, setCache } from "../utils/cache.util";
+import {
+  CACHE_KEYS,
+  CACHE_TTL,
+  deleteCacheByPattern,
+  getCache,
+  setCache,
+} from "../utils/cache.util";
+import { assertAttendanceAllowed, toDateOnly } from "../utils/school-day.util";
 
 const log = createModuleLogger("AttendanceModule");
+
+const ATTENDANCE_CACHE_PATTERNS = {
+  student: "attendance:student:*",
+  teacher: "attendance:teacher:*",
+  moderator: "attendance:moderator:*",
+} as const;
+
+interface AttendanceSummary {
+  totalPresent: number;
+  totalAbsent: number;
+  totalLate: number;
+  totalExcused: number;
+}
+
+interface Paginated<T> {
+  data: T[];
+  total: number;
+  page: number;
+  limit: number;
+  totalPages: number;
+}
+
+interface AttendanceFilters {
+  status?: AttendanceStatus;
+  date?: string;
+}
+
+const summarize = (rows: { status: AttendanceStatus }[]): AttendanceSummary => {
+  const count = (status: AttendanceStatus) =>
+    rows.filter((row) => row.status === status).length;
+  return {
+    totalPresent: count(AttendanceStatus.PRESENT),
+    totalAbsent: count(AttendanceStatus.ABSENT),
+    totalLate: count(AttendanceStatus.LATE),
+    totalExcused: count(AttendanceStatus.EXCUSED),
+  };
+};
+
+const assertNoDuplicates = (ids: string[], label: string): void => {
+  if (new Set(ids).size !== ids.length) {
+    throw new Error(
+      `The same ${label} appears more than once in this attendance list`,
+    );
+  }
+};
+
+async function clearAttendanceCaches(
+  kind: keyof typeof ATTENDANCE_CACHE_PATTERNS,
+): Promise<void> {
+  await Promise.all([
+    deleteCacheByPattern(ATTENDANCE_CACHE_PATTERNS[kind]),
+    deleteCacheByPattern("dashboard:overview:*"),
+    deleteCacheByPattern("user:*:today:*"),
+  ]);
+}
+
+const emptyPage = <T>(page: number, limit: number): Paginated<T> => ({
+  data: [],
+  total: 0,
+  page,
+  limit,
+  totalPages: 0,
+});
 
 export async function markStudentAttendanceService(
   classId: string,
@@ -24,26 +95,21 @@ export async function markStudentAttendanceService(
   classTeacherId: string,
   context: AuditContext,
   statusCode: number,
-): Promise<{
-  totalPresent: number;
-  totalAbsent: number;
-  totalLate: number;
-  totalExcused: number;
-}> {
+): Promise<AttendanceSummary> {
   try {
-    log.info(
-      `Starting service to mark attendance of the class with id ${classId}`,
-      {
-        ipAddress: context.ipAddress,
-        classId,
-        classTeacherId,
-      },
-    );
+    log.info(`Starting service to mark attendance of class ${classId}`, {
+      ipAddress: context.ipAddress,
+      classId,
+      classTeacherId,
+      date: data.date,
+    });
+
+    const attendanceDate = await assertAttendanceAllowed(data.date);
 
     const classExists = await prisma.class.findUnique({
       where: { id: classId },
+      select: { id: true, name: true, section: true, academicYearId: true },
     });
-
     if (!classExists) {
       log.warn(`There is no class with id ${classId}`);
       throw new Error(`There is no class with id ${classId}`);
@@ -51,57 +117,60 @@ export async function markStudentAttendanceService(
 
     const classTeacherExists = await prisma.classTeacher.findFirst({
       where: { teacherId: classTeacherId, classId },
+      select: { id: true },
     });
-
     if (!classTeacherExists) {
       log.warn(
-        `You are not authorized to mark the attendance of the class ${classExists.name} as you are not the class teacher`,
+        "Attendance attempted by a teacher who is not the class teacher",
+        { classId, classTeacherId },
       );
-      throw new Error(`Unauthorized to mark the attendance`);
+      throw new Error("Unauthorized to mark the attendance");
     }
 
-    const isHoliday = await prisma.holiday.findFirst({
-      where: { date: new Date(data.date) },
-    });
+    const studentIds = data.attendance.map((entry) => entry.studentId);
+    assertNoDuplicates(studentIds, "student");
 
-    if (isHoliday) {
-      log.warn(`Cannot mark attendance on holiday: ${isHoliday.name}`);
-      throw new Error(`Cannot mark attendance on holiday: ${isHoliday.name}`);
+    const enrolledCount = await prisma.enrollment.count({
+      where: {
+        classId,
+        academicYearId: classExists.academicYearId,
+        status: EnrollmentStatus.ACTIVE,
+        studentId: { in: studentIds },
+      },
+    });
+    if (enrolledCount !== studentIds.length) {
+      log.warn("Some students are not actively enrolled in this class", {
+        classId,
+        submitted: studentIds.length,
+        enrolled: enrolledCount,
+      });
+      throw new Error(
+        "One or more students are not actively enrolled in this class",
+      );
     }
 
     const alreadyMarked = await prisma.studentAttendance.findFirst({
-      where: { classId, date: new Date(data.date) },
+      where: { classId, date: attendanceDate },
+      select: { id: true },
     });
     if (alreadyMarked) {
-      log.warn(`Attendance already marked for ${data.date}`);
+      log.warn(`Attendance already marked for ${data.date}`, { classId });
       throw new Error(`Attendance already marked for ${data.date}`);
     }
 
-    const response = await prisma.$transaction(async (tx) => {
-      const classAttendance = await tx.studentAttendance.createManyAndReturn({
-        data: data.attendance.map((entry) => ({
-          studentId: entry.studentId,
-          status: entry.status,
-          classId,
-          date: new Date(data.date),
-          markedBy: classTeacherId,
-        })),
-        skipDuplicates: true,
-      });
-
-      const summary = classAttendance.reduce(
-        (acc, entry) => {
-          acc[entry.status] = (acc[entry.status] || 0) + 1;
-          return acc;
-        },
-        {} as Record<AttendanceStatus, number>,
-      );
-
-      return { classAttendance, summary } as {
-        classAttendance: typeof classAttendance;
-        summary: Record<AttendanceStatus, number>;
-      };
+    const created = await prisma.studentAttendance.createManyAndReturn({
+      data: data.attendance.map((entry) => ({
+        studentId: entry.studentId,
+        status: entry.status,
+        classId,
+        date: attendanceDate,
+        markedBy: classTeacherId,
+      })),
+      skipDuplicates: true,
     });
+
+    const summary = summarize(created);
+    await clearAttendanceCaches("student");
 
     await createSystemLog({
       level: "INFO",
@@ -109,38 +178,29 @@ export async function markStudentAttendanceService(
       message: "Attendance marked for students",
       context,
       statusCode,
-      metadata: {
-        classId,
-        classTeacherId,
-        totalPresent: response.summary["PRESENT"] || 0,
-        totalAbsent: response.summary["ABSENT"] || 0,
-        totalLate: response.summary["LATE"] || 0,
-        totalExcused: response.summary["EXCUSED"] || 0,
-      },
+      metadata: { classId, classTeacherId, date: data.date, ...summary },
     });
 
     await createAuditLog({
       performedById: classTeacherId,
       action: "CREATE",
       module: "StudentAttendance",
-      resourceId: response.classAttendance[0]?.id ?? classId,
+      resourceId: classId,
       resourceType: "StudentAttendance",
+      newValues: { date: data.date, records: created.length, ...summary },
       context,
       isSuccessful: true,
       statusCode,
     });
 
-    log.info(`Attendance marked for all students successfully`);
-
-    return {
-      totalPresent: response.summary["PRESENT"] || 0,
-      totalAbsent: response.summary["ABSENT"] || 0,
-      totalLate: response.summary["LATE"] || 0,
-      totalExcused: response.summary["EXCUSED"] || 0,
-    };
+    log.info("Attendance marked for all students successfully", {
+      classId,
+      records: created.length,
+    });
+    return summary;
   } catch (error) {
     const err = error as Error;
-    log.error(`Internal Server Error. Failed to mark attendance`, {
+    log.error("Failed to mark student attendance", {
       error: err.message,
       ipAddress: context.ipAddress,
       classTeacherId,
@@ -155,75 +215,51 @@ export async function markTeacherAttendanceService(
   context: AuditContext,
   moderatorId: string,
   statusCode: number,
-): Promise<{
-  totalPresent: number;
-  totalAbsent: number;
-  totalLate: number;
-  totalExcused: number;
-}> {
+): Promise<AttendanceSummary> {
   try {
-    log.info(`Starting service to mark teacher attendance`, {
+    log.info("Starting service to mark teacher attendance", {
       ipAddress: context.ipAddress,
       moderatorId,
+      date: data.date,
     });
 
+    const attendanceDate = await assertAttendanceAllowed(data.date);
+
     const teacherIds = data.attendance.map((entry) => entry.teacherId);
+    assertNoDuplicates(teacherIds, "teacher");
+
     const teachersExist = await prisma.teacher.count({
-      where: {
-        id: { in: teacherIds },
-      },
+      where: { id: { in: teacherIds } },
     });
     if (teachersExist !== teacherIds.length) {
-      log.warn("One or more teachers do not belong to this school");
+      log.warn("One or more teachers do not exist", {
+        submitted: teacherIds.length,
+        found: teachersExist,
+      });
       throw new Error("One or more teachers do not belong to this school");
     }
 
-    const isHoliday = await prisma.holiday.findFirst({
-      where: { date: new Date(data.date) },
-    });
-
-    if (isHoliday) {
-      log.warn(`Cannot mark attendance on holiday: ${isHoliday.name}`);
-      throw new Error(`Cannot mark attendance on holiday: ${isHoliday.name}`);
-    }
-
     const isAlreadyMarked = await prisma.teacherAttendance.findFirst({
-      where: {
-        date: new Date(data.date),
-        teacherId: { in: data.attendance.map((entry) => entry.teacherId) },
-      },
+      where: { date: attendanceDate, teacherId: { in: teacherIds } },
+      select: { id: true },
     });
-
     if (isAlreadyMarked) {
-      log.warn(`Attendance already marked for ${data.date}`);
+      log.warn(`Teacher attendance already marked for ${data.date}`);
       throw new Error(`Attendance already marked for ${data.date}`);
     }
 
-    const response = await prisma.$transaction(async (tx) => {
-      const teacherAttendanceMarked =
-        await tx.teacherAttendance.createManyAndReturn({
-          data: data.attendance.map((entry) => ({
-            status: entry.status,
-            teacherId: entry.teacherId,
-            date: new Date(data.date),
-            markedBy: moderatorId,
-          })),
-          skipDuplicates: true,
-        });
-
-      const summary = teacherAttendanceMarked.reduce(
-        (acc, entry) => {
-          acc[entry.status] = (acc[entry.status] || 0) + 1;
-          return acc;
-        },
-        {} as Record<AttendanceStatus, number>,
-      );
-
-      return { teacherAttendanceMarked, summary } as {
-        teacherAttendanceMarked: typeof teacherAttendanceMarked;
-        summary: Record<AttendanceStatus, number>;
-      };
+    const created = await prisma.teacherAttendance.createManyAndReturn({
+      data: data.attendance.map((entry) => ({
+        status: entry.status,
+        teacherId: entry.teacherId,
+        date: attendanceDate,
+        markedBy: moderatorId,
+      })),
+      skipDuplicates: true,
     });
+
+    const summary = summarize(created);
+    await clearAttendanceCaches("teacher");
 
     await createSystemLog({
       level: "INFO",
@@ -231,36 +267,28 @@ export async function markTeacherAttendanceService(
       message: "Teacher attendance marked successfully",
       context,
       statusCode,
-      metadata: {
-        totalPresent: response.summary["PRESENT"] || 0,
-        totalAbsent: response.summary["ABSENT"] || 0,
-        totalLate: response.summary["LATE"] || 0,
-        totalExcused: response.summary["EXCUSED"] || 0,
-      },
+      metadata: { date: data.date, ...summary },
     });
 
     await createAuditLog({
       performedById: moderatorId,
       action: "CREATE",
       module: "TeacherAttendance",
-      resourceId: response.teacherAttendanceMarked[0]?.id ?? "",
+      resourceId: data.date,
       resourceType: "TeacherAttendance",
+      newValues: { date: data.date, records: created.length, ...summary },
       context,
       isSuccessful: true,
       statusCode,
     });
 
-    log.info(`Attendance marked for all the teachers`);
-
-    return {
-      totalPresent: response.summary["PRESENT"] || 0,
-      totalAbsent: response.summary["ABSENT"] || 0,
-      totalLate: response.summary["LATE"] || 0,
-      totalExcused: response.summary["EXCUSED"] || 0,
-    };
+    log.info("Attendance marked for all the teachers", {
+      records: created.length,
+    });
+    return summary;
   } catch (error) {
     const err = error as Error;
-    log.error(`Internal Server Error. Failed to mark teacher attendance`, {
+    log.error("Failed to mark teacher attendance", {
       error: err.message,
       ipAddress: context.ipAddress,
       moderatorId,
@@ -274,76 +302,51 @@ export async function markModeratorAttendanceService(
   context: AuditContext,
   statusCode: number,
   adminId: string,
-): Promise<{
-  totalPresent: number;
-  totalAbsent: number;
-  totalLate: number;
-  totalExcused: number;
-}> {
+): Promise<AttendanceSummary> {
   try {
-    log.info(`Starting service to mark attendance for moderators`, {
+    log.info("Starting service to mark attendance for moderators", {
       ipAddress: context.ipAddress,
       adminId,
+      date: data.date,
     });
+
+    const attendanceDate = await assertAttendanceAllowed(data.date);
 
     const moderatorIds = data.attendance.map((entry) => entry.moderatorId);
-    const moderatorExists = await prisma.adminAttendance.count({
-      where: {
-        id: { in: moderatorIds },
-      },
-    });
+    assertNoDuplicates(moderatorIds, "moderator");
 
-    if (moderatorExists !== moderatorIds.length) {
-      log.warn("One or more moderators do not belong to this school");
+    const moderatorsExist = await prisma.admin.count({
+      where: { id: { in: moderatorIds } },
+    });
+    if (moderatorsExist !== moderatorIds.length) {
+      log.warn("One or more moderators do not exist", {
+        submitted: moderatorIds.length,
+        found: moderatorsExist,
+      });
       throw new Error("One or more moderators do not belong to this school");
     }
 
-    const isHoliday = await prisma.holiday.findFirst({
-      where: { date: new Date(data.date) },
-    });
-
-    if (isHoliday) {
-      log.warn(`Cannot mark attendance on holiday: ${isHoliday.name}`);
-      throw new Error(`Cannot mark attendance on holiday: ${isHoliday.name}`);
-    }
-
     const isAlreadyMarked = await prisma.adminAttendance.findFirst({
-      where: {
-        date: new Date(data.date),
-        adminId: { in: data.attendance.map((entry) => entry.moderatorId) },
-      },
+      where: { date: attendanceDate, adminId: { in: moderatorIds } },
+      select: { id: true },
     });
-
     if (isAlreadyMarked) {
-      log.warn(`Attendance already marked for ${data.date}`);
+      log.warn(`Moderator attendance already marked for ${data.date}`);
       throw new Error(`Attendance already marked for ${data.date}`);
     }
 
-    const response = await prisma.$transaction(async (tx) => {
-      const moderatorAttendanceMarked =
-        await tx.teacherAttendance.createManyAndReturn({
-          data: data.attendance.map((entry) => ({
-            status: entry.status,
-            teacherId: entry.moderatorId,
-            date: new Date(data.date),
-            markedBy: adminId,
-          })),
-          skipDuplicates: true,
-        });
-
-      const summary = moderatorAttendanceMarked.reduce(
-        (acc, entry) => {
-          acc[entry.status] = (acc[entry.status] || 0) + 1;
-          return acc;
-        },
-        {} as Record<AttendanceStatus, number>,
-      );
-
-      return { moderatorAttendanceMarked, summary } as {
-        moderatorAttendanceMarked: typeof moderatorAttendanceMarked;
-        summary: Record<AttendanceStatus, number>;
-      };
+    const created = await prisma.adminAttendance.createManyAndReturn({
+      data: data.attendance.map((entry) => ({
+        status: entry.status,
+        adminId: entry.moderatorId,
+        date: attendanceDate,
+        markedBy: adminId,
+      })),
+      skipDuplicates: true,
     });
+
+    const summary = summarize(created);
+    await clearAttendanceCaches("moderator");
 
     await createSystemLog({
       level: "INFO",
@@ -351,36 +354,28 @@ export async function markModeratorAttendanceService(
       message: "Moderator attendance marked successfully",
       context,
       statusCode,
-      metadata: {
-        totalPresent: response.summary["PRESENT"] || 0,
-        totalAbsent: response.summary["ABSENT"] || 0,
-        totalLate: response.summary["LATE"] || 0,
-        totalExcused: response.summary["EXCUSED"] || 0,
-      },
+      metadata: { date: data.date, ...summary },
     });
 
     await createAuditLog({
       performedById: adminId,
       action: "CREATE",
-      module: "TeacherAttendance",
-      resourceId: response.moderatorAttendanceMarked[0]?.id ?? "",
-      resourceType: "TeacherAttendance",
+      module: "ModeratorAttendance",
+      resourceId: data.date,
+      resourceType: "AdminAttendance",
+      newValues: { date: data.date, records: created.length, ...summary },
       context,
       isSuccessful: true,
       statusCode,
     });
 
-    log.info(`Attendance marked for all the moderators`);
-
-    return {
-      totalPresent: response.summary["PRESENT"] || 0,
-      totalAbsent: response.summary["ABSENT"] || 0,
-      totalLate: response.summary["LATE"] || 0,
-      totalExcused: response.summary["EXCUSED"] || 0,
-    };
+    log.info("Attendance marked for all the moderators", {
+      records: created.length,
+    });
+    return summary;
   } catch (error) {
     const err = error as Error;
-    log.error("Internal Server Error. Failed to mark moderator attendance", {
+    log.error("Failed to mark moderator attendance", {
       error: err.message,
       ipAddress: context.ipAddress,
       adminId,
@@ -396,17 +391,8 @@ export async function getStudentAttendanceService(
   statusCode: number,
   page: number = 1,
   limit: number = 10,
-  filters?: {
-    status?: AttendanceStatus;
-    date?: string;
-  },
-): Promise<{
-  data: StudentAttendance[];
-  total: number;
-  page: number;
-  limit: number;
-  totalPages: number;
-}> {
+  filters?: AttendanceFilters,
+): Promise<Paginated<StudentAttendance>> {
   try {
     log.info(
       `Starting service to fetch students attendance of class ${classId}`,
@@ -415,94 +401,86 @@ export async function getStudentAttendanceService(
         filters,
       },
     );
-    const cacheKey = CACHE_KEYS.studentAttendance(
-      classId,
-      classTeacherId,
-      page,
-      limit,
-    );
-    const cached = await getCache<{
-      data: StudentAttendance[];
-      total: number;
-      page: number;
-      limit: number;
-      totalPages: number;
-    }>(cacheKey);
+
+    const cacheKey = `${CACHE_KEYS.studentAttendance(classId, classTeacherId, page, limit)}:status:${filters?.status ?? "ALL"}:date:${filters?.date ?? "ALL"}`;
+    const cached = await getCache<Paginated<StudentAttendance>>(cacheKey);
     if (cached) {
-      log.info(`Returning students attendance from cache`, { cacheKey });
+      log.info("Returning students attendance from cache", { cacheKey });
       return cached;
     }
+
     const [classExists, isClassTeacher] = await prisma.$transaction([
       prisma.class.findUnique({
         where: { id: classId },
+        select: { id: true, name: true },
       }),
       prisma.classTeacher.findFirst({
         where: { teacherId: classTeacherId, classId },
+        select: { id: true },
       }),
     ]);
     if (!classExists) {
-      log.warn(`Class does not exists with classId ${classId}`);
-      throw new Error(`Class does not exists with classId ${classId}`);
+      log.warn(`Class does not exist with classId ${classId}`);
+      throw new Error(`Class does not exist with classId ${classId}`);
     }
     if (!isClassTeacher) {
       log.warn(
-        `You are not authorized as you are not the class teacher of class with id ${classId}`,
+        "Attendance read attempted by a teacher who is not the class teacher",
+        { classId, classTeacherId },
       );
       throw new Error(
-        `You are not authorized as you are not the class teacher of class with id ${classId}`,
+        "You are not authorized as you are not the class teacher of this class",
       );
     }
+
     const where: Prisma.StudentAttendanceWhereInput = { classId };
     if (filters?.status) where.status = filters.status;
-    if (filters?.date) where.date = new Date(filters.date);
+    if (filters?.date) where.date = toDateOnly(filters.date);
+
     const [studentAttendance, total] = await prisma.$transaction([
       prisma.studentAttendance.findMany({
         where,
         take: limit,
         skip: (page - 1) * limit,
-        orderBy: {
-          createdAt: "desc",
-        },
+        orderBy: [{ date: "desc" }, { createdAt: "desc" }],
       }),
       prisma.studentAttendance.count({ where }),
     ]);
-    if (studentAttendance.length === 0) {
-      log.warn(`No attendance found for class ${classId}`);
-      throw new Error(`No attendance found for class ${classId}`);
-    }
+
+    const response: Paginated<StudentAttendance> =
+      total === 0
+        ? emptyPage(page, limit)
+        : {
+            data: studentAttendance,
+            total,
+            page,
+            limit,
+            totalPages: Math.ceil(total / limit),
+          };
+
+    await setCache(cacheKey, response, CACHE_TTL.ATTENDANCE_LIST);
+
     await createSystemLog({
       level: "INFO",
       module: "GetAllStudentsAttendance",
       message: "Fetched attendance of all students",
       context,
       statusCode,
-      metadata: {
-        classId,
-        classTeacherId,
-        filters,
-      },
+      metadata: { classId, classTeacherId, filters, total },
     });
-    const response = {
-      data: studentAttendance,
+
+    log.info(`Fetched attendance of students of class ${classExists.name}`, {
       total,
-      page,
-      limit,
-      totalPages: Math.ceil(total / limit),
-    };
-    await setCache(cacheKey, response, CACHE_TTL.ADMISSION_APPLICATIONS_LIST);
-    log.info(`Fetched attendance of students of class ${classExists.name}`);
+    });
     return response;
   } catch (error) {
     const err = error as Error;
-    log.error(
-      "Internal Server Error. Failed to fetch attendance of the class",
-      {
-        error: err.message,
-        ipAddress: context.ipAddress,
-        classId,
-        classTeacherId,
-      },
-    );
+    log.error("Failed to fetch attendance of the class", {
+      error: err.message,
+      ipAddress: context.ipAddress,
+      classId,
+      classTeacherId,
+    });
     throw err;
   }
 }
@@ -512,17 +490,8 @@ export async function getTeachersAttendanceService(
   statusCode: number,
   page: number = 1,
   limit: number = 10,
-  filters?: {
-    status?: AttendanceStatus;
-    date?: string;
-  },
-): Promise<{
-  data: TeacherAttendance[];
-  total: number;
-  page: number;
-  limit: number;
-  totalPages: number;
-}> {
+  filters?: AttendanceFilters,
+): Promise<Paginated<TeacherAttendance>> {
   try {
     log.info("Starting service to get all teachers attendance", {
       ipAddress: context.ipAddress,
@@ -535,42 +504,38 @@ export async function getTeachersAttendanceService(
       filters?.status ?? "ALL",
       filters?.date ?? "ALL",
     );
-
-    const cached = await getCache<{
-      data: TeacherAttendance[];
-      total: number;
-      page: number;
-      limit: number;
-      totalPages: number;
-    }>(cacheKey);
-
+    const cached = await getCache<Paginated<TeacherAttendance>>(cacheKey);
     if (cached) {
       log.info("Returning teachers attendance from cache", { cacheKey });
       return cached;
     }
 
     const where: Prisma.TeacherAttendanceWhereInput = {};
-
     if (filters?.status) where.status = filters.status;
-    if (filters?.date) where.date = new Date(filters.date);
+    if (filters?.date) where.date = toDateOnly(filters.date);
 
     const [teacherAttendance, total] = await prisma.$transaction([
       prisma.teacherAttendance.findMany({
         where,
         take: limit,
         skip: (page - 1) * limit,
-        orderBy: {
-          createdAt: "desc",
-        },
+        orderBy: [{ date: "desc" }, { createdAt: "desc" }],
       }),
-
       prisma.teacherAttendance.count({ where }),
     ]);
 
-    if (teacherAttendance.length === 0) {
-      log.warn(`No attendance found for teacher`);
-      throw new Error(`No attendance found for teacher`);
-    }
+    const response: Paginated<TeacherAttendance> =
+      total === 0
+        ? emptyPage(page, limit)
+        : {
+            data: teacherAttendance,
+            total,
+            page,
+            limit,
+            totalPages: Math.ceil(total / limit),
+          };
+
+    await setCache(cacheKey, response, CACHE_TTL.ATTENDANCE_LIST);
 
     await createSystemLog({
       level: "INFO",
@@ -578,29 +543,17 @@ export async function getTeachersAttendanceService(
       message: "Fetched attendance of all teachers",
       context,
       statusCode,
-      metadata: {
-        filters,
-      },
+      metadata: { filters, total },
     });
-    const response = {
-      data: teacherAttendance,
-      total,
-      page,
-      limit,
-      totalPages: Math.ceil(total / limit),
-    };
-    await setCache(cacheKey, response, CACHE_TTL.ADMISSION_APPLICATIONS_LIST);
-    log.info(`Fetched attendance of teachers for school`);
+
+    log.info("Fetched attendance of teachers", { total });
     return response;
   } catch (error) {
     const err = error as Error;
-    log.error(
-      "Internal Server Error. Failed to fetch all teachers attendance",
-      {
-        error: err.message,
-        ipAddress: context.ipAddress,
-      },
-    );
+    log.error("Failed to fetch all teachers attendance", {
+      error: err.message,
+      ipAddress: context.ipAddress,
+    });
     throw err;
   }
 }
@@ -610,17 +563,8 @@ export async function getAdminsAttendanceService(
   statusCode: number,
   page: number = 1,
   limit: number = 10,
-  filters?: {
-    status?: AttendanceStatus;
-    date?: string;
-  },
-): Promise<{
-  data: AdminAttendance[];
-  total: number;
-  page: number;
-  limit: number;
-  totalPages: number;
-}> {
+  filters?: AttendanceFilters,
+): Promise<Paginated<AdminAttendance>> {
   try {
     log.info("Starting service to get all moderators attendance", {
       ipAddress: context.ipAddress,
@@ -633,42 +577,38 @@ export async function getAdminsAttendanceService(
       filters?.status ?? "ALL",
       filters?.date ?? "ALL",
     );
-
-    const cached = await getCache<{
-      data: AdminAttendance[];
-      total: number;
-      page: number;
-      limit: number;
-      totalPages: number;
-    }>(cacheKey);
-
+    const cached = await getCache<Paginated<AdminAttendance>>(cacheKey);
     if (cached) {
       log.info("Returning moderators attendance from cache", { cacheKey });
       return cached;
     }
 
     const where: Prisma.AdminAttendanceWhereInput = {};
-
     if (filters?.status) where.status = filters.status;
-    if (filters?.date) where.date = new Date(filters.date);
+    if (filters?.date) where.date = toDateOnly(filters.date);
 
     const [moderatorAttendance, total] = await prisma.$transaction([
       prisma.adminAttendance.findMany({
         where,
         take: limit,
         skip: (page - 1) * limit,
-        orderBy: {
-          createdAt: "desc",
-        },
+        orderBy: [{ date: "desc" }, { createdAt: "desc" }],
       }),
-
       prisma.adminAttendance.count({ where }),
     ]);
 
-    if (moderatorAttendance.length === 0) {
-      log.warn(`No attendance found for admins`);
-      throw new Error(`No attendance found for admins`);
-    }
+    const response: Paginated<AdminAttendance> =
+      total === 0
+        ? emptyPage(page, limit)
+        : {
+            data: moderatorAttendance,
+            total,
+            page,
+            limit,
+            totalPages: Math.ceil(total / limit),
+          };
+
+    await setCache(cacheKey, response, CACHE_TTL.ATTENDANCE_LIST);
 
     await createSystemLog({
       level: "INFO",
@@ -676,23 +616,14 @@ export async function getAdminsAttendanceService(
       message: "Fetched attendance of all admins",
       context,
       statusCode,
-      metadata: {
-        filters,
-      },
+      metadata: { filters, total },
     });
-    const response = {
-      data: moderatorAttendance,
-      total,
-      page,
-      limit,
-      totalPages: Math.ceil(total / limit),
-    };
-    await setCache(cacheKey, response, CACHE_TTL.ADMISSION_APPLICATIONS_LIST);
-    log.info(`Fetched attendance of admins for school`);
+
+    log.info("Fetched attendance of admins", { total });
     return response;
   } catch (error) {
     const err = error as Error;
-    log.error("Internal Server Error. Failed to fetch all admins attendance", {
+    log.error("Failed to fetch all admins attendance", {
       error: err.message,
       ipAddress: context.ipAddress,
     });

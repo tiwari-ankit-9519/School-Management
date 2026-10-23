@@ -38,6 +38,7 @@ import {
   PRIMARY_PILL_CLASS,
   fieldClass,
 } from "@/components/forms/FormParts";
+import { DatePickerField } from "@/components/forms/DatePickerField";
 import {
   formatMoney,
   formatShortDate,
@@ -493,13 +494,19 @@ export const CollectFeesDialog = ({
                   <Label htmlFor="collect-date" className={labelClass}>
                     {t("fieldPaidAt")}
                   </Label>
-                  <Input
-                    id="collect-date"
-                    type="date"
-                    max={today}
-                    aria-invalid={!!errors.paidAt}
-                    className={fieldClass(!!errors.paidAt)}
-                    {...register("paidAt")}
+                  <Controller
+                    control={control}
+                    name="paidAt"
+                    render={({ field }) => (
+                      <DatePickerField
+                        id="collect-date"
+                        value={field.value}
+                        onChange={field.onChange}
+                        placeholder={t("fieldPaidAt")}
+                        invalid={!!errors.paidAt}
+                        maxDate={today}
+                      />
+                    )}
                   />
                   <FieldError message={errors.paidAt?.message} />
                 </div>

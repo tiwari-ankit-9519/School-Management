@@ -17,6 +17,25 @@ import {
   removeMyPhotoService,
   updateMyPhotoService,
 } from "../services/profile-photo.service";
+import { getMyPermissionsService } from "../services/my-permissions.service";
+
+export async function getMyPermissions(
+  req: AuthenticatedRequest,
+  res: Response,
+): Promise<void> {
+  const userId = req.user?.id;
+  const role = req.user?.role as Role;
+  if (!userId) throw new Error("User ID is required");
+  if (!role) throw new Error("Role is required");
+
+  const result = await getMyPermissionsService(userId, role);
+
+  res.status(HTTP_STATUS.OK).json({
+    success: true,
+    message: "Permissions fetched successfully",
+    data: result,
+  });
+}
 
 export async function getMyProfile(
   req: AuthenticatedRequest,

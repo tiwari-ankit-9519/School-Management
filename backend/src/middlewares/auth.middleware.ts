@@ -330,7 +330,7 @@ export function requireVerified(
     });
 }
 
-const IMPLICIT_ACCESS_ROLES: Role[] = ["STUDENT", "PARENT"];
+const IMPLICIT_ACCESS_ROLES: Role[] = ["ADMIN", "STUDENT", "PARENT"];
 
 export function checkPermission(module: Module, action: PermissionAction) {
   return async (

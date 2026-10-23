@@ -18,6 +18,8 @@ import { useGetDashboardCalendar } from "@/hooks/useDashboard";
 import { useTranslations } from "@/hooks/useTranslations";
 import { DashboardEvent, ExamType } from "@/types";
 
+type Translate = ReturnType<typeof useTranslations<"adminDashboard">>;
+
 const DAY_MS = 86_400_000;
 const WEEKDAY_KEYS = [
   "daySun",
@@ -42,12 +44,10 @@ const EXAM_TYPE_KEYS = {
 const EVENT_STYLE = {
   EXAM: {
     border: "border-t-sky-400",
-    dot: "bg-sky-500",
     icon: "bg-sky-500/10 text-sky-700 dark:text-sky-300",
   },
   HOLIDAY: {
     border: "border-t-amber-400",
-    dot: "bg-amber-500",
     icon: "bg-amber-500/10 text-amber-700 dark:text-amber-300",
   },
 } as const;
@@ -82,18 +82,17 @@ const buildGrid = (month: string) => {
   const start = new Date(first.getTime() - first.getUTCDay() * DAY_MS);
   return Array.from({ length: 42 }, (_, index) => {
     const date = new Date(start.getTime() + index * DAY_MS);
+    const ymd = toYmd(date);
     return {
-      ymd: toYmd(date),
+      ymd,
       day: date.getUTCDate(),
-      inMonth: monthOf(toYmd(date)) === month,
+      inMonth: monthOf(ymd) === month,
+      isSunday: date.getUTCDay() === 0,
     };
   });
 };
 
-const eventLabel = (
-  event: DashboardEvent,
-  t: ReturnType<typeof useTranslations<"adminDashboard">>,
-) =>
+const eventLabel = (event: DashboardEvent, t: Translate) =>
   event.type === "HOLIDAY"
     ? t("holiday")
     : [
@@ -103,10 +102,7 @@ const eventLabel = (
         .filter(Boolean)
         .join(" · ");
 
-const eventTime = (
-  event: DashboardEvent,
-  t: ReturnType<typeof useTranslations<"adminDashboard">>,
-) =>
+const eventTime = (event: DashboardEvent, t: Translate) =>
   event.startTime && event.endTime
     ? `${event.startTime} – ${event.endTime}`
     : t("allDay");
@@ -177,66 +173,70 @@ export const CalendarAgendaCard = ({
           </Button>
         </div>
 
-        <div className="mt-4 grid grid-cols-7 gap-y-1 text-center">
-          {WEEKDAY_KEYS.map((key) => (
+        <div className="mt-4 grid grid-cols-7 gap-y-1.5 text-center">
+          {WEEKDAY_KEYS.map((key, index) => (
             <span
               key={key}
-              className="pb-2 font-manrope text-[11px] text-muted-foreground"
+              className={`pb-2 font-manrope text-[11px] ${index === 0 ? "text-red-500/80 dark:text-red-400/80" : "text-muted-foreground"}`}
             >
               {t(key)}
             </span>
           ))}
           {grid.map((cell) => {
             const dayEvents = eventsByDay.get(cell.ymd) ?? [];
+            const holiday = dayEvents.find((event) => event.type === "HOLIDAY");
+            const hasExam = dayEvents.some((event) => event.type === "EXAM");
             const isToday = cell.ymd === today;
             const isSelected = cell.ymd === selected;
-            const types = Array.from(
-              new Set(dayEvents.map((event) => event.type)),
-            );
+
+            const tone = isSelected
+              ? "bg-sky-500 font-semibold text-white"
+              : holiday
+                ? "bg-amber-400/20 font-semibold text-amber-800 ring-1 ring-amber-400/60 hover:bg-amber-400/30 dark:text-amber-200"
+                : isToday
+                  ? "bg-sky-500/15 font-semibold text-sky-700 dark:text-sky-300"
+                  : !cell.inMonth
+                    ? "text-muted-foreground/50 hover:bg-accent"
+                    : cell.isSunday
+                      ? "text-red-500/80 hover:bg-accent dark:text-red-400/80"
+                      : "text-foreground hover:bg-accent";
+
             return (
               <button
                 key={cell.ymd}
                 type="button"
+                title={holiday?.title}
                 onClick={() => {
                   setSelected(cell.ymd);
                   if (!cell.inMonth) setMonth(monthOf(cell.ymd));
                 }}
-                aria-label={`${formatDay(cell.ymd)}${dayEvents.length ? `, ${dayEvents.length} ${t("events")}` : ""}`}
+                aria-label={`${formatDay(cell.ymd)}${holiday ? `, ${t("holiday")}: ${holiday.title}` : ""}${
+                  hasExam ? `, ${t("exam")}` : ""
+                }`}
                 aria-pressed={isSelected}
-                className={`relative mx-auto flex h-9 w-9 flex-col items-center justify-center rounded-lg font-manrope text-sm transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-500 ${
-                  isSelected
-                    ? "bg-sky-500 font-semibold text-white"
-                    : isToday
-                      ? "bg-sky-500/15 font-semibold text-sky-700 dark:text-sky-300"
-                      : cell.inMonth
-                        ? "text-foreground hover:bg-accent"
-                        : "text-muted-foreground/50 hover:bg-accent"
+                className={`relative mx-auto flex h-9 w-9 flex-col items-center justify-center rounded-lg font-manrope text-sm transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-500 ${tone} ${
+                  !cell.inMonth && holiday ? "opacity-60" : ""
                 }`}
               >
                 {String(cell.day).padStart(2, "0")}
-                {types.length > 0 && (
-                  <span className="absolute bottom-1 flex gap-0.5">
-                    {types.map((type) => (
-                      <span
-                        key={type}
-                        className={`h-1 w-1 rounded-full ${isSelected ? "bg-white" : EVENT_STYLE[type].dot}`}
-                      />
-                    ))}
-                  </span>
+                {hasExam && (
+                  <span
+                    className={`absolute bottom-1 h-1.5 w-1.5 rounded-full ${isSelected ? "bg-white" : "bg-sky-500"}`}
+                  />
                 )}
               </button>
             );
           })}
         </div>
 
-        <div className="mt-2 flex items-center justify-center gap-4 font-manrope text-[11px] text-muted-foreground">
+        <div className="mt-3 flex flex-wrap items-center justify-center gap-4 font-manrope text-[11px] text-muted-foreground">
+          <span className="flex items-center gap-1.5">
+            <span className="h-3 w-3 rounded-lg bg-amber-400/20 ring-1 ring-amber-400/60" />
+            {t("holiday")}
+          </span>
           <span className="flex items-center gap-1.5">
             <span className="h-1.5 w-1.5 rounded-full bg-sky-500" />
             {t("exam")}
-          </span>
-          <span className="flex items-center gap-1.5">
-            <span className="h-1.5 w-1.5 rounded-full bg-amber-500" />
-            {t("holiday")}
           </span>
         </div>
 
@@ -277,6 +277,11 @@ export const CalendarAgendaCard = ({
                     {event.subjectName}
                   </p>
                 )}
+                {event.description && (
+                  <p className="mt-1 font-manrope text-[11px] text-muted-foreground">
+                    {event.description}
+                  </p>
+                )}
               </div>
             ))}
           </div>
@@ -286,11 +291,7 @@ export const CalendarAgendaCard = ({
   );
 };
 
-const relativeDays = (
-  ymd: string,
-  today: string,
-  t: ReturnType<typeof useTranslations<"adminDashboard">>,
-) => {
+const relativeDays = (ymd: string, today: string, t: Translate) => {
   const days = Math.round(
     (toDate(ymd).getTime() - toDate(today).getTime()) / DAY_MS,
   );

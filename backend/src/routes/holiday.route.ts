@@ -8,6 +8,7 @@ import {
   createHoliday,
   deleteHoliday,
   getAllHolidays,
+  updateHoliday,
 } from "../controller/holiday.controller";
 import { Module } from "@prisma/client";
 import { controllerContext } from "../config/logger.config";
@@ -25,6 +26,14 @@ router.post(
 );
 
 router.get("/", authenticate, getAllHolidays);
+
+router.patch(
+  "/:holidayId",
+  authenticate,
+  authorize("ADMIN", "MODERATOR"),
+  checkPermission(Module.HOLIDAY, "canUpdate"),
+  updateHoliday,
+);
 
 router.delete(
   "/:holidayId",

@@ -37,7 +37,6 @@ export const QUERY_KEYS = {
   TIME_TABLE: ["timeTable"],
   EXAM_SCHEDULES: ["examSchedules"],
   EXAM_SCHEDULE: ["examSchedule"],
-  HOLIDAYS: ["holidays"],
   HOLIDAY: ["holiday"],
   MY_PROFILE: ["my_profile"],
   MARKS: ["marks"] as const,
@@ -49,4 +48,6 @@ export const QUERY_KEYS = {
   DASHBOARDSUMMARY: ["dashboard-summary"] as const,
   DASHBOARD_OVERVIEW: ["dashboard-overview"] as const,
   DASHBOARD_CALENDAR: ["dashboard-calendar"] as const,
+  HOLIDAYS: ["holidays"] as const,
+  MY_PERMISSIONS: ["my-permissions"] as const,
 };

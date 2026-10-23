@@ -226,23 +226,24 @@ function categorizeRequest(_method: string, path: string): string {
 }
 
 const SUSPICIOUS_PATTERNS: RegExp[] = [
-  /(\.\.|\/etc\/passwd|\/etc\/shadow)/i,
+  /(\.\.\/|\.\.\\|\/etc\/passwd|\/etc\/shadow)/i,
   /(union\s+select|drop\s+table|insert\s+into|delete\s+from)/i,
-  /(<script|javascript:|on\w+\s*=)/i,
+  /(<script|javascript:|<[^>]*\son[a-z]+\s*=)/i,
   /(\.php|\.asp|\.aspx|\.jsp|\.cgi)$/i,
   /(wp-admin|wp-login|phpmyadmin|adminer)/i,
   /(\$\{|%24%7B|\{\{|%7B%7B)/i,
 ];
 
 function isSuspiciousPath(path: string): boolean {
+  let decoded = path;
   try {
-    const decoded = decodeURIComponent(path);
-    return SUSPICIOUS_PATTERNS.some(
-      (pattern) => pattern.test(path) || pattern.test(decoded),
-    );
+    decoded = decodeURIComponent(path);
   } catch {
-    return true;
+    decoded = path;
   }
+  return SUSPICIOUS_PATTERNS.some(
+    (pattern) => pattern.test(path) || pattern.test(decoded),
+  );
 }
 
 export function requestIdMiddleware(
