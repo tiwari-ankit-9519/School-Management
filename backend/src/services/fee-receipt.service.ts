@@ -9,10 +9,17 @@ const log = createModuleLogger("FeeReceiptService");
 const RECEIPT_SEQUENCE_LENGTH = 6;
 const LOGO_FETCH_TIMEOUT_MS = 3000;
 
+const personSelect = {
+  regNumber: true,
+  admin: { select: { firstName: true, lastName: true } },
+  teacher: { select: { firstName: true, lastName: true } },
+} satisfies Prisma.UserSelect;
+
 export const receiptSelect = {
   id: true,
   receiptNumber: true,
-  amount: true,
+  academicYearId: true,
+  totalAmount: true,
   paymentMode: true,
   referenceNumber: true,
   paidAt: true,
@@ -21,61 +28,57 @@ export const receiptSelect = {
   reversedAt: true,
   reversalReason: true,
   createdAt: true,
-  collectedBy: {
-    select: {
-      regNumber: true,
-      admin: { select: { firstName: true, lastName: true } },
-      teacher: { select: { firstName: true, lastName: true } },
-    },
-  },
-  feePayment: {
+  academicYear: { select: { name: true } },
+  collectedBy: { select: personSelect },
+  student: {
     select: {
       id: true,
-      amountDue: true,
-      amountPaid: true,
-      waivedAmount: true,
-      dueDate: true,
-      billingPeriod: true,
-      status: true,
-      feeStructure: {
-        select: { name: true, academicYear: { select: { name: true } } },
-      },
-      student: {
+      userId: true,
+      firstName: true,
+      lastName: true,
+      user: { select: { regNumber: true, email: true } },
+      enrollments: {
+        orderBy: { enrolledAt: "desc" },
         select: {
-          id: true,
-          userId: true,
-          firstName: true,
-          lastName: true,
-          user: { select: { regNumber: true, email: true } },
-          enrollments: {
-            where: { status: "ACTIVE" },
-            orderBy: { enrolledAt: "desc" },
-            take: 1,
+          academicYearId: true,
+          rollNumber: true,
+          class: { select: { name: true, section: true } },
+        },
+      },
+      parentLinks: {
+        select: {
+          parentType: true,
+          parent: {
             select: {
-              rollNumber: true,
-              class: { select: { name: true, section: true } },
-            },
-          },
-          parentLinks: {
-            select: {
-              parentType: true,
-              parent: {
-                select: {
-                  userId: true,
-                  firstName: true,
-                  lastName: true,
-                  user: { select: { email: true } },
-                },
-              },
+              userId: true,
+              firstName: true,
+              lastName: true,
+              user: { select: { email: true } },
             },
           },
         },
       },
     },
   },
-} satisfies Prisma.FeeTransactionSelect;
+  allocations: {
+    orderBy: { feePayment: { dueDate: "asc" } },
+    select: {
+      amount: true,
+      feePayment: {
+        select: {
+          id: true,
+          amountDue: true,
+          waivedAmount: true,
+          dueDate: true,
+          billingPeriod: true,
+          feeStructure: { select: { name: true } },
+        },
+      },
+    },
+  },
+} satisfies Prisma.FeeReceiptSelect;
 
-export type ReceiptTransaction = Prisma.FeeTransactionGetPayload<{
+export type ReceiptRecord = Prisma.FeeReceiptGetPayload<{
   select: typeof receiptSelect;
 }>;
 
@@ -93,11 +96,23 @@ interface ReceiptSchool {
   boardType: string;
 }
 
-export interface ReceiptData {
-  transaction: ReceiptTransaction;
-  school: ReceiptSchool;
-  paidToDate: number;
+export interface ReceiptLine {
+  billId: string;
+  feeName: string;
+  billingPeriod: string | null;
+  dueDate: Date;
+  amountDue: number;
+  waived: number;
+  paidBefore: number;
+  paidNow: number;
   balanceAfter: number;
+}
+
+export interface ReceiptData {
+  receipt: ReceiptRecord;
+  school: ReceiptSchool;
+  lines: ReceiptLine[];
+  totalBalanceAfter: number;
 }
 
 const toReceiptPrefix = (schoolCode: string): string =>
@@ -128,12 +143,10 @@ export async function generateReceiptNumber(
   return `${toReceiptPrefix(school?.code ?? "")}/${academicYear.name}/${sequence}`;
 }
 
-export async function getReceiptData(
-  transactionId: string,
-): Promise<ReceiptData> {
-  const [transaction, school] = await Promise.all([
-    prisma.feeTransaction.findUnique({
-      where: { id: transactionId },
+export async function getReceiptData(receiptId: string): Promise<ReceiptData> {
+  const [receipt, school] = await Promise.all([
+    prisma.feeReceipt.findUnique({
+      where: { id: receiptId },
       select: receiptSelect,
     }),
     prisma.schoolConfig.findFirst({
@@ -153,26 +166,64 @@ export async function getReceiptData(
     }),
   ]);
 
-  if (!transaction) throw new Error("Receipt not found");
+  if (!receipt) throw new Error("Receipt not found");
   if (!school) throw new Error("School settings not found");
 
-  const paidUpToThis = await prisma.feeTransaction.aggregate({
-    where: {
-      feePaymentId: transaction.feePayment.id,
-      status: TransactionStatus.SUCCESS,
-      createdAt: { lte: transaction.createdAt },
-    },
-    _sum: { amount: true },
+  const billIds = receipt.allocations.map(
+    (allocation) => allocation.feePayment.id,
+  );
+
+  const paidUpToThis = billIds.length
+    ? await prisma.feeAllocation.groupBy({
+        by: ["feePaymentId"],
+        where: {
+          feePaymentId: { in: billIds },
+          receipt: {
+            status: TransactionStatus.SUCCESS,
+            createdAt: { lte: receipt.createdAt },
+          },
+        },
+        _sum: { amount: true },
+      })
+    : [];
+
+  const paidByBill = new Map(
+    paidUpToThis.map((row) => [row.feePaymentId, row._sum.amount ?? 0]),
+  );
+  const countsTowardsBalance = receipt.status === TransactionStatus.SUCCESS;
+
+  const lines: ReceiptLine[] = receipt.allocations.map((allocation) => {
+    const bill = allocation.feePayment;
+    const paidThroughThis = roundMoney(paidByBill.get(bill.id) ?? 0);
+    const paidNow = roundMoney(allocation.amount);
+    const paidBefore = roundMoney(
+      Math.max(0, paidThroughThis - (countsTowardsBalance ? paidNow : 0)),
+    );
+    return {
+      billId: bill.id,
+      feeName: bill.feeStructure.name,
+      billingPeriod: bill.billingPeriod,
+      dueDate: bill.dueDate,
+      amountDue: bill.amountDue,
+      waived: bill.waivedAmount,
+      paidBefore,
+      paidNow,
+      balanceAfter: getBillBalance({
+        amountDue: bill.amountDue,
+        amountPaid: paidThroughThis,
+        waivedAmount: bill.waivedAmount,
+      }),
+    };
   });
 
-  const paidToDate = roundMoney(paidUpToThis._sum.amount ?? 0);
-  const balanceAfter = getBillBalance({
-    amountDue: transaction.feePayment.amountDue,
-    amountPaid: paidToDate,
-    waivedAmount: transaction.feePayment.waivedAmount,
-  });
-
-  return { transaction, school, paidToDate, balanceAfter };
+  return {
+    receipt,
+    school,
+    lines,
+    totalBalanceAfter: roundMoney(
+      lines.reduce((sum, line) => sum + line.balanceAfter, 0),
+    ),
+  };
 }
 
 export function assertReceiptAccess(
@@ -182,7 +233,7 @@ export function assertReceiptAccess(
 ): void {
   if (role === Role.ADMIN || role === Role.MODERATOR) return;
 
-  const student = data.transaction.feePayment.student;
+  const student = data.receipt.student;
   if (role === Role.STUDENT && student.userId === userId) return;
   if (
     role === Role.PARENT &&
@@ -193,7 +244,7 @@ export function assertReceiptAccess(
   log.warn("Receipt access denied", {
     userId,
     role,
-    receiptNumber: data.transaction.receiptNumber,
+    receiptNumber: data.receipt.receiptNumber,
   });
   throw new Error("You do not have access to this receipt");
 }
@@ -287,7 +338,7 @@ const formatPeriod = (billingPeriod: string | null): string => {
   if (!billingPeriod) return "One-time";
   const [year, month] = billingPeriod.split("-").map(Number);
   return new Date(Date.UTC(year, month - 1, 1)).toLocaleDateString("en-IN", {
-    month: "long",
+    month: "short",
     year: "numeric",
     timeZone: "UTC",
   });
@@ -302,12 +353,11 @@ const formatMode = (mode: string): string =>
     )
     .join(" ");
 
-const collectorName = (transaction: ReceiptTransaction): string => {
-  const person =
-    transaction.collectedBy.admin ?? transaction.collectedBy.teacher;
+const collectorName = (receipt: ReceiptRecord): string => {
+  const person = receipt.collectedBy.admin ?? receipt.collectedBy.teacher;
   return person
     ? `${person.firstName} ${person.lastName}`
-    : transaction.collectedBy.regNumber;
+    : receipt.collectedBy.regNumber;
 };
 
 async function fetchLogo(logoUrl: string | null): Promise<Buffer | null> {
@@ -337,20 +387,22 @@ async function fetchLogo(logoUrl: string | null): Promise<Buffer | null> {
 }
 
 export async function buildReceiptPdf(data: ReceiptData): Promise<Buffer> {
-  const { transaction, school, paidToDate, balanceAfter } = data;
-  const bill = transaction.feePayment;
-  const student = bill.student;
-  const enrollment = student.enrollments[0];
+  const { receipt, school, lines, totalBalanceAfter } = data;
+  const student = receipt.student;
+  const enrollment =
+    student.enrollments.find(
+      (item) => item.academicYearId === receipt.academicYearId,
+    ) ?? student.enrollments[0];
   const guardian = student.parentLinks[0]?.parent;
-  const isReversed = transaction.status === TransactionStatus.REVERSED;
+  const isReversed = receipt.status === TransactionStatus.REVERSED;
   const logo = await fetchLogo(school.logoUrl);
 
   return new Promise<Buffer>((resolve, reject) => {
     const doc = new PDFDocument({
       size: "A5",
-      margin: 32,
+      margin: 28,
       info: {
-        Title: `Fee Receipt ${transaction.receiptNumber}`,
+        Title: `Fee Receipt ${receipt.receiptNumber}`,
         Author: school.name,
         Subject: "Fee payment receipt",
       },
@@ -363,36 +415,84 @@ export async function buildReceiptPdf(data: ReceiptData): Promise<Buffer> {
     const left = doc.page.margins.left;
     const width =
       doc.page.width - doc.page.margins.left - doc.page.margins.right;
+    const bottomLimit = () => doc.page.height - doc.page.margins.bottom - 40;
     const ink = "#111827";
     const muted = "#6b7280";
     const line = "#e5e7eb";
     const accent = "#4f46e5";
 
+    const drawWatermark = () => {
+      if (!isReversed) return;
+      doc.save();
+      doc.rotate(-30, { origin: [doc.page.width / 2, doc.page.height / 2] });
+      doc
+        .font("Helvetica-Bold")
+        .fontSize(60)
+        .fillColor("#dc2626")
+        .opacity(0.12)
+        .text("REVERSED", 0, doc.page.height / 2 - 30, {
+          width: doc.page.width,
+          align: "center",
+        });
+      doc.restore();
+      doc.opacity(1);
+    };
+
+    const drawFooter = () => {
+      const footerY = doc.page.height - doc.page.margins.bottom - 22;
+      doc
+        .strokeColor(line)
+        .lineWidth(0.5)
+        .moveTo(left, footerY - 6)
+        .lineTo(left + width, footerY - 6)
+        .stroke();
+      doc
+        .font("Helvetica")
+        .fontSize(7)
+        .fillColor(muted)
+        .text(
+          "This is a computer-generated receipt and does not require a signature.",
+          left,
+          footerY,
+          {
+            width,
+            align: "center",
+            lineBreak: false,
+          },
+        );
+      doc.text(`Generated on ${formatDate(new Date())}`, left, footerY + 9, {
+        width,
+        align: "center",
+        lineBreak: false,
+      });
+    };
+
     const headerTop = doc.y;
     if (logo) {
       try {
-        doc.image(logo, left, headerTop, { fit: [44, 44] });
+        doc.image(logo, left, headerTop, { fit: [42, 42] });
       } catch {
         log.warn("Logo image could not be embedded in receipt");
       }
     }
-    const textLeft = logo ? left + 54 : left;
+    const textLeft = logo ? left + 52 : left;
+    const textWidth = width - (textLeft - left);
     doc
       .fillColor(ink)
       .font("Helvetica-Bold")
-      .fontSize(13)
-      .text(school.name, textLeft, headerTop, {
-        width: width - (textLeft - left),
-      });
+      .fontSize(12.5)
+      .text(school.name, textLeft, headerTop, { width: textWidth });
     doc
       .font("Helvetica")
-      .fontSize(8)
+      .fontSize(7.5)
       .fillColor(muted)
       .text(
         `${school.address}, ${school.city}, ${school.state} - ${school.pincode}`,
-        { width: width - (textLeft - left) },
+        { width: textWidth },
       )
-      .text(`Phone: ${school.phone}  |  Email: ${school.email}`)
+      .text(`Phone: ${school.phone}  |  Email: ${school.email}`, {
+        width: textWidth,
+      })
       .text(
         [
           school.boardType,
@@ -402,49 +502,50 @@ export async function buildReceiptPdf(data: ReceiptData): Promise<Buffer> {
         ]
           .filter(Boolean)
           .join("  |  "),
+        { width: textWidth },
       );
 
-    doc.moveDown(0.8);
+    doc.y = Math.max(doc.y, headerTop + 44) + 6;
     doc
       .strokeColor(line)
       .lineWidth(1)
       .moveTo(left, doc.y)
       .lineTo(left + width, doc.y)
       .stroke();
-    doc.moveDown(0.6);
+    doc.moveDown(0.5);
 
     doc
       .font("Helvetica-Bold")
-      .fontSize(12)
+      .fontSize(11.5)
       .fillColor(accent)
       .text("FEE RECEIPT", left, doc.y, { width, align: "center" });
-    doc.moveDown(0.6);
+    doc.moveDown(0.5);
 
     const metaY = doc.y;
     doc
       .font("Helvetica")
-      .fontSize(8)
+      .fontSize(7.5)
       .fillColor(muted)
       .text("Receipt No.", left, metaY);
     doc
       .font("Helvetica-Bold")
       .fontSize(9)
       .fillColor(ink)
-      .text(transaction.receiptNumber, left, metaY + 10);
+      .text(receipt.receiptNumber, left, metaY + 10);
     doc
       .font("Helvetica")
-      .fontSize(8)
+      .fontSize(7.5)
       .fillColor(muted)
       .text("Date", left, metaY, { width, align: "right" });
     doc
       .font("Helvetica-Bold")
       .fontSize(9)
       .fillColor(ink)
-      .text(formatDate(transaction.paidAt), left, metaY + 10, {
+      .text(formatDate(receipt.paidAt), left, metaY + 10, {
         width,
         align: "right",
       });
-    doc.y = metaY + 30;
+    doc.y = metaY + 28;
 
     const detailRows: [string, string][] = [
       ["Student", `${student.firstName} ${student.lastName}`],
@@ -460,155 +561,179 @@ export async function buildReceiptPdf(data: ReceiptData): Promise<Buffer> {
         "Guardian",
         guardian ? `${guardian.firstName} ${guardian.lastName}` : "-",
       ],
-      ["Session", bill.feeStructure.academicYear.name],
+      ["Session", receipt.academicYear.name],
     ];
 
     const columnWidth = width / 2;
-    detailRows.forEach(([label, value], index) => {
-      const column = index % 2;
+    for (let index = 0; index < detailRows.length; index += 2) {
       const rowY = doc.y;
-      const x = left + column * columnWidth;
-      doc
-        .font("Helvetica")
-        .fontSize(7.5)
-        .fillColor(muted)
-        .text(label, x, rowY, { width: columnWidth - 8 });
-      doc
-        .font("Helvetica-Bold")
-        .fontSize(9)
-        .fillColor(ink)
-        .text(value, x, rowY + 9, { width: columnWidth - 8 });
-      if (column === 1) doc.y = rowY + 26;
-      else doc.y = rowY;
-    });
-    if (detailRows.length % 2 === 1) doc.y += 26;
+      [detailRows[index], detailRows[index + 1]].forEach((pair, column) => {
+        if (!pair) return;
+        const x = left + column * columnWidth;
+        doc
+          .font("Helvetica")
+          .fontSize(7)
+          .fillColor(muted)
+          .text(pair[0], x, rowY, { width: columnWidth - 8 });
+        doc
+          .font("Helvetica-Bold")
+          .fontSize(8.5)
+          .fillColor(ink)
+          .text(pair[1], x, rowY + 8, { width: columnWidth - 8 });
+      });
+      doc.y = rowY + 24;
+    }
 
-    doc.moveDown(0.4);
-    const tableTop = doc.y;
-    doc.rect(left, tableTop, width, 20).fill("#f3f4f6");
-    doc.fillColor(muted).font("Helvetica-Bold").fontSize(8);
-    doc.text("Particulars", left + 8, tableTop + 6);
-    doc.text("Amount", left, tableTop + 6, {
-      width: width - 8,
-      align: "right",
-    });
+    doc.moveDown(0.3);
 
-    const tableRows: [string, string, boolean][] = [
-      [
-        `${bill.feeStructure.name} (${formatPeriod(bill.billingPeriod)})`,
-        formatMoney(bill.amountDue),
-        false,
-      ],
-      ["Waived / concession", `- ${formatMoney(bill.waivedAmount)}`, false],
-      [
-        "Paid earlier",
-        `- ${formatMoney(roundMoney(paidToDate - transaction.amount))}`,
-        false,
-      ],
-      ["Amount received (this receipt)", formatMoney(transaction.amount), true],
-      ["Balance after this payment", formatMoney(balanceAfter), true],
+    const columns = [
+      { label: "Particulars", width: width * 0.36, align: "left" as const },
+      { label: "Due", width: width * 0.16, align: "right" as const },
+      { label: "Paid earlier", width: width * 0.16, align: "right" as const },
+      { label: "Paid now", width: width * 0.16, align: "right" as const },
+      { label: "Balance", width: width * 0.16, align: "right" as const },
     ];
 
-    let rowY = tableTop + 26;
-    tableRows.forEach(([label, value, strong]) => {
-      doc
-        .font(strong ? "Helvetica-Bold" : "Helvetica")
-        .fontSize(9)
-        .fillColor(ink);
-      doc.text(label, left + 8, rowY, { width: width * 0.65 });
-      doc.text(value, left, rowY, { width: width - 8, align: "right" });
-      rowY += 18;
+    const drawTableHeader = () => {
+      const top = doc.y;
+      doc.rect(left, top, width, 18).fill("#f3f4f6");
+      let x = left;
+      doc.font("Helvetica-Bold").fontSize(7).fillColor(muted);
+      columns.forEach((column) => {
+        doc.text(column.label, x + 4, top + 6, {
+          width: column.width - 8,
+          align: column.align,
+          lineBreak: false,
+        });
+        x += column.width;
+      });
+      doc.y = top + 22;
+    };
+
+    drawWatermark();
+    drawTableHeader();
+
+    lines.forEach((receiptLine) => {
+      const particulars = `${receiptLine.feeName} (${formatPeriod(receiptLine.billingPeriod)})${
+        receiptLine.waived > 0
+          ? `\nWaived: ${formatMoney(receiptLine.waived)}`
+          : ""
+      }`;
+      doc.font("Helvetica").fontSize(8);
+      const rowHeight =
+        Math.max(
+          14,
+          doc.heightOfString(particulars, { width: columns[0].width - 8 }),
+        ) + 6;
+
+      if (doc.y + rowHeight > bottomLimit()) {
+        drawFooter();
+        doc.addPage();
+        drawWatermark();
+        drawTableHeader();
+      }
+
+      const rowY = doc.y;
+      const values = [
+        particulars,
+        formatMoney(receiptLine.amountDue),
+        formatMoney(receiptLine.paidBefore),
+        formatMoney(receiptLine.paidNow),
+        formatMoney(receiptLine.balanceAfter),
+      ];
+      let x = left;
+      values.forEach((value, index) => {
+        doc
+          .font(index === 3 ? "Helvetica-Bold" : "Helvetica")
+          .fontSize(8)
+          .fillColor(ink)
+          .text(value, x + 4, rowY, {
+            width: columns[index].width - 8,
+            align: columns[index].align,
+          });
+        x += columns[index].width;
+      });
+      doc.y = rowY + rowHeight;
       doc
         .strokeColor(line)
         .lineWidth(0.5)
-        .moveTo(left, rowY - 5)
-        .lineTo(left + width, rowY - 5)
+        .moveTo(left, doc.y - 3)
+        .lineTo(left + width, doc.y - 3)
         .stroke();
     });
-    doc.y = rowY + 4;
+
+    if (doc.y + 110 > bottomLimit()) {
+      drawFooter();
+      doc.addPage();
+      drawWatermark();
+    }
+
+    doc.moveDown(0.3);
+    const totalsY = doc.y;
+    doc
+      .font("Helvetica-Bold")
+      .fontSize(10)
+      .fillColor(ink)
+      .text("Total received", left, totalsY);
+    doc.text(formatMoney(receipt.totalAmount), left, totalsY, {
+      width,
+      align: "right",
+    });
+    doc
+      .font("Helvetica")
+      .fontSize(8)
+      .fillColor(muted)
+      .text("Balance on these fees after this payment", left, totalsY + 15);
+    doc.text(formatMoney(totalBalanceAfter), left, totalsY + 15, {
+      width,
+      align: "right",
+    });
+    doc.y = totalsY + 32;
 
     doc
       .font("Helvetica-Oblique")
-      .fontSize(8.5)
+      .fontSize(8)
       .fillColor(ink)
-      .text(amountInWords(transaction.amount), left, doc.y, { width });
-    doc.moveDown(0.8);
+      .text(amountInWords(receipt.totalAmount), left, doc.y, { width });
+    doc.moveDown(0.6);
 
     const paymentRows: [string, string][] = [
-      ["Payment mode", formatMode(transaction.paymentMode)],
-      ["Reference No.", transaction.referenceNumber ?? "-"],
-      ["Collected by", collectorName(transaction)],
+      ["Payment mode", formatMode(receipt.paymentMode)],
+      ["Reference No.", receipt.referenceNumber ?? "-"],
+      ["Collected by", collectorName(receipt)],
     ];
-    if (transaction.remarks) paymentRows.push(["Remarks", transaction.remarks]);
+    if (receipt.remarks) paymentRows.push(["Remarks", receipt.remarks]);
 
     paymentRows.forEach(([label, value]) => {
       const y = doc.y;
       doc
         .font("Helvetica")
-        .fontSize(8)
+        .fontSize(7.5)
         .fillColor(muted)
-        .text(label, left, y, { width: 90 });
+        .text(label, left, y, { width: 84 });
       doc
         .font("Helvetica-Bold")
-        .fontSize(8.5)
+        .fontSize(8)
         .fillColor(ink)
-        .text(value, left + 90, y, { width: width - 90 });
-      doc.moveDown(0.35);
+        .text(value, left + 84, y, { width: width - 84 });
+      doc.moveDown(0.3);
     });
 
     if (isReversed) {
-      doc.moveDown(0.6);
+      doc.moveDown(0.5);
       doc
         .font("Helvetica-Bold")
-        .fontSize(9)
+        .fontSize(8.5)
         .fillColor("#dc2626")
         .text(
-          `REVERSED on ${transaction.reversedAt ? formatDate(transaction.reversedAt) : "-"}: ${transaction.reversalReason ?? ""}`,
+          `REVERSED on ${receipt.reversedAt ? formatDate(receipt.reversedAt) : "-"}: ${receipt.reversalReason ?? ""}`,
           left,
           doc.y,
           { width },
         );
-
-      doc.save();
-      doc.rotate(-30, { origin: [doc.page.width / 2, doc.page.height / 2] });
-      doc
-        .font("Helvetica-Bold")
-        .fontSize(60)
-        .fillColor("#dc2626")
-        .opacity(0.12)
-        .text("REVERSED", 0, doc.page.height / 2 - 30, {
-          width: doc.page.width,
-          align: "center",
-        });
-      doc.restore();
-      doc.opacity(1);
     }
 
-    const footerY = doc.page.height - doc.page.margins.bottom - 24;
-    doc
-      .strokeColor(line)
-      .lineWidth(0.5)
-      .moveTo(left, footerY - 6)
-      .lineTo(left + width, footerY - 6)
-      .stroke();
-    doc
-      .font("Helvetica")
-      .fontSize(7)
-      .fillColor(muted)
-      .text(
-        "This is a computer-generated receipt and does not require a signature.",
-        left,
-        footerY,
-        {
-          width,
-          align: "center",
-        },
-      )
-      .text(`Generated on ${formatDate(new Date())}`, {
-        width,
-        align: "center",
-      });
-
+    drawFooter();
     doc.end();
   });
 }

@@ -6,17 +6,19 @@ import {
 } from "../middlewares/request-logger.middleware";
 import { HTTP_STATUS } from "../utils/constants";
 import {
-  CollectFeePaymentPayload,
+  CollectStudentFeesPayload,
   FeePaymentListQuery,
-  ReverseFeeTransactionPayload,
+  FeeStudentListQuery,
+  ReverseFeeReceiptPayload,
   WaiveFeePaymentPayload,
 } from "../validations/input.validations";
 import {
-  collectFeePaymentService,
-  getFeePaymentDetailService,
+  collectStudentFeesService,
+  getFeeStudentDetailService,
   getMyFeesService,
   listFeePaymentsService,
-  reverseFeeTransactionService,
+  listFeeStudentsService,
+  reverseFeeReceiptService,
   waiveFeePaymentService,
 } from "../services/fee-payment.service";
 import {
@@ -35,6 +37,14 @@ const requireIdentity = (req: AuthenticatedRequest) => {
   return { userId, role };
 };
 
+const requireParam = (req: AuthenticatedRequest, name: string): string => {
+  const value = req.params[name];
+  if (typeof value !== "string" || !value.trim()) {
+    throw new Error(`${name} is required`);
+  }
+  return value;
+};
+
 const sendValidationError = (
   res: Response,
   issues: unknown,
@@ -44,6 +54,82 @@ const sendValidationError = (
     .status(HTTP_STATUS.BAD_REQUEST)
     .json({ success: false, message, errors: issues });
 };
+
+export async function listFeeStudents(
+  req: AuthenticatedRequest,
+  res: Response,
+): Promise<void> {
+  const parsed = FeeStudentListQuery.safeParse(req.query);
+  if (!parsed.success)
+    return sendValidationError(res, parsed.error.issues, "Invalid filters");
+
+  const { userId } = requireIdentity(req);
+  const auditContext = buildAuditContext(req);
+  res.status(HTTP_STATUS.OK);
+
+  const result = await listFeeStudentsService(
+    parsed.data,
+    userId,
+    auditContext,
+    res.statusCode,
+  );
+
+  res.json({
+    success: true,
+    message: "Students fetched successfully",
+    data: result,
+  });
+}
+
+export async function getFeeStudentDetail(
+  req: AuthenticatedRequest,
+  res: Response,
+): Promise<void> {
+  const { userId } = requireIdentity(req);
+  const studentId = requireParam(req, "studentId");
+  const auditContext = buildAuditContext(req);
+  res.status(HTTP_STATUS.OK);
+
+  const detail = await getFeeStudentDetailService(
+    studentId,
+    userId,
+    auditContext,
+    res.statusCode,
+  );
+
+  res.json({
+    success: true,
+    message: "Student fees fetched successfully",
+    data: detail,
+  });
+}
+
+export async function collectStudentFees(
+  req: AuthenticatedRequest,
+  res: Response,
+): Promise<void> {
+  const parsed = CollectStudentFeesPayload.safeParse(req.body);
+  if (!parsed.success) return sendValidationError(res, parsed.error.issues);
+
+  const { userId } = requireIdentity(req);
+  const studentId = requireParam(req, "studentId");
+  const auditContext = buildAuditContext(req);
+  res.status(HTTP_STATUS.CREATED);
+
+  const result = await collectStudentFeesService(
+    studentId,
+    parsed.data,
+    userId,
+    auditContext,
+    res.statusCode,
+  );
+
+  res.json({
+    success: true,
+    message: `Payment recorded. Receipt ${result.receipt.receiptNumber}`,
+    data: result,
+  });
+}
 
 export async function listFeePayments(
   req: AuthenticatedRequest,
@@ -66,61 +152,7 @@ export async function listFeePayments(
 
   res.json({
     success: true,
-    message: "Fee payments fetched successfully",
-    data: result,
-  });
-}
-
-export async function getFeePaymentDetail(
-  req: AuthenticatedRequest,
-  res: Response,
-): Promise<void> {
-  const { userId } = requireIdentity(req);
-  const billId = req.params.billId as string;
-  if (!billId) throw new Error("Bill ID is required");
-
-  const auditContext = buildAuditContext(req);
-  res.status(HTTP_STATUS.OK);
-
-  const bill = await getFeePaymentDetailService(
-    billId,
-    userId,
-    auditContext,
-    res.statusCode,
-  );
-
-  res.json({
-    success: true,
-    message: "Fee bill fetched successfully",
-    data: bill,
-  });
-}
-
-export async function collectFeePayment(
-  req: AuthenticatedRequest,
-  res: Response,
-): Promise<void> {
-  const parsed = CollectFeePaymentPayload.safeParse(req.body);
-  if (!parsed.success) return sendValidationError(res, parsed.error.issues);
-
-  const { userId } = requireIdentity(req);
-  const billId = req.params.billId as string;
-  if (!billId) throw new Error("Bill ID is required");
-
-  const auditContext = buildAuditContext(req);
-  res.status(HTTP_STATUS.CREATED);
-
-  const result = await collectFeePaymentService(
-    billId,
-    parsed.data,
-    userId,
-    auditContext,
-    res.statusCode,
-  );
-
-  res.json({
-    success: true,
-    message: `Payment recorded. Receipt ${result.transaction.receiptNumber}`,
+    message: "Fee bills fetched successfully",
     data: result,
   });
 }
@@ -133,9 +165,7 @@ export async function waiveFeePayment(
   if (!parsed.success) return sendValidationError(res, parsed.error.issues);
 
   const { userId } = requireIdentity(req);
-  const billId = req.params.billId as string;
-  if (!billId) throw new Error("Bill ID is required");
-
+  const billId = requireParam(req, "billId");
   const auditContext = buildAuditContext(req);
   res.status(HTTP_STATUS.OK);
 
@@ -150,22 +180,20 @@ export async function waiveFeePayment(
   res.json({ success: true, message: "Fee waived successfully", data: bill });
 }
 
-export async function reverseFeeTransaction(
+export async function reverseFeeReceipt(
   req: AuthenticatedRequest,
   res: Response,
 ): Promise<void> {
-  const parsed = ReverseFeeTransactionPayload.safeParse(req.body);
+  const parsed = ReverseFeeReceiptPayload.safeParse(req.body);
   if (!parsed.success) return sendValidationError(res, parsed.error.issues);
 
   const { userId } = requireIdentity(req);
-  const transactionId = req.params.transactionId as string;
-  if (!transactionId) throw new Error("Transaction ID is required");
-
+  const receiptId = requireParam(req, "receiptId");
   const auditContext = buildAuditContext(req);
   res.status(HTTP_STATUS.OK);
 
-  const result = await reverseFeeTransactionService(
-    transactionId,
+  const result = await reverseFeeReceiptService(
+    receiptId,
     parsed.data,
     userId,
     auditContext,
@@ -174,7 +202,7 @@ export async function reverseFeeTransaction(
 
   res.json({
     success: true,
-    message: `Payment ${result.transaction.receiptNumber} reversed`,
+    message: `Receipt ${result.receipt.receiptNumber} reversed`,
     data: result,
   });
 }
@@ -206,30 +234,28 @@ export async function downloadFeeReceipt(
   res: Response,
 ): Promise<void> {
   const { userId, role } = requireIdentity(req);
-  const transactionId = req.params.transactionId as string;
-  if (!transactionId) throw new Error("Transaction ID is required");
+  const receiptId = requireParam(req, "receiptId");
 
-  const receipt = await getReceiptData(transactionId);
+  const receipt = await getReceiptData(receiptId);
 
   try {
     assertReceiptAccess(receipt, userId, role);
   } catch (error) {
-    res.status(HTTP_STATUS.FORBIDDEN).json({
-      success: false,
-      message: (error as Error).message,
-    });
+    res
+      .status(HTTP_STATUS.FORBIDDEN)
+      .json({ success: false, message: (error as Error).message });
     return;
   }
 
   const pdf = await buildReceiptPdf(receipt);
-  const fileName = receiptFileName(receipt.transaction.receiptNumber);
+  const fileName = receiptFileName(receipt.receipt.receiptNumber);
   const disposition = req.query.inline === "true" ? "inline" : "attachment";
 
   await createAuditLog({
     performedById: userId,
     action: "EXPORT",
     module: "FeePayment",
-    resourceId: receipt.transaction.receiptNumber,
+    resourceId: receipt.receipt.receiptNumber,
     resourceType: "FeeReceipt",
     context: buildAuditContext(req),
     isSuccessful: true,

@@ -4,20 +4,23 @@ import api, { getErrorMessage } from "@/lib/api";
 import { QUERY_KEYS } from "@/lib/constants";
 import {
   ApiResponse,
-  CollectFeePaymentPayload,
-  FeeBillDetail,
+  CollectStudentFeesPayload,
+  CollectStudentFeesResult,
   FeeBillFilters,
   FeeBillSnapshot,
-  FeeTransactionResult,
+  FeeStudentDetail,
+  FeeStudentFilters,
   MyFeesResponse,
   PaginatedFeeBills,
-  ReverseFeeTransactionPayload,
+  PaginatedFeeStudents,
+  ReverseFeeReceiptPayload,
+  ReverseFeeReceiptResult,
   WaiveFeePaymentPayload,
 } from "@/types";
 
 const BASE = "/school/fee-payments";
 
-const cleanParams = (filters: FeeBillFilters) =>
+const cleanParams = <T extends object>(filters: T) =>
   Object.fromEntries(
     Object.entries(filters).filter(
       ([, value]) => value !== undefined && value !== "" && value !== false,
@@ -25,26 +28,38 @@ const cleanParams = (filters: FeeBillFilters) =>
   );
 
 const feePaymentApi = {
-  list: async (filters: FeeBillFilters): Promise<PaginatedFeeBills> => {
+  students: async (
+    filters: FeeStudentFilters,
+  ): Promise<PaginatedFeeStudents> => {
+    const response = await api.get<ApiResponse<PaginatedFeeStudents>>(
+      `${BASE}/students`,
+      {
+        params: cleanParams(filters),
+      },
+    );
+    return response.data.data;
+  },
+
+  student: async (studentId: string): Promise<FeeStudentDetail> => {
+    const response = await api.get<ApiResponse<FeeStudentDetail>>(
+      `${BASE}/students/${studentId}`,
+    );
+    return response.data.data;
+  },
+
+  bills: async (filters: FeeBillFilters): Promise<PaginatedFeeBills> => {
     const response = await api.get<ApiResponse<PaginatedFeeBills>>(BASE, {
       params: cleanParams(filters),
     });
     return response.data.data;
   },
 
-  detail: async (billId: string): Promise<FeeBillDetail> => {
-    const response = await api.get<ApiResponse<FeeBillDetail>>(
-      `${BASE}/${billId}`,
-    );
-    return response.data.data;
-  },
-
   collect: async (
-    billId: string,
-    data: CollectFeePaymentPayload,
-  ): Promise<ApiResponse<FeeTransactionResult>> => {
-    const response = await api.post<ApiResponse<FeeTransactionResult>>(
-      `${BASE}/${billId}/collect`,
+    studentId: string,
+    data: CollectStudentFeesPayload,
+  ): Promise<ApiResponse<CollectStudentFeesResult>> => {
+    const response = await api.post<ApiResponse<CollectStudentFeesResult>>(
+      `${BASE}/students/${studentId}/collect`,
       data,
     );
     return response.data;
@@ -62,11 +77,11 @@ const feePaymentApi = {
   },
 
   reverse: async (
-    transactionId: string,
-    data: ReverseFeeTransactionPayload,
-  ): Promise<ApiResponse<FeeTransactionResult>> => {
-    const response = await api.patch<ApiResponse<FeeTransactionResult>>(
-      `${BASE}/transactions/${transactionId}/reverse`,
+    receiptId: string,
+    data: ReverseFeeReceiptPayload,
+  ): Promise<ApiResponse<ReverseFeeReceiptResult>> => {
+    const response = await api.patch<ApiResponse<ReverseFeeReceiptResult>>(
+      `${BASE}/receipts/${receiptId}/reverse`,
       data,
     );
     return response.data;
@@ -77,14 +92,11 @@ const feePaymentApi = {
     return response.data.data;
   },
 
-  receipt: async (transactionId: string, inline: boolean): Promise<Blob> => {
-    const response = await api.get<Blob>(
-      `${BASE}/transactions/${transactionId}/receipt`,
-      {
-        params: inline ? { inline: "true" } : undefined,
-        responseType: "blob",
-      },
-    );
+  receiptPdf: async (receiptId: string, inline: boolean): Promise<Blob> => {
+    const response = await api.get<Blob>(`${BASE}/receipts/${receiptId}/pdf`, {
+      params: inline ? { inline: "true" } : undefined,
+      responseType: "blob",
+    });
     return response.data;
   },
 };
@@ -92,34 +104,44 @@ const feePaymentApi = {
 const useInvalidateFeeData = () => {
   const queryClient = useQueryClient();
   return () => {
+    queryClient.invalidateQueries({ queryKey: QUERY_KEYS.FEE_STUDENTS });
+    queryClient.invalidateQueries({ queryKey: QUERY_KEYS.FEE_STUDENT });
     queryClient.invalidateQueries({ queryKey: QUERY_KEYS.FEE_PAYMENTS });
-    queryClient.invalidateQueries({ queryKey: QUERY_KEYS.FEE_PAYMENT });
     queryClient.invalidateQueries({ queryKey: QUERY_KEYS.MY_FEES });
-    queryClient.invalidateQueries({ queryKey: QUERY_KEYS.DASHBOARD });
+    queryClient.invalidateQueries({ queryKey: QUERY_KEYS.DASHBOARDSUMMARY });
+    queryClient.invalidateQueries({ queryKey: QUERY_KEYS.DASHBOARD_OVERVIEW });
     queryClient.invalidateQueries({ queryKey: QUERY_KEYS.MY_TODAY });
   };
 };
 
-export const useGetFeeBills = (filters: FeeBillFilters, enabled = true) =>
+export const useGetFeeStudents = (filters: FeeStudentFilters, enabled = true) =>
   useQuery({
-    queryKey: [...QUERY_KEYS.FEE_PAYMENTS, filters],
-    queryFn: () => feePaymentApi.list(filters),
+    queryKey: [...QUERY_KEYS.FEE_STUDENTS, filters],
+    queryFn: () => feePaymentApi.students(filters),
     enabled,
     placeholderData: (previous) => previous,
   });
 
-export const useGetFeeBill = (billId: string | null) =>
+export const useGetFeeStudent = (studentId: string | null) =>
   useQuery({
-    queryKey: [...QUERY_KEYS.FEE_PAYMENT, billId],
-    queryFn: () => feePaymentApi.detail(billId ?? ""),
-    enabled: !!billId,
+    queryKey: [...QUERY_KEYS.FEE_STUDENT, studentId],
+    queryFn: () => feePaymentApi.student(studentId ?? ""),
+    enabled: !!studentId,
   });
 
-export const useCollectFeePayment = (billId: string) => {
+export const useGetFeeBills = (filters: FeeBillFilters, enabled = true) =>
+  useQuery({
+    queryKey: [...QUERY_KEYS.FEE_PAYMENTS, filters],
+    queryFn: () => feePaymentApi.bills(filters),
+    enabled,
+    placeholderData: (previous) => previous,
+  });
+
+export const useCollectStudentFees = (studentId: string) => {
   const invalidate = useInvalidateFeeData();
   return useMutation({
-    mutationFn: (data: CollectFeePaymentPayload) =>
-      feePaymentApi.collect(billId, data),
+    mutationFn: (data: CollectStudentFeesPayload) =>
+      feePaymentApi.collect(studentId, data),
     onSuccess: (response) => {
       invalidate();
       toast.success(response.message ?? "Payment recorded");
@@ -145,19 +167,19 @@ export const useWaiveFeePayment = (billId: string) => {
   });
 };
 
-export const useReverseFeeTransaction = () => {
+export const useReverseFeeReceipt = () => {
   const invalidate = useInvalidateFeeData();
   return useMutation({
     mutationFn: ({
-      transactionId,
+      receiptId,
       data,
     }: {
-      transactionId: string;
-      data: ReverseFeeTransactionPayload;
-    }) => feePaymentApi.reverse(transactionId, data),
+      receiptId: string;
+      data: ReverseFeeReceiptPayload;
+    }) => feePaymentApi.reverse(receiptId, data),
     onSuccess: (response) => {
       invalidate();
-      toast.success(response.message ?? "Payment reversed");
+      toast.success(response.message ?? "Receipt reversed");
     },
     onError: (error) => {
       toast.error(getErrorMessage(error));
@@ -177,30 +199,30 @@ export const receiptFileName = (receiptNumber: string) =>
 export const useDownloadReceipt = () =>
   useMutation({
     mutationFn: async ({
-      transactionId,
+      receiptId,
       receiptNumber,
       inline = false,
     }: {
-      transactionId: string;
+      receiptId: string;
       receiptNumber: string;
       inline?: boolean;
     }) => {
-      const blob = await feePaymentApi.receipt(transactionId, inline);
+      const blob = await feePaymentApi.receiptPdf(receiptId, inline);
       const url = URL.createObjectURL(
         new Blob([blob], { type: "application/pdf" }),
       );
       if (inline) {
         window.open(url, "_blank", "noopener,noreferrer");
         setTimeout(() => URL.revokeObjectURL(url), 60_000);
-      } else {
-        const link = document.createElement("a");
-        link.href = url;
-        link.download = receiptFileName(receiptNumber);
-        document.body.appendChild(link);
-        link.click();
-        link.remove();
-        URL.revokeObjectURL(url);
+        return;
       }
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = receiptFileName(receiptNumber);
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      URL.revokeObjectURL(url);
     },
     onError: (error) => {
       toast.error(getErrorMessage(error));

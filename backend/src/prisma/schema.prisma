@@ -262,6 +262,7 @@ model AcademicYear {
   examSchedules  ExamSchedule[]
   feeStructures  FeeStructure[]
   receiptCounter ReceiptCounter?
+  feeReceipts    FeeReceipt[]
 
   @@index([isCurrent])
 }
@@ -323,34 +324,34 @@ model RegistrationCounter {
 }
 
 model User {
-  id                       String                  @id @default(cuid())
-  regNumber                String                  @unique
-  role                     Role
-  email                    String?                 @unique
-  phone                    String?
-  passwordHash             String
-  isActive                 Boolean                 @default(true)
-  isVerified               Boolean                 @default(false)
-  lastLoginAt              DateTime?
-  lastLoginIp              String?
-  createdAt                DateTime                @default(now())
-  updatedAt                DateTime                @updatedAt
-  admin                    Admin?
-  teacher                  Teacher?
-  student                  Student?
-  parent                   Parent?
-  sessions                 Session[]
-  notifications            NotificationRecipient[]
-  sseConnections           SSEConnection[]
-  auditLogs                AuditLog[]              @relation("AuditPerformedBy")
-  targetAuditLogs          AuditLog[]              @relation("AuditTargetUser")
-  systemLogs               SystemLog[]
-  passwordResets           PasswordReset[]
-  sentNotifications        Notification[]          @relation("NotificationSender")
-  userPermission           UserPermission[]
-  feeTransactionsCollected FeeTransaction[]        @relation("FeeTransactionCollector")
-  feeTransactionsReversed  FeeTransaction[]        @relation("FeeTransactionReverser")
-  feePaymentsWaived        FeePayment[]            @relation("FeePaymentWaiver")
+  id                   String                  @id @default(cuid())
+  regNumber            String                  @unique
+  role                 Role
+  email                String?                 @unique
+  phone                String?
+  passwordHash         String
+  isActive             Boolean                 @default(true)
+  isVerified           Boolean                 @default(false)
+  lastLoginAt          DateTime?
+  lastLoginIp          String?
+  createdAt            DateTime                @default(now())
+  updatedAt            DateTime                @updatedAt
+  admin                Admin?
+  teacher              Teacher?
+  student              Student?
+  parent               Parent?
+  sessions             Session[]
+  notifications        NotificationRecipient[]
+  sseConnections       SSEConnection[]
+  auditLogs            AuditLog[]              @relation("AuditPerformedBy")
+  targetAuditLogs      AuditLog[]              @relation("AuditTargetUser")
+  systemLogs           SystemLog[]
+  passwordResets       PasswordReset[]
+  sentNotifications    Notification[]          @relation("NotificationSender")
+  userPermission       UserPermission[]
+  feeReceiptsCollected FeeReceipt[]            @relation("FeeReceiptCollector")
+  feeReceiptsReversed  FeeReceipt[]            @relation("FeeReceiptReverser")
+  feePaymentsWaived    FeePayment[]            @relation("FeePaymentWaiver")
 
   @@index([regNumber])
   @@index([role])
@@ -597,6 +598,7 @@ model Student {
   leaveRequests     LeaveRequest[]
   documents         Document[]            @relation("StudentDocuments")
   photoUrl          String?
+  feeReceipts       FeeReceipt[]
 
   @@index([userId])
   @@index([enrollmentStatus])
@@ -817,13 +819,13 @@ model FeeStructure {
 }
 
 model FeePayment {
-  id             String           @id @default(cuid())
+  id             String          @id @default(cuid())
   studentId      String
   feeStructureId String
   amountDue      Float
-  amountPaid     Float            @default(0)
-  waivedAmount   Float            @default(0)
-  status         FeeStatus        @default(PENDING)
+  amountPaid     Float           @default(0)
+  waivedAmount   Float           @default(0)
+  status         FeeStatus       @default(PENDING)
   paymentDate    DateTime?
   dueDate        DateTime
   billingPeriod  String?
@@ -831,13 +833,13 @@ model FeePayment {
   waivedById     String?
   waivedAt       DateTime?
   remarks        String?
-  createdAt      DateTime         @default(now())
-  updatedAt      DateTime         @updatedAt
-  student        Student          @relation(fields: [studentId], references: [id], onDelete: Cascade)
-  feeStructure   FeeStructure     @relation(fields: [feeStructureId], references: [id], onDelete: Cascade)
-  waivedBy       User?            @relation("FeePaymentWaiver", fields: [waivedById], references: [id])
-  transactions   FeeTransaction[]
-  documents      Document[]       @relation("FeePaymentDocuments")
+  createdAt      DateTime        @default(now())
+  updatedAt      DateTime        @updatedAt
+  student        Student         @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  feeStructure   FeeStructure    @relation(fields: [feeStructureId], references: [id], onDelete: Cascade)
+  waivedBy       User?           @relation("FeePaymentWaiver", fields: [waivedById], references: [id])
+  allocations    FeeAllocation[]
+  documents      Document[]      @relation("FeePaymentDocuments")
 
   @@unique([studentId, feeStructureId, billingPeriod])
   @@index([studentId])
@@ -848,13 +850,14 @@ model FeePayment {
   @@index([studentId, status])
 }
 
-model FeeTransaction {
+model FeeReceipt {
   id              String            @id @default(cuid())
-  feePaymentId    String
-  amount          Float
+  receiptNumber   String            @unique
+  studentId       String
+  academicYearId  String
+  totalAmount     Float
   paymentMode     PaymentMode
   referenceNumber String?
-  receiptNumber   String            @unique
   paidAt          DateTime          @default(now())
   remarks         String?
   status          TransactionStatus @default(SUCCESS)
@@ -865,14 +868,30 @@ model FeeTransaction {
   emailedAt       DateTime?
   createdAt       DateTime          @default(now())
   updatedAt       DateTime          @updatedAt
-  feePayment      FeePayment        @relation(fields: [feePaymentId], references: [id], onDelete: Restrict)
-  collectedBy     User              @relation("FeeTransactionCollector", fields: [collectedById], references: [id])
-  reversedBy      User?             @relation("FeeTransactionReverser", fields: [reversedById], references: [id])
+  student         Student           @relation(fields: [studentId], references: [id], onDelete: Restrict)
+  academicYear    AcademicYear      @relation(fields: [academicYearId], references: [id], onDelete: Restrict)
+  collectedBy     User              @relation("FeeReceiptCollector", fields: [collectedById], references: [id])
+  reversedBy      User?             @relation("FeeReceiptReverser", fields: [reversedById], references: [id])
+  allocations     FeeAllocation[]
 
-  @@index([feePaymentId])
+  @@index([studentId])
+  @@index([academicYearId])
   @@index([paidAt])
   @@index([status])
   @@index([collectedById])
+}
+
+model FeeAllocation {
+  id           String     @id @default(cuid())
+  receiptId    String
+  feePaymentId String
+  amount       Float
+  createdAt    DateTime   @default(now())
+  receipt      FeeReceipt @relation(fields: [receiptId], references: [id], onDelete: Restrict)
+  feePayment   FeePayment @relation(fields: [feePaymentId], references: [id], onDelete: Restrict)
+
+  @@unique([receiptId, feePaymentId])
+  @@index([feePaymentId])
 }
 
 model ReceiptCounter {

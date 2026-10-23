@@ -1066,8 +1066,56 @@ const queryInt = (fallback: number, max: number) =>
     z.number().int().min(1).max(max),
   );
 
-export const CollectFeePaymentPayload = z
+export const WaiveFeePaymentPayload = z.object({
+  amount: z
+    .number({ error: "Amount must be a number" })
+    .positive({ error: "Amount must be greater than 0" })
+    .optional(),
+  reason: z
+    .string({ error: "A reason is required to waive fees" })
+    .trim()
+    .min(5, { error: "Reason must be at least 5 characters" })
+    .max(300, { error: "Reason must be at most 300 characters" }),
+});
+
+export const FeePaymentListQuery = z.object({
+  page: queryInt(1, 10_000),
+  limit: queryInt(10, 100),
+  status: z
+    .enum(["PENDING", "PARTIAL", "PAID", "OVERDUE", "WAIVED"])
+    .optional(),
+  academicYearId: z.string().trim().min(1).optional(),
+  classId: z.string().trim().min(1).optional(),
+  classGroupId: z.string().trim().min(1).optional(),
+  feeStructureId: z.string().trim().min(1).optional(),
+  billingPeriod: z
+    .string()
+    .regex(/^\d{4}-(0[1-9]|1[0-2])$/, {
+      error: "Billing period must be YYYY-MM",
+    })
+    .optional(),
+  overdueOnly: queryBoolean,
+  search: z.string().trim().max(60).optional(),
+  sortBy: z
+    .enum(["dueDate", "createdAt", "paymentDate", "amountDue"])
+    .optional()
+    .default("dueDate"),
+  order: z.enum(["asc", "desc"]).optional().default("asc"),
+});
+
+const MAX_BILLS_PER_RECEIPT = 24;
+
+export const CollectStudentFeesPayload = z
   .object({
+    billIds: z
+      .array(z.string().trim().min(1), { error: "Select at least one bill" })
+      .min(1, { error: "Select at least one bill" })
+      .max(MAX_BILLS_PER_RECEIPT, {
+        error: `A receipt can cover at most ${MAX_BILLS_PER_RECEIPT} bills`,
+      })
+      .refine((ids) => new Set(ids).size === ids.length, {
+        error: "The same bill can't be selected twice",
+      }),
     amount: z
       .number({ error: "Amount is required" })
       .positive({ error: "Amount must be greater than 0" })
@@ -1104,60 +1152,50 @@ export const CollectFeePaymentPayload = z
     },
   );
 
-export const WaiveFeePaymentPayload = z.object({
-  amount: z
-    .number({ error: "Amount must be a number" })
-    .positive({ error: "Amount must be greater than 0" })
-    .optional(),
+export const ReverseFeeReceiptPayload = z.object({
   reason: z
-    .string({ error: "A reason is required to waive fees" })
-    .trim()
-    .min(5, { error: "Reason must be at least 5 characters" })
-    .max(300, { error: "Reason must be at most 300 characters" }),
-});
-
-export const ReverseFeeTransactionPayload = z.object({
-  reason: z
-    .string({ error: "A reason is required to reverse a payment" })
+    .string({ error: "A reason is required to reverse a receipt" })
     .trim()
     .min(10, { error: "Reason must be at least 10 characters" })
     .max(300, { error: "Reason must be at most 300 characters" }),
 });
 
-export const FeePaymentListQuery = z.object({
+export const DashboardCalendarQuery = z.object({
+  month: z
+    .string({ error: "Month is required" })
+    .regex(/^\d{4}-(0[1-9]|1[0-2])$/, {
+      error: "Month must be in YYYY-MM format",
+    }),
+});
+
+export const FeeStudentListQuery = z.object({
   page: queryInt(1, 10_000),
-  limit: queryInt(10, 100),
-  status: z
-    .enum(["PENDING", "PARTIAL", "PAID", "OVERDUE", "WAIVED"])
-    .optional(),
+  limit: queryInt(15, 100),
   academicYearId: z.string().trim().min(1).optional(),
   classId: z.string().trim().min(1).optional(),
   classGroupId: z.string().trim().min(1).optional(),
-  feeStructureId: z.string().trim().min(1).optional(),
-  billingPeriod: z
-    .string()
-    .regex(/^\d{4}-(0[1-9]|1[0-2])$/, {
-      error: "Billing period must be YYYY-MM",
-    })
-    .optional(),
-  overdueOnly: queryBoolean,
   search: z.string().trim().max(60).optional(),
-  sortBy: z
-    .enum(["dueDate", "createdAt", "paymentDate", "amountDue"])
+  dueStatus: z
+    .enum(["ALL", "DUE", "OVERDUE", "CLEARED"])
     .optional()
-    .default("dueDate"),
-  order: z.enum(["asc", "desc"]).optional().default("asc"),
+    .default("ALL"),
+  sortBy: z
+    .enum(["outstanding", "overdue", "name", "lastPayment"])
+    .optional()
+    .default("outstanding"),
+  order: z.enum(["asc", "desc"]).optional().default("desc"),
 });
+
+export type CollectStudentFeesType = z.infer<typeof CollectStudentFeesPayload>;
+export type ReverseFeeReceiptType = z.infer<typeof ReverseFeeReceiptPayload>;
+export type FeeStudentListQueryType = z.infer<typeof FeeStudentListQuery>;
 
 export const UpdateFeeStructureStatusPayload = z.object({
   isActive: z.boolean({ error: "isActive must be true or false" }),
 });
 
-export type CollectFeePaymentType = z.infer<typeof CollectFeePaymentPayload>;
 export type WaiveFeePaymentType = z.infer<typeof WaiveFeePaymentPayload>;
-export type ReverseFeeTransactionType = z.infer<
-  typeof ReverseFeeTransactionPayload
->;
+
 export type FeePaymentListQueryType = z.infer<typeof FeePaymentListQuery>;
 export type UpdateFeeStructureStatusType = z.infer<
   typeof UpdateFeeStructureStatusPayload
@@ -1238,3 +1276,4 @@ export type AssignTeacherToSubjectInput = z.infer<
   typeof AssignTeacherToSubjectSchema
 >;
 export type AssignClassTeacher = z.infer<typeof AssignClassTeacherSchema>;
+export type DashboardCalendarQueryType = z.infer<typeof DashboardCalendarQuery>;

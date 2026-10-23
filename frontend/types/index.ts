@@ -1630,23 +1630,6 @@ export type UpdateMyProfilePayload =
   | UpdateParentProfilePayload
   | UpdateAdminProfilePayload;
 
-export interface FeeTransactionItem {
-  id: string;
-  amount: number;
-  paymentMode: PaymentMode;
-  referenceNumber: string | null;
-  receiptNumber: string;
-  paidAt: string;
-  remarks: string | null;
-  status: TransactionStatus;
-  reversedAt: string | null;
-  reversalReason: string | null;
-  emailedAt: string | null;
-  createdAt: string;
-  collectedBy: string | null;
-  reversedBy: string | null;
-}
-
 export interface FeeBillStructureRef {
   id: string;
   name: string;
@@ -1674,7 +1657,7 @@ export interface FeeBillListItem {
   billingPeriod: string | null;
   paymentDate: string | null;
   createdAt: string;
-  transactionCount: number;
+  receiptCount: number;
   feeStructure: FeeBillStructureRef;
   student: FeeBillStudentRef;
 }
@@ -1697,45 +1680,14 @@ export interface FeeBillGuardian {
   phone: string | null;
 }
 
-export interface FeeBillDetail {
-  id: string;
-  amountDue: number;
-  amountPaid: number;
-  waivedAmount: number;
-  balance: number;
-  status: FeeStatus;
-  dueDate: string;
-  billingPeriod: string | null;
-  paymentDate: string | null;
-  createdAt: string;
-  remarks: string | null;
-  waiverReason: string | null;
-  waivedAt: string | null;
-  waivedBy: string | null;
-  feeStructure: FeeBillStructureRef & {
-    academicYear: { id: string; name: string };
-  };
-  student: FeeBillStudentRef & {
-    email: string | null;
-    phone: string | null;
-    guardians: FeeBillGuardian[];
-  };
-  transactions: FeeTransactionItem[];
-}
-
 export interface FeeBillSnapshot {
   id: string;
-  studentId: string;
+  studentId?: string;
   amountDue: number;
   amountPaid: number;
   waivedAmount: number;
-  balance: number;
   status: FeeStatus;
-}
-
-export interface FeeTransactionResult {
-  bill: FeeBillSnapshot;
-  transaction: FeeTransactionItem;
+  balance: number;
 }
 
 export interface FeeBillFilters {
@@ -1753,50 +1705,9 @@ export interface FeeBillFilters {
   order?: "asc" | "desc";
 }
 
-export interface CollectFeePaymentPayload {
-  amount: number;
-  paymentMode: Exclude<PaymentMode, PaymentMode.ONLINE>;
-  referenceNumber?: string;
-  paidAt?: string;
-  remarks?: string;
-}
-
 export interface WaiveFeePaymentPayload {
   amount?: number;
   reason: string;
-}
-
-export interface ReverseFeeTransactionPayload {
-  reason: string;
-}
-
-export interface MyFeeTransaction {
-  id: string;
-  amount: number;
-  paymentMode: PaymentMode;
-  receiptNumber: string;
-  paidAt: string;
-  status: TransactionStatus;
-}
-
-export interface MyFeeBill {
-  id: string;
-  amountDue: number;
-  amountPaid: number;
-  waivedAmount: number;
-  balance: number;
-  isOverdue: boolean;
-  status: FeeStatus;
-  dueDate: string;
-  billingPeriod: string | null;
-  paymentDate: string | null;
-  createdAt: string;
-  feeStructure: {
-    name: string;
-    isRecurring: boolean;
-    academicYear: { name: string };
-  };
-  transactions: MyFeeTransaction[];
 }
 
 export interface MyFeesSummary {
@@ -1808,16 +1719,327 @@ export interface MyFeesSummary {
   openCount: number;
 }
 
+export type FeeDueStatus = "ALL" | "DUE" | "OVERDUE" | "CLEARED";
+
+export type FeeStudentSort = "outstanding" | "overdue" | "name" | "lastPayment";
+
+export interface FeeStudentFilters {
+  page?: number;
+  limit?: number;
+  academicYearId?: string;
+  classId?: string;
+  classGroupId?: string;
+  search?: string;
+  dueStatus?: FeeDueStatus;
+  sortBy?: FeeStudentSort;
+  order?: "asc" | "desc";
+}
+
+export interface FeeStudentRow {
+  studentId: string;
+  firstName: string;
+  lastName: string;
+  regNumber: string;
+  className: string | null;
+  classId: string | null;
+  rollNumber: string | null;
+  enrollmentStatus: EnrollmentStatus | null;
+  billCount: number;
+  billed: number;
+  paid: number;
+  waived: number;
+  outstanding: number;
+  overdueCount: number;
+  lastPaymentAt: string | null;
+}
+
+export interface FeeStudentTotals {
+  students: number;
+  billed: number;
+  collected: number;
+  waived: number;
+  outstanding: number;
+  withDues: number;
+  withOverdue: number;
+}
+
+export interface PaginatedFeeStudents extends PaginatedResponse<FeeStudentRow> {
+  totals: FeeStudentTotals;
+}
+
+export interface FeeBillsSummary {
+  billed: number;
+  paid: number;
+  waived: number;
+  outstanding: number;
+  overdueCount: number;
+  openCount: number;
+  billCount: number;
+}
+
+export interface StudentFeeBill {
+  id: string;
+  amountDue: number;
+  amountPaid: number;
+  waivedAmount: number;
+  balance: number;
+  isOverdue: boolean;
+  status: FeeStatus;
+  dueDate: string;
+  billingPeriod: string | null;
+  paymentDate: string | null;
+  createdAt: string;
+  waiverReason: string | null;
+  waivedAt: string | null;
+  waivedBy: string | null;
+  feeStructure: FeeBillStructureRef;
+}
+
+export interface StudentFeeYear {
+  academicYearId: string;
+  name: string;
+  isCurrent: boolean;
+  summary: FeeBillsSummary;
+  bills: StudentFeeBill[];
+}
+
+export interface FeeReceiptItem {
+  billId: string;
+  feeName: string;
+  billingPeriod: string | null;
+  amount: number;
+}
+
+export interface FeeReceiptSummary {
+  id: string;
+  receiptNumber: string;
+  totalAmount: number;
+  paymentMode: PaymentMode;
+  referenceNumber: string | null;
+  paidAt: string;
+  remarks: string | null;
+  status: TransactionStatus;
+  reversedAt: string | null;
+  reversalReason: string | null;
+  createdAt: string;
+  academicYear: { id: string; name: string };
+  collectedBy: string | null;
+  reversedBy: string | null;
+  items: FeeReceiptItem[];
+}
+
+export interface FeeStudentDetail {
+  student: FeeBillStudentRef & {
+    email: string | null;
+    phone: string | null;
+    enrollmentStatus: EnrollmentStatus | null;
+    session: string | null;
+    guardians: FeeBillGuardian[];
+  };
+  summary: FeeBillsSummary;
+  years: StudentFeeYear[];
+  receipts: FeeReceiptSummary[];
+}
+
+export interface CollectStudentFeesPayload {
+  billIds: string[];
+  amount: number;
+  paymentMode: Exclude<PaymentMode, PaymentMode.ONLINE>;
+  referenceNumber?: string;
+  paidAt?: string;
+  remarks?: string;
+}
+
+export interface CollectStudentFeesResult {
+  receipt: FeeReceiptSummary;
+  bills: FeeBillSnapshot[];
+  balanceRemaining: number;
+}
+
+export interface ReverseFeeReceiptPayload {
+  reason: string;
+}
+
+export interface ReverseFeeReceiptResult {
+  receipt: FeeReceiptSummary;
+  bills: FeeBillSnapshot[];
+}
+
+export interface MyFeeReceipt {
+  id: string;
+  receiptNumber: string;
+  totalAmount: number;
+  paymentMode: PaymentMode;
+  paidAt: string;
+  status: TransactionStatus;
+  academicYear: { id: string; name: string };
+  items: FeeReceiptItem[];
+}
+
 export interface MyFeesChild {
   studentId: string;
   name: string;
   className: string | null;
-  summary: MyFeesSummary;
-  bills: MyFeeBill[];
+  summary: FeeBillsSummary;
+  years: StudentFeeYear[];
+  receipts: MyFeeReceipt[];
 }
 
 export interface MyFeesResponse {
   children: MyFeesChild[];
+}
+
+export interface DashboardAccess {
+  students: boolean;
+  teachers: boolean;
+  studentAttendance: boolean;
+  teacherAttendance: boolean;
+  fees: boolean;
+  admissions: boolean;
+  teacherApplications: boolean;
+  classes: boolean;
+  leaves: boolean;
+}
+
+export interface DashboardTrendStat {
+  value: number;
+  previous: number | null;
+  changePercent: number | null;
+}
+
+export interface DashboardAttendanceToday {
+  isHoliday: boolean;
+  holidayName: string | null;
+  present: number;
+  late: number;
+  absent: number;
+  excused: number;
+  marked: number;
+  enrolled: number;
+  percent: number | null;
+  weekAveragePercent: number | null;
+  changePoints: number | null;
+}
+
+export interface DashboardWeeklyDay {
+  date: string;
+  label: string;
+  isHoliday: boolean;
+  holidayName: string | null;
+  isFuture: boolean;
+  marked: number;
+  presentPercent: number;
+  latePercent: number;
+  absentPercent: number;
+}
+
+export interface DashboardMonthlyFee {
+  month: string;
+  label: string;
+  collected: number;
+  billed: number;
+}
+
+export interface DashboardFeeDefaulter {
+  studentId: string;
+  name: string;
+  regNumber: string;
+  className: string | null;
+  overdueAmount: number;
+  overdueCount: number;
+  oldestDueDate: string;
+}
+
+export interface DashboardRecentPayment {
+  receiptId: string;
+  receiptNumber: string;
+  studentId: string;
+  studentName: string;
+  amount: number;
+  paymentMode: PaymentMode;
+  paidAt: string;
+}
+
+export interface DashboardSeatsByGroup {
+  classGroupId: string;
+  name: string;
+  classCount: number;
+  capacity: number;
+  filled: number;
+}
+
+export interface DashboardTeacherAttendance {
+  total: number;
+  present: number;
+  late: number;
+  absent: number;
+  onLeave: number;
+  notMarked: number;
+}
+
+export interface DashboardAdmissionsFunnel {
+  since: string;
+  applied: number;
+  pending: number;
+  waitlisted: number;
+  slotOffered: number;
+  approved: number;
+  rejected: number;
+  enrolled: number;
+}
+
+export interface DashboardPendingCounts {
+  admissions: number | null;
+  teacherApplications: number | null;
+  studentLeaves: number | null;
+  teacherLeaves: number | null;
+}
+
+export type DashboardEventType = "EXAM" | "HOLIDAY";
+
+export interface DashboardEvent {
+  id: string;
+  type: DashboardEventType;
+  title: string;
+  date: string;
+  startTime: string | null;
+  endTime: string | null;
+  examType: ExamType | null;
+  className: string | null;
+  subjectName: string | null;
+  description: string | null;
+}
+
+export interface DashboardOverview {
+  generatedAt: string;
+  today: string;
+  academicYear: {
+    id: string;
+    name: string;
+    startDate: string;
+    endDate: string;
+  } | null;
+  access: DashboardAccess;
+  pending: DashboardPendingCounts;
+  stats: {
+    students: DashboardTrendStat | null;
+    teachers: DashboardTrendStat | null;
+    attendanceToday: DashboardAttendanceToday | null;
+    feeCollected: DashboardTrendStat | null;
+  };
+  weeklyAttendance: { weekStart: string; days: DashboardWeeklyDay[] } | null;
+  monthlyFees: DashboardMonthlyFee[] | null;
+  feeDefaulters: DashboardFeeDefaulter[] | null;
+  recentPayments: DashboardRecentPayment[] | null;
+  seatsByGroup: DashboardSeatsByGroup[] | null;
+  teacherAttendanceToday: DashboardTeacherAttendance | null;
+  admissionsFunnel: DashboardAdmissionsFunnel | null;
+  upcoming: DashboardEvent[];
+}
+
+export interface DashboardCalendar {
+  month: string;
+  events: DashboardEvent[];
 }
 
 export type PaginatedTeachers = PaginatedResponse<TeacherListItem>;

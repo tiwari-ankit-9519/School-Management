@@ -15,6 +15,7 @@ import {
   Baby,
   type LucideIcon,
   TimerIcon,
+  HandCoins,
 } from "lucide-react";
 
 export interface NavItem {
@@ -78,6 +79,11 @@ export const NAV_CONFIG: Record<UserRole, NavItem[]> = {
       icon: Banknote,
     },
     {
+      labelKey: "feeCollection",
+      href: "/admin/fees/collection",
+      icon: HandCoins,
+    },
+    {
       labelKey: "Time Table",
       href: "/admin/time-table",
       icon: TimerIcon,
@@ -139,6 +145,11 @@ export const NAV_CONFIG: Record<UserRole, NavItem[]> = {
       labelKey: "Fees",
       href: "/admin/fees",
       icon: Banknote,
+    },
+    {
+      labelKey: "feeCollection",
+      href: "/admin/fees/collection",
+      icon: HandCoins,
     },
     {
       labelKey: "Time Table",

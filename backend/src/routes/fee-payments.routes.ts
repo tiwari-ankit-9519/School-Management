@@ -6,12 +6,13 @@ import {
   checkPermission,
 } from "../middlewares/auth.middleware";
 import {
-  collectFeePayment,
+  collectStudentFees,
   downloadFeeReceipt,
-  getFeePaymentDetail,
+  getFeeStudentDetail,
   getMyFees,
   listFeePayments,
-  reverseFeeTransaction,
+  listFeeStudents,
+  reverseFeeReceipt,
   waiveFeePayment,
 } from "../controller/fee-payment.controller";
 import { controllerContext } from "../config/logger.config";
@@ -23,17 +24,41 @@ router.use(controllerContext("FeePaymentController"));
 router.get("/me", authenticate, authorize("STUDENT", "PARENT"), getMyFees);
 
 router.get(
-  "/transactions/:transactionId/receipt",
+  "/students",
+  authenticate,
+  authorize("ADMIN", "MODERATOR"),
+  checkPermission(Module.FEE_PAYMENT, "canRead"),
+  listFeeStudents,
+);
+
+router.get(
+  "/students/:studentId",
+  authenticate,
+  authorize("ADMIN", "MODERATOR"),
+  checkPermission(Module.FEE_PAYMENT, "canRead"),
+  getFeeStudentDetail,
+);
+
+router.post(
+  "/students/:studentId/collect",
+  authenticate,
+  authorize("ADMIN", "MODERATOR"),
+  checkPermission(Module.FEE_PAYMENT, "canCreate"),
+  collectStudentFees,
+);
+
+router.get(
+  "/receipts/:receiptId/pdf",
   authenticate,
   authorize("ADMIN", "MODERATOR", "STUDENT", "PARENT"),
   downloadFeeReceipt,
 );
 
 router.patch(
-  "/transactions/:transactionId/reverse",
+  "/receipts/:receiptId/reverse",
   authenticate,
   authorize("ADMIN"),
-  reverseFeeTransaction,
+  reverseFeeReceipt,
 );
 
 router.get(
@@ -42,22 +67,6 @@ router.get(
   authorize("ADMIN", "MODERATOR"),
   checkPermission(Module.FEE_PAYMENT, "canRead"),
   listFeePayments,
-);
-
-router.get(
-  "/:billId",
-  authenticate,
-  authorize("ADMIN", "MODERATOR"),
-  checkPermission(Module.FEE_PAYMENT, "canRead"),
-  getFeePaymentDetail,
-);
-
-router.post(
-  "/:billId/collect",
-  authenticate,
-  authorize("ADMIN", "MODERATOR"),
-  checkPermission(Module.FEE_PAYMENT, "canCreate"),
-  collectFeePayment,
 );
 
 router.patch(
